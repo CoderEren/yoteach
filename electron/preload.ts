@@ -40,6 +40,13 @@ const api: DesktopApi = {
     },
     onNavigate: (fn) => listen('tutor:navigate', fn),
   },
+  media: {
+    generate: (request) => ipcRenderer.invoke('media:generate', request),
+    cancel: () => ipcRenderer.invoke('media:cancel'),
+    dismiss: () => ipcRenderer.invoke('media:dismiss'),
+    read: (id) => ipcRenderer.invoke('media:read', id),
+    remove: (id) => ipcRenderer.invoke('media:remove', id),
+  },
   getState: () => ipcRenderer.invoke('workspace:get'),
   command: (command) => ipcRenderer.invoke('workspace:command', command),
   pickPdf: (courseId, sample = false) => ipcRenderer.invoke('pdf:pick', { courseId, sample }),

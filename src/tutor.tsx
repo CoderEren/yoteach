@@ -355,6 +355,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
             [
               'open_visual_lesson',
               'navigate_visual_lesson',
+              'generate_illustration',
               'analyze_current_screen',
               'highlight_screen_region',
               'draw_annotation',
@@ -575,7 +576,21 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   handler.current = handle;
   useEffect(() => {
     if (!api) return;
+    let announced = '';
     const update = (state: TutorRuntime) => {
+      const g = state.generation;
+      // Tell the tutor when media settles. It never sees the pixels, only the outcome.
+      if (owner && g && ['done', 'failed', 'cancelled'].includes(g.phase)) {
+        const key = g.id + g.phase;
+        if (announced !== key) {
+          announced = key;
+          voice.current?.sendContextualUpdate(
+            g.phase === 'done'
+              ? `An AI-generated ${g.kind} visual analogy is now displayed to the student (subject: ${JSON.stringify(g.subject)}). You have not seen it. Refer to it only as an illustrative analogy, not a precise scientific diagram, and keep teaching from authored or lecture content.`
+              : `The requested ${g.kind} illustration did not complete: ${g.error} Do not claim it was shown; offer to retry if useful.`,
+          );
+        }
+      }
       live.current = state;
       setRuntime(state);
       if (owner) {

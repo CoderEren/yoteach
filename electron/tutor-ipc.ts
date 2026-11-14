@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { Id } from '../shared/model';
 import { IntentSchema, SnapshotSchema } from '../shared/tutor';
 import { Providers } from './providers';
+import { FalClient } from './fal';
 import { TutorService } from './tutor';
 import type { Store } from './store';
 import { macStudyWindows } from './window-sources';
@@ -44,7 +45,12 @@ export function installTutor(
     for (const w of [main(), pet()])
       if (w && !w.isDestroyed()) w.webContents.send('tutor:changed', service.get());
   };
-  const service = new TutorService(store, providers, emit, open);
+  const fal = new FalClient({
+    key: process.env.FAL_KEY ?? '',
+    imageModel: process.env.FAL_IMAGE_MODEL || 'fal-ai/flux/schnell',
+    videoModel: process.env.FAL_VIDEO_MODEL ?? '',
+  });
+  const service = new TutorService(store, providers, emit, open, fal);
   let selected: { id: string; epoch: number } | null = null;
   let displayGrant = false;
   let holdActive = false;
@@ -382,6 +388,26 @@ export function installTutor(
     'tutor:delete-explanation',
     (input) => {
       store.deleteExplanation(Id.parse(input));
+      emit();
+    },
+    true,
+  );
+  handle(
+    'media:generate',
+    (input) => {
+      const job = service.generate(input, 'student');
+      void job.settled;
+      return { id: job.id };
+    },
+    true,
+  );
+  handle('media:cancel', () => service.cancelGeneration(), true);
+  handle('media:dismiss', () => service.dismissGeneration(), true);
+  handle('media:read', (input) => store.readMedia(Id.parse(input)), true);
+  handle(
+    'media:remove',
+    (input) => {
+      store.deleteMedia(Id.parse(input));
       emit();
     },
     true,

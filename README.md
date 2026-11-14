@@ -83,4 +83,4 @@ The ElevenLabs SDK remains responsible for hosted conversations, recognition, ou
 
 “Yo teach” wake-word activation is **not implemented**. Reliable background wake detection needs a separate always-listening engine and permission/CPU work; browser speech recognition is not a reliable drop-in for this Electron app.
 
-Stage 3 is in progress. The authored visual lesson is implemented; fal generation, practice/feedback memory and final demo acceptance remain. See [the resumable checkpoint](docs/STAGE-3-HANDOFF.md). A live fal call will require `FAL_KEY` entered locally when that integration is added.
+Stage 3 is in progress. The authored visual lesson and fal-generated visual analogies are implemented; practice/feedback memory and final demo acceptance remain. See [the resumable checkpoint](docs/STAGE-3-HANDOFF.md). Set `FAL_KEY` in `.env` to generate images (default model `fal-ai/flux/schnell`, override with `FAL_IMAGE_MODEL`). Short clips are off until `FAL_VIDEO_MODEL` names a fal text-to-video model.

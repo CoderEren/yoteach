@@ -11,6 +11,8 @@ import {
 } from '../shared/tutor';
 import { Store } from './store';
 import { Providers, type VisionAnswer } from './providers';
+import { FalClient } from './fal';
+import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
 export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): Annotation[] {
   return answer.regions.flatMap((region) => {
     if (region.confidence < 0.7) return [];
@@ -44,11 +46,13 @@ export class TutorService {
   state: TutorRuntime;
   private abort?: AbortController;
   private connecting?: AbortController;
+  private generating?: AbortController;
   constructor(
     readonly store: Store,
     readonly providers: Providers,
     private changed: () => void,
     private openWorkspace: () => void,
+    readonly fal = new FalClient({ key: '', imageModel: '', videoModel: '' }),
   ) {
     this.state = {
       activeLessonId: null,
@@ -71,7 +75,8 @@ export class TutorService {
       analysis: '',
       latencyMs: null,
       error: '',
-      config: providers.status(),
+      generation: null,
+      config: { ...providers.status(), media: fal.status() },
     };
   }
   get() {
@@ -115,6 +120,93 @@ export class TutorService {
     this.store.setLessonStep(id, step);
     this.emit();
     return this.lessonContext();
+  }
+  /** One generation at a time. Resolves when it settles; callers may ignore the promise. */
+  generate(raw: GenerateRequest, origin: 'student' | 'tutor') {
+    const request = GenerateRequestSchema.parse(raw);
+    const current = this.state.generation;
+    if (current && ['queued', 'running', 'saving'].includes(current.phase))
+      throw new Error('An illustration is already being generated. Cancel it or wait.');
+    const lesson = this.store.snapshot().lessons.find((l) => l.id === this.state.activeLessonId);
+    const ctl = new AbortController(),
+      id = randomUUID(),
+      started = Date.now();
+    this.generating = ctl;
+    this.state.generation = {
+      id,
+      kind: request.kind,
+      subject: request.subject,
+      origin,
+      lessonId: lesson?.id ?? null,
+      lessonStep: lesson?.step ?? null,
+      phase: 'queued',
+      queuePosition: null,
+      startedAt: new Date(started).toISOString(),
+      error: '',
+      mediaId: null,
+      latencyMs: null,
+    };
+    this.emit();
+    const mine = () => this.state.generation?.id === id && this.generating === ctl;
+    const settled = (async () => {
+      try {
+        const out = await this.fal.generate(request.kind, request.subject, ctl.signal, (p) => {
+          if (!mine()) return;
+          Object.assign(this.state.generation!, p);
+          this.emit();
+        });
+        if (!mine()) return;
+        this.state.generation!.phase = 'saving';
+        this.emit();
+        const media = this.store.addMedia(
+          {
+            kind: request.kind,
+            model: out.model,
+            subject: request.subject,
+            prompt: out.prompt,
+            contentType: out.contentType,
+            width: out.width,
+            height: out.height,
+            requestId: out.requestId,
+            origin,
+            sessionId: this.state.sessionId,
+            lessonId: lesson?.id ?? null,
+            lessonStep: lesson?.step ?? null,
+          },
+          out.bytes,
+        );
+        if (!mine()) return;
+        Object.assign(this.state.generation!, {
+          phase: 'done',
+          mediaId: media.id,
+          latencyMs: Date.now() - started,
+        });
+      } catch (e) {
+        if (this.state.generation?.id !== id) return;
+        Object.assign(this.state.generation, {
+          phase: ctl.signal.aborted ? 'cancelled' : 'failed',
+          error: ctl.signal.aborted
+            ? 'Generation cancelled.'
+            : e instanceof Error
+              ? e.message
+              : 'Generation failed. Try again.',
+        });
+      } finally {
+        if (this.generating === ctl) this.generating = undefined;
+        this.emit();
+      }
+    })();
+    return { id, settled };
+  }
+  cancelGeneration() {
+    this.generating?.abort();
+  }
+  dismissGeneration() {
+    const g = this.state.generation;
+    if (g && ['queued', 'running', 'saving'].includes(g.phase))
+      throw new Error('Cancel the generation before dismissing it.');
+    this.state.generation = null;
+    this.emit();
   }
   async start(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
     if (this.state.sessionId || this.connecting)
@@ -271,6 +363,16 @@ export class TutorService {
       case 'navigate_visual_lesson': {
         if (!this.state.activeLessonId) throw new Error('Open a visual lesson first.');
         return this.stepLesson(this.state.activeLessonId, tool.step);
+      }
+      case 'generate_illustration': {
+        const job = this.generate({ kind: tool.kind, subject: tool.subject }, 'tutor');
+        void job.settled;
+        return {
+          started: true,
+          generationId: job.id,
+          kind: tool.kind,
+          note: 'Generation runs in the background. The app sends a contextual update when it is shown or fails. You cannot see the result: do not describe its contents, and call it an AI-generated visual analogy, not a precise diagram.',
+        };
       }
       case 'analyze_current_screen': {
         const snapshot = this.state.snapshot;

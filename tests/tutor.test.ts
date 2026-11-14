@@ -88,7 +88,7 @@ function setup(
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
-test('Stage 1 migration preserves notes and persists version 4 safely', () => {
+test('Stage 1 migration preserves notes and persists the current version safely', () => {
   const f = setup();
   try {
     const old = { ...f.store.snapshot(), version: 1 };
@@ -97,7 +97,7 @@ test('Stage 1 migration preserves notes and persists version 4 safely', () => {
     delete (old as any).explanations;
     writeFileSync(f.store.file, JSON.stringify(old));
     const next = new Store(f.dir).snapshot();
-    assert.equal(next.version, 4);
+    assert.equal(next.version, 5);
     assert.equal(next.documents[0].id, f.doc.id);
     assert.deepEqual(next.sessions, []);
   } finally {

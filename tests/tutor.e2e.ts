@@ -16,6 +16,9 @@ async function launch(dir: string) {
     ELEVENLABS_API_KEY: 'test-only-key',
     ELEVENLABS_AGENT_ID: 'test-only-agent',
     ANTHROPIC_API_KEY: 'test-only-vision',
+    FAL_KEY: 'test-only-fal',
+    FAL_IMAGE_MODEL: 'fal-ai/flux/schnell',
+    FAL_VIDEO_MODEL: '',
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
   if (process.env.YOTEACH_TEST_DEV === '1') env.YOTEACH_DEV_URL = 'http://127.0.0.1:5173';
@@ -560,6 +563,119 @@ test('agent opens and navigates a visual lesson while narration and held questio
     await page.waitForTimeout(150);
     expect(narrationRequests()).toBe(before);
     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'end' }));
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('fal visual analogy shows progress, saves with the lesson step, explains failure and survives restart', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-fal-'));
+  let app: ElectronApplication | undefined;
+  // Fixture only: scripted fal queue in the isolated main process. The CDN serves a committed PNG.
+  const installFal = (target: ElectronApplication, png: string) =>
+    target.evaluate((_electron, png) => {
+      const fs = process.getBuiltinModule('node:fs')!;
+      const g = globalThis as any;
+      g.falCalls = [];
+      g.falMode = 'ok';
+      let polls = 0;
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        });
+      globalThis.fetch = async (input, init) => {
+        const url = String(input),
+          auth = new Headers(init?.headers).get('authorization');
+        g.falCalls.push({ url, auth });
+        const base = 'https://queue.fal.run/fal-ai/flux/requests/fixture-1';
+        if (url === 'https://queue.fal.run/fal-ai/flux/schnell') {
+          if (g.falMode === 'credit') return json({ detail: 'Exhausted balance' }, 402);
+          polls = 0;
+          return json({
+            request_id: 'fixture-1',
+            status_url: base + '/status',
+            response_url: base,
+            cancel_url: base + '/cancel',
+            queue_position: 1,
+          });
+        }
+        if (url === base + '/status') {
+          await new Promise((r) => setTimeout(r, 400));
+          return json(
+            polls++ < 2 ? { status: 'IN_QUEUE', queue_position: 1 } : { status: 'COMPLETED' },
+          );
+        }
+        if (url === base)
+          return json({
+            images: [
+              {
+                url: 'https://v3.fal.media/files/fixture/analogy.png',
+                width: 1024,
+                height: 1024,
+                content_type: 'image/png',
+              },
+            ],
+            has_nsfw_concepts: [false],
+          });
+        if (url === 'https://v3.fal.media/files/fixture/analogy.png')
+          return new Response(fs.readFileSync(png), { headers: { 'content-type': 'image/png' } });
+        throw new Error('Unexpected live request in fixture test: ' + url);
+      };
+    }, png);
+  const png = resolve('assets/icons/yoyo.png');
+  try {
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
+    await installFal(app, png);
+    await page.getByRole('button', { name: /Why invest ATP in glucose/ }).click();
+    await page.getByRole('button', { name: 'Next step', exact: true }).click();
+    await page.getByRole('button', { name: 'Next step', exact: true }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Follow the terminal phosphate' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Generate visual analogy', exact: true }).click();
+    await expect(page.getByText(/Waiting in fal’s queue/)).toBeVisible();
+    const image = page.getByRole('img', {
+      name: /AI-generated visual analogy: a small glowing orb/,
+    });
+    await expect(image).toBeVisible({ timeout: 15000 });
+    await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1024);
+    await expect(page.getByText('not a scientific diagram')).toBeVisible();
+    const calls = await app.evaluate(
+      () => (globalThis as any).falCalls as { url: string; auth: string | null }[],
+    );
+    expect(calls.filter((c) => c.url.includes('fal.media')).every((c) => c.auth === null)).toBe(
+      true,
+    );
+    expect(
+      calls
+        .filter((c) => c.url.startsWith('https://queue.fal.run/'))
+        .every((c) => c.auth === 'Key test-only-fal'),
+    ).toBe(true);
+    await page.screenshot({ path: '.impeccable/review/visual-lesson-fal.png' });
+    // Another step has its own media; a failure explains itself and offers a retry.
+    await page.getByRole('button', { name: 'Next step', exact: true }).click();
+    await expect(page.getByRole('img', { name: /AI-generated visual analogy/ })).toHaveCount(0);
+    await app.evaluate(() => {
+      (globalThis as any).falMode = 'credit';
+    });
+    await page.getByRole('button', { name: 'Generate visual analogy', exact: true }).click();
+    await expect(page.getByRole('alert').filter({ hasText: /no available credit/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Retry/ })).toBeVisible();
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
+    await page.getByRole('button', { name: /Visual analogy · Lesson step 3/ }).click();
+    await expect(
+      page.getByRole('dialog').getByRole('img', { name: /AI-generated visual analogy/ }),
+    ).toBeVisible();
+    await expect(page.getByText('requested by you')).toBeVisible();
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

@@ -1,0 +1,28 @@
+{
+  "type": "client",
+  "name": "generate_illustration",
+  "description": "Start one AI-generated visual analogy (fal) shown to the student and saved locally with the current lesson step, session and lecture slide. Use simple concrete scenes and everyday analogies; never request text, labels, formulas, molecules or diagrams. Returns immediately once started; a later contextual update reports whether it was displayed or failed. You cannot see the result.",
+  "expects_response": true,
+  "response_timeout_secs": 20,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "subject": {
+        "type": "string",
+        "description": "A concrete scene to illustrate, 3\u2013600 characters, for example: a small glowing orb handed from a battery to a hexagonal glass tile like a relay baton."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ],
+        "description": "image (default). video only when the app reports a video model; it can take minutes."
+      }
+    },
+    "required": [
+      "subject",
+      "kind"
+    ]
+  }
+}

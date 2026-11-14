@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { LessonKey, LessonStep } from './lessons';
+import { MediaKind, Subject, type Generation } from './media';
 const Uuid = z.uuid();
 export const Shape = z.enum(['highlight', 'arrow', 'circle', 'point', 'label']);
 export const Box = z
@@ -105,7 +106,13 @@ export type TutorRuntime = {
   analysis: string;
   latencyMs: number | null;
   error: string;
-  config: { voice: boolean; vision: boolean; model: string };
+  generation: Generation | null;
+  config: {
+    voice: boolean;
+    vision: boolean;
+    model: string;
+    media: { image: boolean; video: boolean; imageModel: string; videoModel: string };
+  };
 };
 export type WindowSource = { id: string; name: string };
 export const ToolSchema = z.discriminatedUnion('name', [
@@ -115,6 +122,11 @@ export const ToolSchema = z.discriminatedUnion('name', [
     step: LessonStep.default(1),
   }),
   z.object({ name: z.literal('navigate_visual_lesson'), step: LessonStep }),
+  z.object({
+    name: z.literal('generate_illustration'),
+    subject: Subject,
+    kind: MediaKind.default('image'),
+  }),
   z.object({
     name: z.literal('analyze_current_screen'),
     question: z.string().trim().min(1).max(2000),

@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { useTutor } from '../tutor';
 import { AnnotationLayer } from './TutorWorkspace';
 import { HoldButton } from './HoldButton';
-export function LectureStage() {
+import { GenerationPanel } from './GeneratedMedia';
+import type { GeneratedMedia } from '../../shared/media';
+export function LectureStage({ media }: { media: GeneratedMedia[] }) {
   const { runtime: r, act } = useTutor();
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -29,6 +31,11 @@ export function LectureStage() {
           </div>
         ) : (
           <p role="status">Preparing slide {r.lecture.page}…</p>
+        )}
+        {r.generation && (
+          <aside className="lecture-generation glass">
+            <GenerationPanel media={media} />
+          </aside>
         )}
         {r.error && (
           <div className="lecture-error" role="alert">

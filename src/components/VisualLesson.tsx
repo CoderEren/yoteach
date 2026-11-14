@@ -4,8 +4,10 @@ import { lessonDefinition, type SavedLesson } from '../../shared/lessons';
 import { useTutor } from '../tutor';
 import { LessonScene } from './LessonScene';
 import { HoldButton } from './HoldButton';
+import { GenerationPanel } from './GeneratedMedia';
+import type { GeneratedMedia } from '../../shared/media';
 
-export function VisualLesson({ saved }: { saved: SavedLesson }) {
+export function VisualLesson({ saved, media }: { saved: SavedLesson; media: GeneratedMedia[] }) {
   const definition = lessonDefinition(saved.key),
     step = definition.steps[saved.step - 1];
   const { runtime: r, act } = useTutor();
@@ -135,6 +137,12 @@ export function VisualLesson({ saved }: { saved: SavedLesson }) {
           <h2>{step.title}</h2>
           <p>{step.text}</p>
           <blockquote>{step.takeaway}</blockquote>
+          <GenerationPanel
+            media={media}
+            subject={step.analogy}
+            lessonId={saved.id}
+            lessonStep={saved.step}
+          />
         </article>
       </section>
       {(error || r?.error) && (

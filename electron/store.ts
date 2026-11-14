@@ -18,6 +18,13 @@ import {
   type Explanation,
 } from '../shared/tutor';
 import { LessonKey, LessonStep, type SavedLesson } from '../shared/lessons';
+import {
+  GeneratedMediaSchema,
+  MediaFilename,
+  mediaExtension,
+  type GeneratedMedia,
+  type MediaType,
+} from '../shared/media';
 import { randomUUID } from 'node:crypto';
 import {
   AppState,
@@ -34,21 +41,25 @@ import {
 export class Store {
   private state: AppState;
   readonly documentsDir: string;
+  readonly mediaDir: string;
   readonly file: string;
   constructor(readonly directory: string) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     this.documentsDir = join(directory, 'documents');
     mkdirSync(this.documentsDir, { recursive: true, mode: 0o700 });
+    this.mediaDir = join(directory, 'media');
+    mkdirSync(this.mediaDir, { recursive: true, mode: 0o700 });
     this.file = join(directory, 'workspace.json');
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, 'utf8'));
-        if (raw.version === 1 || raw.version === 2 || raw.version === 3) {
+        if ([1, 2, 3, 4].includes(raw.version)) {
           // Keep an exact pre-migration snapshot, including legacy notes and associations.
           const backup = this.file + `.v${raw.version}.backup`;
           if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
-          raw.version = 4;
+          raw.version = 5;
           raw.lessons ??= [];
+          raw.media ??= [];
           raw.sessions ??= [];
           raw.messages ??= [];
           raw.explanations ??= [];
@@ -106,6 +117,71 @@ export class Store {
     lesson.updatedAt = new Date().toISOString();
     this.save(n);
     return lesson;
+  }
+  /** Write the file first, then reference it; a failed save removes the unreferenced file. */
+  addMedia(
+    meta: Omit<GeneratedMedia, 'id' | 'filename' | 'bytes' | 'createdAt' | 'source'>,
+    bytes: Uint8Array,
+  ) {
+    const n = this.snapshot(),
+      id = randomUUID(),
+      filename = `${id}.${mediaExtension[meta.contentType]}`,
+      path = join(this.mediaDir, filename);
+    const session = meta.sessionId ? n.sessions.find((s) => s.id === meta.sessionId) : null;
+    const lesson = meta.lessonId ? n.lessons.find((l) => l.id === meta.lessonId) : null;
+    if (meta.lessonId && !lesson) throw new Error('This saved lesson is unavailable.');
+    const source = session?.documentId
+      ? { documentId: session.documentId, page: session.page }
+      : (lesson?.source ?? null);
+    const media = GeneratedMediaSchema.parse({
+      ...meta,
+      id,
+      filename,
+      bytes: bytes.byteLength,
+      source,
+      sessionId: session ? session.id : null,
+      createdAt: new Date().toISOString(),
+    });
+    const temporary = path + '.tmp',
+      fd = openSync(temporary, 'w', 0o600);
+    try {
+      writeFileSync(fd, bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(temporary, path);
+    n.media.push(media);
+    this.activity(
+      n,
+      session?.courseId ?? null,
+      `Generated ${media.kind}: ${media.subject.slice(0, 200)}`,
+    );
+    try {
+      this.save(n);
+    } catch (error) {
+      unlinkSync(path);
+      throw error;
+    }
+    return media;
+  }
+  readMedia(id: string): { bytes: Uint8Array; contentType: MediaType } {
+    const media = this.state.media.find((m) => m.id === id);
+    if (!media) throw new Error('This generated media no longer exists.');
+    try {
+      return {
+        bytes: new Uint8Array(readFileSync(join(this.mediaDir, media.filename))),
+        contentType: media.contentType,
+      };
+    } catch {
+      throw new Error('The saved media file is missing. Generate it again.');
+    }
+  }
+  deleteMedia(id: string) {
+    const n = this.snapshot();
+    n.media = n.media.filter((m) => m.id !== id);
+    this.save(n);
+    this.cleanupOrphans();
   }
   snapshot() {
     return structuredClone(this.state);
@@ -268,6 +344,10 @@ export class Store {
     n.explanations.forEach((e) => {
       if (e.source && !n.documents.some((d) => d.id === e.source!.documentId)) e.source = null;
     });
+    n.media.forEach((m) => {
+      if (m.source && !n.documents.some((d) => d.id === m.source!.documentId)) m.source = null;
+      if (m.sessionId && !n.sessions.some((s) => s.id === m.sessionId)) m.sessionId = null;
+    });
     this.save(n);
     this.cleanupOrphans();
     return this.snapshot();
@@ -404,7 +484,9 @@ export class Store {
     n.sessions = n.sessions.filter((s) => s.id !== id);
     n.messages = n.messages.filter((m) => m.sessionId !== id);
     n.explanations = n.explanations.filter((e) => e.sessionId !== id);
+    n.media = n.media.filter((m) => m.sessionId !== id);
     this.save(n);
+    this.cleanupOrphans();
   }
   deleteExplanation(id: string) {
     const n = this.snapshot();
@@ -412,19 +494,27 @@ export class Store {
     this.save(n);
   }
   private cleanupOrphans() {
-    // Delete only UUID-owned PDF files. Never follow paths supplied by the renderer.
-    const retained = new Set(this.state.documents.map((d) => d.filename));
-    for (const name of readdirOwned(this.documentsDir))
-      if (!retained.has(name)) {
-        try {
-          unlinkSync(join(this.documentsDir, name));
-        } catch {
-          /* Retry on next launch/mutation; no data references remain. */
+    // Delete only UUID-owned files. Never follow paths supplied by the renderer.
+    const owned: [string, Set<string>, RegExp][] = [
+      [
+        this.documentsDir,
+        new Set(this.state.documents.map((d) => d.filename)),
+        /^[a-f0-9-]{36}\.pdf$/,
+      ],
+      [this.mediaDir, new Set(this.state.media.map((m) => m.filename)), MediaFilename],
+    ];
+    for (const [dir, retained, pattern] of owned)
+      for (const name of readdirSync(dir))
+        if (
+          (pattern.test(name) && !retained.has(name)) ||
+          /^[a-f0-9-]{36}\.(jpg|png|webp|mp4|webm)\.tmp$/.test(name)
+        ) {
+          try {
+            unlinkSync(join(dir, name));
+          } catch {
+            /* Retry on next launch/mutation; no data references remain. */
+          }
         }
-      }
   }
 }
 import { readdirSync } from 'node:fs';
-function readdirOwned(dir: string) {
-  return readdirSync(dir).filter((name) => /^[a-f0-9-]{36}\.pdf$/.test(name));
-}

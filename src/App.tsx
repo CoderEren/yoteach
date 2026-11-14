@@ -7,12 +7,14 @@ import {
   Upload,
   FileText,
   ArrowRight,
+  Sparkles,
 } from 'lucide-react';
 import type { AppState } from '../shared/model';
 import { api, unwrap } from './api';
 import { Companion } from './components/Companion';
 import { TutorWorkspace } from './components/TutorWorkspace';
 import { Modal } from './components/Modal';
+import { MediaView } from './components/GeneratedMedia';
 import { Yoyo } from './components/Yoyo';
 import { useTutor } from './tutor';
 import { LectureStage } from './components/LectureStage';
@@ -29,7 +31,8 @@ export default function App() {
     [error, setError] = useState(''),
     [busy, setBusy] = useState('');
   const [settings, setSettings] = useState(false),
-    [saved, setSaved] = useState(false);
+    [saved, setSaved] = useState(false),
+    [mediaId, setMediaId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ id: string; page: number } | null>(null);
   const { runtime: r, act } = useTutor();
   const companion = location.hash === '#/companion';
@@ -102,8 +105,9 @@ export default function App() {
   if (companion) return <Companion data={data} />;
   if (overlay) return <DesktopOverlay />;
   const lesson = data.lessons.find((l) => l.id === r?.activeLessonId);
-  if (lesson) return <VisualLesson key={lesson.id} saved={lesson} />;
-  if (r?.lecture) return <LectureStage />;
+  const media = data.media.find((m) => m.id === mediaId);
+  if (lesson) return <VisualLesson key={lesson.id} saved={lesson} media={data.media} />;
+  if (r?.lecture) return <LectureStage media={data.media} />;
   const doc = data.documents.find((d) => d.id === viewer?.id);
   return (
     <div className="app-shell">
@@ -308,6 +312,22 @@ export default function App() {
                 {lessonDefinition(l.key).title} · Step {l.step}
               </button>
             ))}
+            {[...data.media].reverse().map((m) => (
+              <button
+                className="button"
+                key={m.id}
+                onClick={() => {
+                  setSaved(false);
+                  setMediaId(m.id);
+                }}
+              >
+                <Sparkles size={16} />
+                {m.kind === 'video' ? 'Clip' : 'Visual analogy'} ·{' '}
+                {m.lessonStep ? `Lesson step ${m.lessonStep} · ` : ''}
+                {m.subject.slice(0, 70)}
+                {m.subject.length > 70 ? '…' : ''}
+              </button>
+            ))}
             {data.documents.map((d) => (
               <button
                 className="button"
@@ -339,12 +359,33 @@ export default function App() {
                 </article>
               ))}
             {!data.lessons.length &&
+              !data.media.length &&
               !data.documents.length &&
               !data.explanations.length &&
               !data.topics.some((t) => t.overview) && (
-                <p>Your PDFs, saved explanations and preserved notes will appear here.</p>
+                <p>
+                  Your PDFs, lessons, generated visuals, saved explanations and preserved notes will
+                  appear here.
+                </p>
               )}
           </div>
+        </Modal>
+      )}
+      {media && (
+        <Modal title="Generated visual" onClose={() => setMediaId(null)}>
+          <MediaView media={media} />
+          <p className="generated-media-meta">
+            {media.subject}
+            <br />
+            <small>
+              Generated {new Date(media.createdAt).toLocaleString()} ·{' '}
+              {media.origin === 'tutor' ? 'requested by Yoyo' : 'requested by you'}
+              {media.lessonStep ? ` · glucose lesson step ${media.lessonStep}` : ''}
+              {media.source
+                ? ` · ${data.documents.find((d) => d.id === media.source!.documentId)?.originalName ?? 'lecture'} p. ${media.source.page}`
+                : ''}
+            </small>
+          </p>
         </Modal>
       )}
       {viewer && doc && (

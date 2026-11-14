@@ -17,6 +17,7 @@ import {
 import type { AppState } from '../../shared/model';
 import type { Annotation, WindowSource } from '../../shared/tutor';
 import { useTutor } from '../tutor';
+import { GenerationPanel } from './GeneratedMedia';
 import { api, unwrap } from '../api';
 import { Yoyo } from './Yoyo';
 import { Modal } from './Modal';
@@ -149,6 +150,7 @@ export function TutorWorkspace({
           </button>
         </div>
       )}
+      <GenerationPanel media={data.media} />
       <section className="session-start glass">
         <div>
           <h2>Hold. Ask. Release.</h2>
