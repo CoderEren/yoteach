@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "draw_on_screen",
-  "description": "Draw on the student's screen (or the lecture slide) over regions returned by the latest analyze_current_screen: circle, underline, box, arrow, highlight or point, with short labels and labelled arrows between regions. Animated like hand drawing. Use it while you explain. Never invent regionIds.",
+  "description": "Draw on the student's screen (or lecture slide) over regionIds from the screen map or analyze_current_screen: circle, underline, box, arrow, highlight or point, with few-word labels and labelled arrows between regions. Animated like handwriting; Yoyo flies to each mark. Call it repeatedly with clear:false to build an explanation as you speak. Never invent regionIds.",
   "expects_response": true,
   "response_timeout_secs": 10,
   "parameters": {

@@ -63,6 +63,8 @@ export type ScreenDrawing = {
   }[];
   connections: { id: string; from: Box; to: Box; label: string | null }[];
   diagram: Diagram | null;
+  /** A free-form sketch, optionally placed beside a grounded region. */
+  sketch: (Sketch & { near: Box | null }) | null;
   revision: number;
 };
 export type LaidOut = {
@@ -83,6 +85,7 @@ const NODE_W = 150,
 /** Deterministic layout: layered left-to-right flow, or nodes around a circle. */
 export function layoutDiagram(d: Diagram): LaidOut {
   const pos = new Map<string, { x: number; y: number }>();
+  let skipOver = (_from: string, _to: string) => 0;
   let width: number, height: number;
   if (d.layout === 'cycle') {
     const n = d.nodes.length,
@@ -104,16 +107,23 @@ export function layoutDiagram(d: Diagram): LaidOut {
     for (const n of d.nodes) (columns[Math.min(layer.get(n.id)!, 6)] ??= []).push(n.id);
     const filled = columns.filter(Boolean);
     const tallest = Math.max(...filled.map((c) => c.length));
+    const column = new Map<string, number>();
+    filled.forEach((ids, c) => ids.forEach((id) => column.set(id, c)));
+    // Edges that jump over a column travel in a lane above the nodes instead of through them.
+    const skips = d.edges.some((e) => Math.abs(column.get(e.to)! - column.get(e.from)!) > 1);
+    const lane = skips ? 70 : 0;
     width = filled.length * (NODE_W + GAP) - GAP + 40;
-    height = tallest * (NODE_H + 34) - 34 + 40;
-    filled.forEach((column, c) =>
-      column.forEach((id, row) =>
+    height = tallest * (NODE_H + 34) - 34 + 40 + lane;
+    filled.forEach((ids, c) =>
+      ids.forEach((id, row) =>
         pos.set(id, {
           x: 20 + c * (NODE_W + GAP) + NODE_W / 2,
-          y: height / 2 + (row - (column.length - 1) / 2) * (NODE_H + 34),
+          y: lane + (height - lane) / 2 + (row - (ids.length - 1) / 2) * (NODE_H + 34),
         }),
       ),
     );
+    skipOver = (from: string, to: string) =>
+      Math.abs(column.get(to)! - column.get(from)!) > 1 ? lane : 0;
   }
   const nodes = d.nodes.map((n) => ({
     ...n,
@@ -124,6 +134,20 @@ export function layoutDiagram(d: Diagram): LaidOut {
   const edges = d.edges.map((e) => {
     const a = pos.get(e.from)!,
       b = pos.get(e.to)!;
+    if (skipOver(e.from, e.to)) {
+      // Leave from the top of each node and arc through the lane above the row.
+      const s = { x: a.x, y: a.y - NODE_H / 2 - 4 },
+        t = { x: b.x, y: b.y - NODE_H / 2 - 6 };
+      const top = Math.min(s.y, t.y) - skipOver(e.from, e.to) + 8;
+      const d = `M ${s.x.toFixed(1)} ${s.y.toFixed(1)} C ${s.x.toFixed(1)} ${top.toFixed(1)} ${t.x.toFixed(1)} ${top.toFixed(1)} ${t.x.toFixed(1)} ${t.y.toFixed(1)}`;
+      return {
+        d,
+        label: e.label ?? null,
+        lx: (s.x + t.x) / 2,
+        ly: top + 14,
+        tip: { x: t.x, y: t.y, angle: Math.PI / 2 },
+      };
+    }
     const dx = b.x - a.x,
       dy = b.y - a.y,
       len = Math.hypot(dx, dy) || 1;
@@ -146,3 +170,63 @@ export function layoutDiagram(d: Diagram): LaidOut {
   });
   return { width, height, nodes, edges };
 }
+
+// Free-form sketch on a 100 × 70 canvas (y grows downward). The tutor draws what a diagram
+// cannot: vectors, graphs, geometry, annotated shapes.
+const Pt = z.tuple([z.number().min(0).max(100), z.number().min(0).max(70)]);
+const Tone = z.enum(['ink', 'accent', 'muted']).optional();
+const Short = z.string().trim().min(1).max(40);
+export const SketchElementSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('arrow'),
+    from: Pt,
+    to: Pt,
+    label: Short.optional(),
+    dashed: z.boolean().optional(),
+    tone: Tone,
+  }),
+  z.object({
+    type: z.literal('line'),
+    from: Pt,
+    to: Pt,
+    label: Short.optional(),
+    dashed: z.boolean().optional(),
+    tone: Tone,
+  }),
+  z.object({
+    type: z.literal('curve'),
+    points: z.array(Pt).min(2).max(24),
+    label: Short.optional(),
+    dashed: z.boolean().optional(),
+    tone: Tone,
+  }),
+  z.object({
+    type: z.literal('circle'),
+    at: Pt,
+    r: z.number().min(1).max(35),
+    label: Short.optional(),
+    tone: Tone,
+  }),
+  z.object({
+    type: z.literal('box'),
+    at: Pt,
+    w: z.number().min(2).max(100),
+    h: z.number().min(2).max(70),
+    label: Short.optional(),
+    tone: Tone,
+  }),
+  z.object({ type: z.literal('dot'), at: Pt, label: Short.optional(), tone: Tone }),
+  z.object({ type: z.literal('text'), at: Pt, text: z.string().trim().min(1).max(60), tone: Tone }),
+  z.object({
+    type: z.literal('axes'),
+    origin: Pt,
+    xLabel: Short.optional(),
+    yLabel: Short.optional(),
+  }),
+]);
+export type SketchElement = z.infer<typeof SketchElementSchema>;
+export const SketchSchema = z.object({
+  title: z.string().trim().min(1).max(60),
+  elements: z.array(SketchElementSchema).min(1).max(30),
+});
+export type Sketch = z.infer<typeof SketchSchema>;

@@ -30,3 +30,28 @@ export function pcmChunks(frames: Float32Array[], fromRate: number, toRate: numb
   for (let i = 0; i < bytes.length; i += chunkSize) chunks.push(bytes.slice(i, i + chunkSize));
   return chunks;
 }
+/**
+ * True when a hold contains speech: at least ~250 ms of 30 ms windows clearly above the
+ * recording's own noise floor. A silent hold is never sent, so the agent does not wait on it.
+ */
+export function hasSpeech(frames: Float32Array[], rate: number) {
+  const window = Math.max(1, Math.round(rate * 0.03));
+  const levels: number[] = [];
+  let sum = 0,
+    n = 0;
+  for (const frame of frames)
+    for (let i = 0; i < frame.length; i++) {
+      sum += frame[i] * frame[i];
+      if (++n === window) {
+        levels.push(Math.sqrt(sum / n));
+        sum = 0;
+        n = 0;
+      }
+    }
+  if (!levels.length) return false;
+  const sorted = [...levels].sort((a, b) => a - b);
+  const floor = sorted[Math.floor(sorted.length * 0.2)];
+  // Clearly above the room's own level, but a steady voice from the first moment still counts.
+  const threshold = Math.max(0.015, Math.min(floor * 3, 0.04));
+  return levels.filter((l) => l > threshold).length * 0.03 >= 0.25;
+}

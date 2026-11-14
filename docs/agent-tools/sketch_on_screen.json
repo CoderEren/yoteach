@@ -1,0 +1,136 @@
+{
+  "type": "client",
+  "name": "sketch_on_screen",
+  "description": "Draw freely on the student's screen: vectors, graphs, geometry, forces, a worked construction. Elements draw in order like handwriting. Optionally place it beside a region (near). Use it when the screen has nothing to point at, or to add the missing step beside their figure.",
+  "expects_response": true,
+  "response_timeout_secs": 10,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Short title, up to 60 characters."
+      },
+      "elements": {
+        "type": "array",
+        "description": "1-30 elements in explanation order.",
+        "items": {
+          "type": "object",
+          "description": "One element. Coordinates are [x,y] on a 100x70 canvas, y down.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "arrow",
+                "line",
+                "curve",
+                "circle",
+                "box",
+                "dot",
+                "text",
+                "axes"
+              ],
+              "description": "Element kind."
+            },
+            "from": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "arrow/line start [x,y]."
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "arrow/line end [x,y]."
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "description": "x then y."
+                },
+                "description": "[x,y]"
+              },
+              "description": "curve points, 2-24."
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "circle centre, box top-left, dot or text position [x,y]."
+            },
+            "r": {
+              "type": "number",
+              "description": "circle radius."
+            },
+            "w": {
+              "type": "number",
+              "description": "box width."
+            },
+            "h": {
+              "type": "number",
+              "description": "box height."
+            },
+            "origin": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "axes origin [x,y]."
+            },
+            "xLabel": {
+              "type": "string",
+              "description": "axes x label."
+            },
+            "yLabel": {
+              "type": "string",
+              "description": "axes y label."
+            },
+            "label": {
+              "type": "string",
+              "description": "Up to 40 characters."
+            },
+            "text": {
+              "type": "string",
+              "description": "text element content, up to 60 characters."
+            },
+            "dashed": {
+              "type": "boolean",
+              "description": "Dashed stroke (e.g. a resultant or guide line)."
+            },
+            "tone": {
+              "type": "string",
+              "enum": [
+                "ink",
+                "accent",
+                "muted"
+              ],
+              "description": "ink default, accent to highlight, muted for guides."
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      },
+      "near": {
+        "type": "string",
+        "description": "Optional regionId from the screen map to sit beside."
+      }
+    },
+    "required": [
+      "title",
+      "elements"
+    ]
+  }
+}

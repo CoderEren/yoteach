@@ -39,6 +39,7 @@ export function installTutor(
     agentId: process.env.ELEVENLABS_AGENT_ID ?? '',
     visionKey: process.env.ANTHROPIC_API_KEY ?? '',
     model: process.env.VISION_MODEL ?? 'claude-sonnet-4-6',
+    quickModel: process.env.QUICK_VISION_MODEL || undefined,
   });
   const emit = () => {
     changed();
@@ -184,6 +185,13 @@ export function installTutor(
       service.state.mic = false;
       if (action.type === 'hold-cancel') service.state.activity = 'idle';
       if (action.type === 'hold-cancel') {
+        if (action.reason === 'silent') {
+          service.state.notice = 'I didn’t hear anything. Hold and speak.';
+          setTimeout(() => {
+            service.state.notice = null;
+            service.emit();
+          }, 2600);
+        }
         captureAbort?.abort();
         if (!service.state.lecture) service.stopSharing(false);
       }
@@ -208,6 +216,7 @@ export function installTutor(
     main()?.webContents.send('tutor:intent', action);
   }
   handle('tutor:intent', intent);
+  handle('tutor:screen-map', () => service.screenMap(), true);
   handle(
     'tutor:capture-screen',
     async () => {
@@ -253,6 +262,7 @@ export function installTutor(
         service.state.sharing = 'screen';
         service.state.sourceName = 'Current screen';
         service.acceptSnapshot(snapshot);
+        service.preAnalyze();
       } catch (error) {
         if (ctl.signal.aborted || service.state.sessionId !== id) return;
         service.state.error =

@@ -48,12 +48,16 @@ function setup() {
     store,
     new Providers(
       { elevenKey: 'k', agentId: 'a', visionKey: 'v', model: 'claude-sonnet-4-6' },
-      async (url) =>
-        String(url).includes('elevenlabs')
-          ? new Response(JSON.stringify({ signed_url: 'wss://api.elevenlabs.io/x' }))
-          : new Response(
-              JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(vision) }] }),
-            ),
+      async (url, init) => {
+        if (String(url).includes('elevenlabs'))
+          return new Response(JSON.stringify({ signed_url: 'wss://api.elevenlabs.io/x' }));
+        // The quick screen map and the question-specific analysis have different shapes.
+        const map = String(init?.body).includes('You map a screenshot');
+        const body = map ? { summary: vision.explanation, regions: vision.regions } : vision;
+        return new Response(
+          JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(body) }] }),
+        );
+      },
     ),
     () => {},
     () => {
@@ -260,6 +264,92 @@ test('outside lectures, lessons and practice appear on the screen; lectures keep
     });
     assert.equal(f.service.state.lessonSurface, 'app');
     assert.equal(f.opened(), 1);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('an edge that skips a column arcs above the row instead of through the middle node', () => {
+  const l = layoutDiagram(
+    DiagramSchema.parse({
+      title: 'Vector addition',
+      nodes: [
+        { id: 'start', label: 'Start' },
+        { id: 'tip', label: 'Tip of A' },
+        { id: 'end', label: 'End' },
+      ],
+      edges: [
+        { from: 'start', to: 'tip', label: 'A' },
+        { from: 'tip', to: 'end', label: 'B' },
+        { from: 'start', to: 'end', label: 'A + B' },
+      ],
+    }),
+  );
+  const tip = l.nodes.find((n) => n.id === 'tip')!;
+  const resultant = l.edges[2];
+  assert.ok(resultant.ly < tip.y - tip.h / 2, 'label sits above the middle node');
+  assert.match(resultant.d, / C /);
+  for (const n of l.nodes) assert.ok(n.y - n.h / 2 >= 0);
+});
+
+test('the screen map is ready by release, merges with deeper analysis, and sketches validate', async () => {
+  const f = setup();
+  try {
+    const s = await f.service.start(null, 'voice');
+    f.service.state.sharing = 'screen';
+    f.service.acceptSnapshot(f.screenStill());
+    f.service.preAnalyze();
+    const map = await f.service.screenMap();
+    assert.ok(map);
+    assert.equal(map!.summary, vision.explanation);
+    assert.equal(map!.regions.length, 2);
+    // Drawing works straight from the map, with no analyze_current_screen call.
+    await f.service.tool(
+      s.id,
+      ToolSchema.parse({
+        name: 'draw_on_screen',
+        marks: [{ regionId: map!.regions[0].regionId, shape: 'circle' }],
+      }),
+    );
+    // Deeper analysis adds regions; the map's IDs stay valid.
+    await f.service.tool(s.id, { name: 'analyze_current_screen', question: 'More detail?' });
+    assert.ok(f.service.state.annotations.some((a) => a.id === map!.regions[0].regionId));
+    assert.equal(f.service.state.annotations.length, 4);
+    const sketch = ToolSchema.parse({
+      name: 'sketch_on_screen',
+      title: 'Head to tail',
+      near: map!.regions[1].regionId,
+      elements: [
+        { type: 'arrow', from: [10, 60], to: [45, 30], label: 'A' },
+        { type: 'arrow', from: [45, 30], to: [85, 50], label: 'B' },
+        {
+          type: 'arrow',
+          from: [10, 60],
+          to: [85, 50],
+          label: 'A + B',
+          dashed: true,
+          tone: 'accent',
+        },
+      ],
+    });
+    await f.service.tool(s.id, sketch);
+    assert.equal(f.service.state.drawing!.sketch!.elements.length, 3);
+    assert.deepEqual(f.service.state.drawing!.sketch!.near, vision.regions[1].box);
+    await assert.rejects(
+      f.service.tool(s.id, { ...sketch, near: randomUUID() } as never),
+      /regionId from the latest screen map/,
+    );
+    assert.throws(() =>
+      ToolSchema.parse({
+        name: 'sketch_on_screen',
+        title: 'x',
+        elements: [{ type: 'arrow', from: [10, 10], to: [500, 10] }],
+      }),
+    );
+    // A new capture drops grounded marks and the sketch's anchor, but keeps the sketch.
+    f.service.stopSharing();
+    assert.equal(f.service.state.drawing!.sketch!.near, null);
+    assert.equal(await f.service.screenMap(), null);
   } finally {
     f.cleanup();
   }

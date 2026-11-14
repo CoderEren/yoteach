@@ -3788,3 +3788,64 @@ html:has(.companion-body),
     opacity: 1;
   }
 }
+.companion-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 190px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(29, 34, 53, 0.86);
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-align: center;
+  animation: label-in 0.2s ease-out;
+}
+/* Free-form sketches use a 100 × 70 canvas; strokes scale with it. */
+.sketch-canvas svg {
+  max-width: min(560px, 44vw);
+  height: auto;
+}
+.sketch-canvas .draw {
+  stroke-width: 0.7;
+  filter: none;
+}
+.sketch-canvas .draw.dashed {
+  stroke-dasharray: 0.02 0.015;
+  stroke-dashoffset: 0;
+  animation: label-in 0.4s ease-out both;
+}
+.sketch-canvas .draw.dot {
+  fill: currentColor;
+}
+.sketch-canvas .tone-ink .draw {
+  stroke: #5545c9;
+  color: #5545c9;
+}
+.sketch-canvas .tone-accent .draw {
+  stroke: #d0603f;
+  color: #d0603f;
+}
+.sketch-canvas .tone-muted .draw {
+  stroke: #8b93a8;
+  color: #8b93a8;
+}
+.sketch-label {
+  font:
+    600 2.6px/1 -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    sans-serif;
+  fill: #1d2235;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 0.8px;
+  opacity: 0;
+  animation: label-in 0.35s ease-out forwards;
+}
+.tone-accent .sketch-label {
+  fill: #b04b2c;
+}

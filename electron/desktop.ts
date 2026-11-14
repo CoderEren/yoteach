@@ -49,6 +49,11 @@ export function installDesktop(options: {
     }, 16);
   }
   let stage: Electron.Rectangle | null = null;
+  let tour: ReturnType<typeof setTimeout>[] = [];
+  const stopTour = () => {
+    tour.forEach(clearTimeout);
+    tour = [];
+  };
   /** The overlay is Yoyo's drawing surface on the user's screen; lectures draw in the app. */
   function needsOverlay(r: TutorRuntime) {
     if (r.lecture) return false;
@@ -58,7 +63,7 @@ export function installDesktop(options: {
     const lesson = !!r.activeLessonId && r.lessonSurface === 'screen';
     const appLesson = !!r.activeLessonId && r.lessonSurface === 'app';
     const media = !!r.generation && r.generation.origin === 'tutor' && !appLesson;
-    return marks || lesson || media || !!r.drawing?.diagram;
+    return marks || lesson || media || !!r.drawing?.diagram || !!r.drawing?.sketch;
   }
   function syncOverlay(r: TutorRuntime) {
     const layer = overlay();
@@ -102,6 +107,7 @@ export function installDesktop(options: {
   }
   function returnHome() {
     clearTimeout(returnTimer);
+    stopTour();
     pet()?.webContents.send('companion:pose', { direction: null });
     if (!dragging && pointed && home) {
       const area = screen.getDisplayNearestPoint(home).workArea;
@@ -167,6 +173,7 @@ export function installDesktop(options: {
     if (r.input === 'arming' || r.input === 'listening') {
       clearInterval(flight);
       clearTimeout(returnTimer);
+      stopTour();
       pet()?.webContents.send('companion:pose', { direction: null });
       focusKey = '';
       return;
@@ -212,8 +219,27 @@ export function installDesktop(options: {
     pet()?.showInactive();
     pet()?.webContents.send('companion:pose', { direction: target.direction });
     animate(target.x, target.y);
+    // Visit every mark of the drawing in order, like a teacher walking along the board.
+    stopTour();
+    const stops = (r.drawing?.snapshotId === snapshot.id ? r.drawing.marks : [])
+      .filter((m) => m.regionId !== region.id)
+      .slice(0, 7);
+    const surface = area;
+    stops.forEach((m, i) => {
+      tour.push(
+        setTimeout(
+          () => {
+            if (dragging) return;
+            const next = pointBeside(m.box, surface);
+            pet()?.webContents.send('companion:pose', { direction: next.direction });
+            animate(next.x, next.y);
+          },
+          1700 * (i + 1),
+        ),
+      );
+    });
     clearTimeout(returnTimer);
-    returnTimer = setTimeout(returnHome, 9000);
+    returnTimer = setTimeout(returnHome, 9000 + stops.length * 1700);
   }
   function drag(action: { phase: 'start' | 'move' | 'end'; x: number; y: number }) {
     const win = pet();

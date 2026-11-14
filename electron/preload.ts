@@ -20,6 +20,7 @@ const api: DesktopApi = {
       ipcRenderer.invoke('tutor:transcript', { sessionId, role, text, eventId }),
     tool: (sessionId, tool) => ipcRenderer.invoke('tutor:tool', { sessionId, tool }),
     captureScreen: () => ipcRenderer.invoke('tutor:capture-screen'),
+    screenMap: () => ipcRenderer.invoke('tutor:screen-map'),
     windows: () => ipcRenderer.invoke('tutor:windows'),
     selectWindow: (id) => ipcRenderer.invoke('tutor:select-window', id),
     validateWindow: (id, epoch) => ipcRenderer.invoke('tutor:validate-window', { id, epoch }),

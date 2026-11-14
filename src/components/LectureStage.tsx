@@ -3,7 +3,7 @@ import { useTutor } from '../tutor';
 import { AnnotationLayer } from './TutorWorkspace';
 import { HoldButton } from './HoldButton';
 import { GenerationPanel } from './GeneratedMedia';
-import { DiagramSketch, DrawingLayer } from './DesktopOverlay';
+import { DiagramSketch, DrawingLayer, SketchCanvas } from './DesktopOverlay';
 import type { GeneratedMedia } from '../../shared/media';
 export function LectureStage({ media }: { media: GeneratedMedia[] }) {
   const { runtime: r, act } = useTutor();
@@ -42,6 +42,14 @@ export function LectureStage({ media }: { media: GeneratedMedia[] }) {
           <aside className="lecture-sketch">
             <DiagramSketch
               diagram={r.drawing.diagram}
+              onClose={() => void act({ type: 'screen-clear' })}
+            />
+          </aside>
+        )}
+        {r.drawing?.sketch && (
+          <aside className="lecture-sketch">
+            <SketchCanvas
+              sketch={r.drawing.sketch}
               onClose={() => void act({ type: 'screen-clear' })}
             />
           </aside>

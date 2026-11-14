@@ -2,7 +2,13 @@ import { z } from 'zod';
 import { LessonKey, LessonStep } from './lessons';
 import { MediaKind, Subject, type Generation } from './media';
 import { QuestionId } from './practice';
-import { ConnectionSchema, DiagramSchema, MarkSchema, type ScreenDrawing } from './drawing';
+import {
+  ConnectionSchema,
+  DiagramSchema,
+  MarkSchema,
+  SketchSchema,
+  type ScreenDrawing,
+} from './drawing';
 const Uuid = z.uuid();
 export const Shape = z.enum(['highlight', 'arrow', 'circle', 'point', 'label']);
 export const Box = z
@@ -112,6 +118,8 @@ export type TutorRuntime = {
   latencyMs: number | null;
   error: string;
   generation: Generation | null;
+  /** A short, transient message shown beside Yoyo. */
+  notice: string | null;
   practice: { questionId: QuestionId; checking: boolean } | null;
   config: {
     voice: boolean;
@@ -141,6 +149,7 @@ export const ToolSchema = z.discriminatedUnion('name', [
   }),
   z.object({ name: z.literal('sketch_diagram'), diagram: DiagramSchema }),
   z.object({ name: z.literal('clear_screen') }),
+  SketchSchema.extend({ name: z.literal('sketch_on_screen'), near: Uuid.optional() }),
   z.object({ name: z.literal('ask_practice_question'), question: QuestionId.optional() }),
   z.object({
     name: z.literal('record_practice_attempt'),
@@ -177,7 +186,7 @@ export const IntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('inform'), text: z.string().min(1).max(6000) }),
   z.object({ type: z.literal('hold-start') }),
   z.object({ type: z.literal('hold-end') }),
-  z.object({ type: z.literal('hold-cancel') }),
+  z.object({ type: z.literal('hold-cancel'), reason: z.enum(['silent']).optional() }),
   z.object({
     type: z.literal('start'),
     topicId: Uuid.nullable().default(null),
@@ -226,6 +235,13 @@ export interface TutorApi {
   ): Promise<import('./model').Result<void>>;
   tool(sessionId: string, tool: TutorTool): Promise<import('./model').Result<unknown>>;
   captureScreen(): Promise<import('./model').Result<void>>;
+  screenMap(): Promise<
+    import('./model').Result<{
+      snapshotId: string;
+      summary: string;
+      regions: { regionId: string; label: string; evidence: string }[];
+    } | null>
+  >;
   windows(): Promise<import('./model').Result<WindowSource[]>>;
   selectWindow(id: string): Promise<import('./model').Result<number>>;
   validateWindow(id: string, epoch: number): Promise<import('./model').Result<boolean>>;

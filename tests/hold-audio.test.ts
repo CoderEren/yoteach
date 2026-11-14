@@ -31,3 +31,20 @@ test('existing settings gain a talk key without losing the mascot home', () => {
   assert.equal(result.talkKey, 'control');
   assert.deepEqual(result.mascotPosition, { x: -500, y: 100 });
 });
+import { hasSpeech } from '../shared/hold-audio';
+test('silent or noise-only holds are not speech; a spoken burst is', () => {
+  const rate = 16000;
+  const noise = (seconds: number, level: number) =>
+    Float32Array.from({ length: rate * seconds }, () => (Math.random() * 2 - 1) * level);
+  const tone = (seconds: number, level: number) =>
+    Float32Array.from(
+      { length: rate * seconds },
+      (_, i) => Math.sin((i / rate) * 2 * Math.PI * 220) * level,
+    );
+  assert.equal(hasSpeech([new Float32Array(rate * 2)], rate), false);
+  assert.equal(hasSpeech([noise(2, 0.004)], rate), false);
+  assert.equal(hasSpeech([noise(1, 0.004), tone(0.1, 0.2), noise(1, 0.004)], rate), false);
+  assert.equal(hasSpeech([noise(0.5, 0.004), tone(0.6, 0.2), noise(0.5, 0.004)], rate), true);
+  assert.equal(hasSpeech([], rate), false);
+  assert.equal(hasSpeech([tone(1.5, 0.5)], rate), true, 'speaking from the first moment');
+});

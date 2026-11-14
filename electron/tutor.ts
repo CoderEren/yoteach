@@ -61,6 +61,12 @@ export class TutorService {
   private abort?: AbortController;
   private connecting?: AbortController;
   private generating?: AbortController;
+  private inventory?: {
+    snapshotId: string;
+    done: Promise<void>;
+    summary: string | null;
+    ctl: AbortController;
+  };
   constructor(
     readonly store: Store,
     readonly providers: Providers,
@@ -92,6 +98,7 @@ export class TutorService {
       latencyMs: null,
       error: '',
       generation: null,
+      notice: null,
       practice: null,
       config: { ...providers.status(), media: fal.status() },
     };
@@ -338,6 +345,53 @@ export class TutorService {
     this.state.generation = null;
     this.emit();
   }
+  /** Map the captured screen while the student is still talking. Never blocks capture. */
+  preAnalyze() {
+    const snapshot = this.state.snapshot;
+    if (!snapshot || snapshot.source.kind !== 'screen' || !this.providers.config.visionKey) return;
+    this.inventory?.ctl.abort();
+    const ctl = new AbortController(),
+      epoch = this.state.epoch;
+    const entry = {
+      snapshotId: snapshot.id,
+      summary: null as string | null,
+      ctl,
+      done: Promise.resolve(),
+    };
+    entry.done = (async () => {
+      try {
+        const map = await this.providers.inventory(snapshot, ctl.signal);
+        if (
+          ctl.signal.aborted ||
+          epoch !== this.state.epoch ||
+          this.state.snapshot?.id !== snapshot.id
+        )
+          return;
+        const regions = groundRegions(snapshot, { explanation: map.summary, regions: map.regions });
+        this.state.annotations = [...this.state.annotations, ...regions].slice(-40);
+        entry.summary = map.summary;
+        this.emit();
+      } catch {
+        /* The tutor can still call analyze_current_screen. */
+      }
+    })();
+    this.inventory = entry;
+  }
+  /** What the tutor needs to answer and draw at once: summary plus grounded region IDs. */
+  async screenMap(timeoutMs = 3500) {
+    const entry = this.inventory,
+      snapshot = this.state.snapshot;
+    if (!entry || !snapshot || entry.snapshotId !== snapshot.id) return null;
+    await Promise.race([entry.done, new Promise((r) => setTimeout(r, timeoutMs))]);
+    if (this.state.snapshot?.id !== entry.snapshotId || !entry.summary) return null;
+    return {
+      snapshotId: snapshot.id,
+      summary: entry.summary,
+      regions: this.state.annotations
+        .filter((a) => a.snapshotId === snapshot.id)
+        .map((a) => ({ regionId: a.id, label: a.label, evidence: a.evidence })),
+    };
+  }
   async start(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
     if (this.state.sessionId || this.connecting)
       throw new Error('End the current session before starting another.');
@@ -425,11 +479,21 @@ export class TutorService {
   stopSharing(emit = true) {
     this.abort?.abort();
     this.abort = undefined;
+    this.inventory?.ctl.abort();
+    this.inventory = undefined;
     // Grounded marks die with their snapshot; a concept diagram does not depend on one.
     const d = this.state.drawing;
-    this.state.drawing = d?.diagram
-      ? { ...d, snapshotId: null, marks: [], connections: [], revision: d.revision + 1 }
-      : null;
+    this.state.drawing =
+      d?.diagram || d?.sketch
+        ? {
+            ...d,
+            snapshotId: null,
+            marks: [],
+            connections: [],
+            sketch: d.sketch ? { ...d.sketch, near: null } : null,
+            revision: d.revision + 1,
+          }
+        : null;
     if (['thinking', 'pointing'].includes(this.state.activity))
       this.state.activity = this.state.mic ? 'listening' : 'idle';
     Object.assign(this.state, {
@@ -595,6 +659,7 @@ export class TutorService {
             })),
           ],
           diagram: this.state.drawing?.diagram ?? null,
+          sketch: this.state.drawing?.sketch ?? null,
           revision: (this.state.drawing?.revision ?? 0) + 1,
         };
         this.state.drawing = drawing;
@@ -618,6 +683,7 @@ export class TutorService {
           marks: current?.marks ?? [],
           connections: current?.connections ?? [],
           diagram: tool.diagram,
+          sketch: null,
           revision: (current?.revision ?? 0) + 1,
         };
         this.emit();
@@ -625,6 +691,31 @@ export class TutorService {
           shown: true,
           where: this.state.lecture ? 'over the lecture slide' : 'on the student’s screen',
           note: 'The app laid it out and is drawing it now. Walk through it node by node.',
+        };
+      }
+      case 'sketch_on_screen': {
+        const current = this.state.drawing;
+        const near = tool.near ? this.state.annotations.find((a) => a.id === tool.near) : undefined;
+        if (tool.near && !near)
+          throw new Error('Use a regionId from the latest screen map, or omit near.');
+        this.state.drawing = {
+          id: randomUUID(),
+          snapshotId: current?.snapshotId ?? null,
+          marks: current?.marks ?? [],
+          connections: current?.connections ?? [],
+          diagram: null,
+          sketch: { title: tool.title, elements: tool.elements, near: near?.box ?? null },
+          revision: (current?.revision ?? 0) + 1,
+        };
+        if (near) {
+          this.state.focusRegion = near.id;
+          this.state.focusRevision++;
+        }
+        this.emit();
+        return {
+          shown: true,
+          where: near ? 'beside the region on screen' : 'in free space on the screen',
+          note: 'It draws itself element by element. Talk through it in the same order.',
         };
       }
       case 'clear_screen':
@@ -658,7 +749,9 @@ export class TutorService {
             snapshot.id !== this.state.snapshot?.id
           )
             throw new Error('The shared content changed. Analysis was discarded.');
-          this.state.annotations = groundRegions(snapshot, answer);
+          // Keep the quick map's regions valid; deeper analysis adds to them.
+          const fresh = groundRegions(snapshot, answer);
+          this.state.annotations = [...this.state.annotations, ...fresh].slice(-40);
           this.state.analysis = answer.explanation;
           this.state.latencyMs = Date.now() - started;
           this.state.activity = this.state.mic ? 'listening' : 'thinking';
@@ -666,7 +759,7 @@ export class TutorService {
           return {
             explanation: answer.explanation,
             snapshotId: snapshot.id,
-            regions: this.state.annotations.map((a) => ({
+            regions: fresh.map((a) => ({
               regionId: a.id,
               label: a.label,
               evidence: a.evidence,

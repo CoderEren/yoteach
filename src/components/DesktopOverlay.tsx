@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, ClipboardCheck, Volume2, X } from 'lucide-react';
 import type { AppState } from '../../shared/model';
 import type { ScreenDrawing } from '../../shared/drawing';
-import { layoutDiagram, type Diagram } from '../../shared/drawing';
+import { layoutDiagram, type Diagram, type Sketch, type SketchElement } from '../../shared/drawing';
 import { lessonDefinition } from '../../shared/lessons';
 import { api } from '../api';
 import { useTutor } from '../tutor';
@@ -187,6 +187,142 @@ export function DrawingLayer({ drawing }: { drawing: ScreenDrawing | null }) {
         </svg>
       )}
     </div>
+  );
+}
+const tone = (t?: 'ink' | 'accent' | 'muted') => `tone-${t ?? 'ink'}`;
+/** Smooth path through points (Catmull-Rom as cubic Béziers). */
+function smooth(points: [number, number][]) {
+  if (points.length < 3) return `M ${points.map((p) => p.join(' ')).join(' L ')}`;
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i],
+      p1 = points[i],
+      p2 = points[i + 1],
+      p3 = points[i + 2] ?? p2;
+    d += ` C ${p1[0] + (p2[0] - p0[0]) / 6} ${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6} ${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]} ${p2[1]}`;
+  }
+  return d;
+}
+function SketchItem({ e, i }: { e: SketchElement; i: number }) {
+  const s = stroke(i);
+  const label = (x: number, y: number, text?: string, anchor: 'start' | 'middle' = 'middle') =>
+    text ? (
+      <text className="sketch-label" style={stroke(i + 0.5)} x={x} y={y} textAnchor={anchor}>
+        {text}
+      </text>
+    ) : null;
+  const dash = (d?: boolean) => (d ? 'draw dashed' : 'draw');
+  switch (e.type) {
+    case 'arrow':
+    case 'line': {
+      const [x1, y1] = e.from,
+        [x2, y2] = e.to;
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      return (
+        <g className={tone(e.tone)}>
+          <path
+            className={dash(e.dashed)}
+            style={s}
+            d={`M ${x1} ${y1} L ${x2} ${y2}`}
+            pathLength={1}
+          />
+          {e.type === 'arrow' && (
+            <path
+              className="draw"
+              style={stroke(i + 0.4)}
+              d={arrowHead(x2, y2, angle, 2.6)}
+              pathLength={1}
+            />
+          )}
+          {label(
+            (x1 + x2) / 2 - Math.sin(angle) * 3.2,
+            (y1 + y2) / 2 + Math.cos(angle) * 3.2 * -1 + 1,
+            e.label,
+          )}
+        </g>
+      );
+    }
+    case 'curve':
+      return (
+        <g className={tone(e.tone)}>
+          <path className={dash(e.dashed)} style={s} d={smooth(e.points)} pathLength={1} />
+          {label(e.points.at(-1)![0] + 1.5, e.points.at(-1)![1] - 1.5, e.label, 'start')}
+        </g>
+      );
+    case 'circle':
+      return (
+        <g className={tone(e.tone)}>
+          <circle className="draw" style={s} cx={e.at[0]} cy={e.at[1]} r={e.r} pathLength={1} />
+          {label(e.at[0], e.at[1] + 1.2, e.label)}
+        </g>
+      );
+    case 'box':
+      return (
+        <g className={tone(e.tone)}>
+          <rect
+            className="draw"
+            style={s}
+            x={e.at[0]}
+            y={e.at[1]}
+            width={e.w}
+            height={e.h}
+            rx={1.5}
+            pathLength={1}
+          />
+          {label(e.at[0] + e.w / 2, e.at[1] + e.h / 2 + 1.2, e.label)}
+        </g>
+      );
+    case 'dot':
+      return (
+        <g className={tone(e.tone)}>
+          <circle className="draw dot" style={s} cx={e.at[0]} cy={e.at[1]} r={0.9} pathLength={1} />
+          {label(e.at[0] + 1.8, e.at[1] - 1.4, e.label, 'start')}
+        </g>
+      );
+    case 'text':
+      return <g className={tone(e.tone)}>{label(e.at[0], e.at[1], e.text, 'start')}</g>;
+    case 'axes': {
+      const [x, y] = e.origin;
+      return (
+        <g className="tone-muted">
+          <path className="draw" style={s} d={`M ${x} 2 L ${x} ${y} L 98 ${y}`} pathLength={1} />
+          <path
+            className="draw"
+            style={stroke(i + 0.3)}
+            d={arrowHead(x, 2, -Math.PI / 2, 2)}
+            pathLength={1}
+          />
+          <path
+            className="draw"
+            style={stroke(i + 0.3)}
+            d={arrowHead(98, y, 0, 2)}
+            pathLength={1}
+          />
+          {label(97, y + 4, e.xLabel)}
+          {label(x + 1.5, 4, e.yLabel, 'start')}
+        </g>
+      );
+    }
+  }
+}
+/** Yoyo's free-form drawing: vectors, graphs, geometry. Drawn element by element. */
+export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: () => void }) {
+  return (
+    <figure className="diagram-sketch sketch-canvas">
+      <figcaption>
+        <span>{sketch.title}</span>
+        {onClose && (
+          <button className="icon-button small" aria-label="Clear Yoyo’s drawing" onClick={onClose}>
+            <X size={15} />
+          </button>
+        )}
+      </figcaption>
+      <svg viewBox="-2 -2 104 74" width={560} height={400} role="img" aria-label={sketch.title}>
+        {sketch.elements.map((e, i) => (
+          <SketchItem key={i} e={e} i={i} />
+        ))}
+      </svg>
+    </figure>
   );
 }
 /** A concept sketch laid out by the app, drawn in node by node. */
@@ -415,6 +551,22 @@ export function DesktopOverlay({ data }: { data: AppState }) {
           />
         </Interactive>
       )}
+      {r.drawing?.sketch && (
+        <Interactive
+          className={`screen-sketch ${
+            r.drawing.sketch.near
+              ? r.drawing.sketch.near.x + r.drawing.sketch.near.width / 2 < 0.5
+                ? 'right'
+                : 'left'
+              : sketchSide
+          }${!r.drawing.sketch.near && sketchLow ? ' low' : ''}`}
+        >
+          <SketchCanvas
+            sketch={r.drawing.sketch}
+            onClose={() => void act({ type: 'screen-clear' })}
+          />
+        </Interactive>
+      )}
       {lesson && <ScreenLesson data={data} side={cardSide} />}
       {media && (
         <Interactive className={`screen-card glass ${cardSide}`}>
@@ -425,6 +577,7 @@ export function DesktopOverlay({ data }: { data: AppState }) {
         </Interactive>
       )}
       {!r.drawing?.diagram &&
+        !r.drawing?.sketch &&
         onScreen &&
         !!(r.drawing?.marks.length || r.drawing?.connections.length) && (
           <Interactive className="screen-clear">
