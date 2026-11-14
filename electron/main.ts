@@ -121,8 +121,23 @@ function resizeCompanion(open: boolean) {
 function showCompanion(show: boolean) {
   if (!companion) return;
   store.settings({ mascotVisible: show });
-  if (show) companion.show();
-  else companion.hide();
+  if (show) {
+    // Transparent windows must never be restored as native fullscreen surfaces.
+    if (companion.isFullScreen()) companion.setFullScreen(false);
+    if (process.platform === 'darwin' && companion.isSimpleFullScreen())
+      companion.setSimpleFullScreen(false);
+    if (companion.isMaximized()) companion.unmaximize();
+    const width = expanded ? 350 : 200,
+      height = expanded ? 540 : 220;
+    const current = companion.getBounds();
+    const saved = store.snapshot().settings.mascotPosition;
+    const x = current.width === width ? current.x : (saved?.x ?? current.x) + 200 - width;
+    const y = current.height === height ? current.y : (saved?.y ?? current.y) + 220 - height;
+    companion.setBounds({ ...clampPosition(x, y, width, height), width, height });
+    companion.setBackgroundColor('#00000000');
+    companion.showInactive();
+    companion.webContents.invalidate();
+  } else companion.hide();
   sendState();
 }
 function createCompanion() {
@@ -143,6 +158,11 @@ function createCompanion() {
     backgroundColor: '#00000000',
     hasShadow: false,
     resizable: false,
+    fullscreen: false,
+    fullscreenable: false,
+    maximizable: false,
+    minimizable: false,
+    hiddenInMissionControl: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
@@ -155,6 +175,10 @@ function createCompanion() {
     },
   });
   companion.setAlwaysOnTop(true, 'floating');
+  companion.on('enter-full-screen', () => companion?.setFullScreen(false));
+  companion.on('leave-full-screen', () => {
+    if (store.snapshot().settings.mascotVisible) showCompanion(true);
+  });
   companion.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   load(companion, '/companion');
   companion.once('ready-to-show', () => {
@@ -406,7 +430,10 @@ else {
     });
   });
   app.on('activate', () => {
-    if (store) showWorkspace();
+    if (store) {
+      showWorkspace();
+      if (store.snapshot().settings.mascotVisible) showCompanion(true);
+    }
   });
   app.on('before-quit', () => {
     quitting = true;

@@ -125,6 +125,28 @@ test('desktop journey: real PDF import, editing, native companion, security and 
       expect(w.preferences.nodeIntegration).toBe(false);
       expect(w.preferences.sandbox).toBe(true);
     }
+    expect(
+      await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().includes('/companion'))!
+          .isFullScreenable(),
+      ),
+    ).toBe(false);
+    // Reproduce the oversized transparent surface reported on restore.
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().includes('/companion'))!
+        .setBounds({ x: 0, y: 0, width: 1512, height: 977 }),
+    );
+    await page.evaluate(() => window.yoteach.companion('hide'));
+    await page.evaluate(() => window.yoteach.companion('show'));
+    const restored = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().includes('/companion'))!
+        .getBounds(),
+    );
+    expect({ width: restored.width, height: restored.height }).toEqual({ width: 200, height: 220 });
+    await expect(companion.getByRole('button', { name: 'Expand Yoyo panel' })).toBeVisible();
     await companion.getByRole('button', { name: 'Expand Yoyo panel' }).click();
     await expect(companion.getByText('Animation preview', { exact: true })).toBeVisible();
     await expect(companion.getByText('Energy investment phase', { exact: true })).toBeVisible();
