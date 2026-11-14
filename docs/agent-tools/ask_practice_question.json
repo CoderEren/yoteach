@@ -1,0 +1,25 @@
+{
+  "type": "client",
+  "name": "ask_practice_question",
+  "description": "Show one authored practice question about glucose phosphorylation in the app and return its prompt and options (never the answer). Omit question to pick the next one needing review or unanswered. Then ask it briefly and wait for the student's answer.",
+  "expects_response": true,
+  "response_timeout_secs": 20,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "question": {
+        "type": "string",
+        "enum": [
+          "atp-first-step",
+          "hexokinase-role",
+          "energy-source",
+          "g6p-fate",
+          "net-atp",
+          "why-invest"
+        ],
+        "description": "atp-first-step (step 1, what happens to ATP), hexokinase-role (step 2), energy-source (step 4, written: where the energy comes from), g6p-fate (step 5), net-atp (step 6), why-invest (step 6, written: why invest ATP)."
+      }
+    },
+    "required": []
+  }
+}

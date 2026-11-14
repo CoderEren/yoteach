@@ -47,6 +47,10 @@ const api: DesktopApi = {
     read: (id) => ipcRenderer.invoke('media:read', id),
     remove: (id) => ipcRenderer.invoke('media:remove', id),
   },
+  practice: {
+    answer: (questionId, answer) => ipcRenderer.invoke('practice:answer', { questionId, answer }),
+    remove: (id) => ipcRenderer.invoke('practice:remove', id),
+  },
   getState: () => ipcRenderer.invoke('workspace:get'),
   command: (command) => ipcRenderer.invoke('workspace:command', command),
   pickPdf: (courseId, sample = false) => ipcRenderer.invoke('pdf:pick', { courseId, sample }),

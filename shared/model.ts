@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SavedLessonSchema } from './lessons';
 import { GeneratedMediaSchema, type GenerateRequest, type MediaType } from './media';
+import { AttemptSchema, type Answer, type PracticeAttempt, type QuestionId } from './practice';
 import { StudySessionSchema, MessageSchema, ExplanationSchema, type TutorApi } from './tutor';
 export const Id = z.uuid();
 export const Title = z
@@ -60,9 +61,10 @@ export const ActivitySchema = z.object({
   createdAt: Stamp,
 });
 export const StateSchema = z.object({
-  version: z.literal(5),
+  version: z.literal(6),
   lessons: z.array(SavedLessonSchema),
   media: z.array(GeneratedMediaSchema),
+  attempts: z.array(AttemptSchema),
   sessions: z.array(StudySessionSchema),
   messages: z.array(MessageSchema),
   explanations: z.array(ExplanationSchema),
@@ -125,9 +127,14 @@ export interface MediaApi {
   read(id: string): Promise<Result<{ bytes: Uint8Array; contentType: MediaType }>>;
   remove(id: string): Promise<Result<void>>;
 }
+export interface PracticeApi {
+  answer(questionId: QuestionId, answer: Answer): Promise<Result<PracticeAttempt>>;
+  remove(id: string): Promise<Result<void>>;
+}
 export interface DesktopApi {
   tutor: TutorApi;
   media: MediaApi;
+  practice: PracticeApi;
   getState(): Promise<Result<AppState>>;
   command(command: Command): Promise<Result<AppState>>;
   pickPdf(courseId: string | null, sample?: boolean): Promise<Result<PendingImport | null>>;
@@ -141,9 +148,10 @@ export interface DesktopApi {
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
-  version: 5,
+  version: 6,
   lessons: [],
   media: [],
+  attempts: [],
   sessions: [],
   messages: [],
   explanations: [],

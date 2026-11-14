@@ -18,6 +18,7 @@ import type { AppState } from '../../shared/model';
 import type { Annotation, WindowSource } from '../../shared/tutor';
 import { useTutor } from '../tutor';
 import { GenerationPanel } from './GeneratedMedia';
+import { reviewSuggestions } from '../../shared/practice';
 import { api, unwrap } from '../api';
 import { Yoyo } from './Yoyo';
 import { Modal } from './Modal';
@@ -182,7 +183,12 @@ export function TutorWorkspace({
         <BookOpen size={23} />
         <span>
           <strong>Why invest ATP in glucose?</strong>
-          <small>Explore a visual lesson · 6 steps</small>
+          <small>
+            Explore a visual lesson · 6 steps · practice
+            {reviewSuggestions(data.attempts).length
+              ? ` · ${reviewSuggestions(data.attempts).length} to review`
+              : ''}
+          </small>
         </span>
         <ArrowUpRight size={20} />
       </button>

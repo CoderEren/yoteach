@@ -13,6 +13,19 @@ import { Store } from './store';
 import { Providers, type VisionAnswer } from './providers';
 import { FalClient } from './fal';
 import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
+import {
+  AnswerSchema,
+  QuestionId,
+  gradeChoice,
+  groundMisconceptions,
+  misconceptions,
+  normalize,
+  practice,
+  publicQuestion,
+  question,
+  reviewSuggestions,
+  type Answer,
+} from '../shared/practice';
 export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): Annotation[] {
   return answer.regions.flatMap((region) => {
     if (region.confidence < 0.7) return [];
@@ -76,6 +89,7 @@ export class TutorService {
       latencyMs: null,
       error: '',
       generation: null,
+      practice: null,
       config: { ...providers.status(), media: fal.status() },
     };
   }
@@ -92,6 +106,7 @@ export class TutorService {
     const doc = d.documents.find((d) => d.id === (documentId ?? s?.documentId));
     return JSON.stringify({
       visualLesson: this.lessonContext(),
+      practice: this.practiceContext(),
       mode: doc ? 'lecture' : 'tutor',
       lecture: doc ? { name: doc.originalName, page: s?.page ?? page, total: doc.pageCount } : null,
       legacyNotes: topic?.overview.slice(0, 6000),
@@ -102,6 +117,111 @@ export class TutorService {
       screenSharing: this.state.sharing,
       source: this.state.sourceName,
     });
+  }
+  /** Evidence the tutor may use to resume: latest answers and open review items only. */
+  practiceContext() {
+    const attempts = this.store.snapshot().attempts;
+    if (!attempts.length) return null;
+    return {
+      recentAnswers: attempts.slice(-6).map((a) => ({
+        question: question(a.questionId).prompt,
+        verdict: a.verdict,
+        possibleMisconceptions: a.misconceptions.map((m) => misconceptions[m.id].description),
+        at: a.createdAt,
+      })),
+      review: reviewSuggestions(attempts).map((r) => ({
+        reviewStep: r.step,
+        question: question(r.questionId).prompt,
+        possibleMisconception: r.misconception ? misconceptions[r.misconception].description : null,
+        evidence: r.evidence,
+      })),
+      note: 'Review items come only from the latest answer to each question, never from time spent.',
+    };
+  }
+  openPractice(id?: string) {
+    if (!this.state.activeLessonId) this.openLesson();
+    // Questions whose latest answer needs review come first, then unanswered ones.
+    const attempts = this.store.snapshot().attempts;
+    const latest = (q: string) => attempts.filter((a) => a.questionId === q).at(-1);
+    const chosen = id
+      ? QuestionId.parse(id)
+      : (
+          practice.find((q) => latest(q.id) && latest(q.id)!.verdict !== 'correct') ??
+          practice.find((q) => !latest(q.id)) ??
+          practice[0]
+        ).id;
+    this.state.practice = { questionId: chosen, checking: false };
+    this.emit();
+    return publicQuestion(question(chosen));
+  }
+  closePractice() {
+    this.checking?.abort();
+    this.state.practice = null;
+    this.emit();
+  }
+  private checking?: AbortController;
+  /** Grades and saves one answer. Misconceptions need evidence in the student's own words. */
+  async answerPractice(id: string, raw: Answer, origin: 'student' | 'tutor') {
+    const q = question(QuestionId.parse(id));
+    let answer = AnswerSchema.parse(raw);
+    if (this.state.practice?.checking)
+      throw new Error('The previous answer is still being checked.');
+    if (!this.state.activeLessonId) this.openLesson();
+    const lessonId = this.state.activeLessonId;
+    // A spoken or typed option counts as choosing it.
+    if (answer.kind === 'text' && q.choices) {
+      const typed = normalize(answer.text);
+      const match = q.choices.find((c) => normalize(c.text) === typed);
+      if (match) answer = { kind: 'choice', choiceId: match.id };
+    }
+    let answerSource: 'typed' | 'transcript' | 'reported' = 'typed';
+    if (origin === 'tutor') {
+      const said = this.store
+        .snapshot()
+        .messages.filter((m) => m.sessionId === this.state.sessionId && m.role === 'user')
+        .slice(-4)
+        .map((m) => normalize(m.text));
+      const words = answer.kind === 'text' ? normalize(answer.text) : '';
+      answerSource = words && said.some((s) => s.includes(words)) ? 'transcript' : 'reported';
+    }
+    this.state.practice = { questionId: q.id, checking: true };
+    this.emit();
+    const ctl = new AbortController();
+    this.checking = ctl;
+    try {
+      let graded;
+      if (answer.kind === 'choice')
+        graded = { ...gradeChoice(q, answer.choiceId), grader: 'authored' as const, model: null };
+      else {
+        const result = await this.providers.grade(q, answer.text, ctl.signal);
+        graded = {
+          verdict: result.verdict,
+          feedback: result.feedback,
+          misconceptions: groundMisconceptions(answer.text, result.misconceptions),
+          grader: 'claude' as const,
+          model: this.providers.config.model,
+        };
+      }
+      if (ctl.signal.aborted) throw new Error('Answer checking was cancelled.');
+      // A tutor paraphrase is not the student's own words, so it is never evidence.
+      if (answerSource === 'reported') graded.misconceptions = [];
+      const attempt = this.store.addAttempt({
+        questionId: q.id,
+        lessonId,
+        sessionId: this.state.sessionId,
+        origin,
+        answerSource,
+        answer,
+        ...graded,
+      });
+      return attempt;
+    } finally {
+      if (this.checking === ctl) {
+        this.checking = undefined;
+        if (this.state.practice) this.state.practice.checking = false;
+        this.emit();
+      }
+    }
   }
   lessonContext() {
     const lesson = this.store.snapshot().lessons.find((l) => l.id === this.state.activeLessonId);
@@ -372,6 +492,36 @@ export class TutorService {
           generationId: job.id,
           kind: tool.kind,
           note: 'Generation runs in the background. The app sends a contextual update when it is shown or fails. You cannot see the result: do not describe its contents, and call it an AI-generated visual analogy, not a precise diagram.',
+        };
+      }
+      case 'ask_practice_question': {
+        this.openWorkspace();
+        return {
+          ...this.openPractice(tool.question),
+          note: 'The question is now shown. Ask it in your own short words, wait for the student, then call record_practice_attempt with their answer verbatim. Do not reveal the answer first.',
+        };
+      }
+      case 'record_practice_attempt': {
+        if (this.state.practice?.questionId !== tool.question) this.openPractice(tool.question);
+        const a = await this.answerPractice(
+          tool.question,
+          { kind: 'text', text: tool.answer },
+          'tutor',
+        );
+        return {
+          verdict: a.verdict,
+          feedback: a.feedback,
+          answerSource: a.answerSource,
+          possibleMisconceptions: a.misconceptions.map((m) => ({
+            ...misconceptions[m.id],
+            reviewStep: misconceptions[m.id].step,
+            evidence: m.evidence,
+          })),
+          modelAnswer: question(tool.question).modelAnswer,
+          note:
+            a.answerSource === 'reported'
+              ? 'Saved, but the answer did not match the student’s saved words, so no misconception was recorded. Pass their words verbatim next time.'
+              : 'Saved locally. Explain kindly using the feedback and correction; call any misconception possible, cite their words, and suggest the review step. Never call it mastery.',
         };
       }
       case 'analyze_current_screen': {

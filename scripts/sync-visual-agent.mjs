@@ -28,7 +28,13 @@ const attached = await Promise.all(
   ids.map((toolId) => request('/tools/' + encodeURIComponent(toolId))),
 );
 writeFileSync(directory + '/tools-before.json', JSON.stringify(attached, null, 2), { mode: 0o600 });
-for (const name of ['open_visual_lesson', 'navigate_visual_lesson', 'generate_illustration']) {
+for (const name of [
+  'open_visual_lesson',
+  'navigate_visual_lesson',
+  'generate_illustration',
+  'ask_practice_question',
+  'record_practice_attempt',
+]) {
   const tool_config = JSON.parse(readFileSync(`docs/agent-tools/${name}.json`, 'utf8'));
   const existing = attached.find((tool) => tool.tool_config.name === name);
   if (existing) await request('/tools/' + existing.id, 'PATCH', { tool_config });

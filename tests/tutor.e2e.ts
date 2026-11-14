@@ -681,3 +681,183 @@ test('fal visual analogy shows progress, saves with the lesson step, explains fa
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/** Adds fal and practice-grading fixtures on top of the existing provider fixture. */
+async function generatedFixtures(app: ElectronApplication, png: string) {
+  await app.evaluate((_electron, png) => {
+    const fs = process.getBuiltinModule('node:fs')!;
+    const g = globalThis as any,
+      previous = globalThis.fetch;
+    g.gradeRequests = [];
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    const base = 'https://queue.fal.run/fal-ai/flux/requests/demo-1';
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url === 'https://queue.fal.run/fal-ai/flux/schnell')
+        return json({ request_id: 'demo-1', status_url: base + '/status', response_url: base });
+      if (url === base + '/status') return json({ status: 'COMPLETED' });
+      if (url === base)
+        return json({
+          images: [{ url: 'https://v3.fal.media/files/demo/a.png', width: 1024, height: 1024 }],
+          has_nsfw_concepts: [false],
+        });
+      if (url === 'https://v3.fal.media/files/demo/a.png')
+        return new Response(fs.readFileSync(png), { headers: { 'content-type': 'image/png' } });
+      const body = typeof init?.body === 'string' ? init.body : '';
+      if (url === 'https://api.anthropic.com/v1/messages' && body.includes('one practice answer')) {
+        const request = JSON.parse(body);
+        g.gradeRequests.push(JSON.parse(request.messages[0].content));
+        return json({
+          stop_reason: 'end_turn',
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                verdict: 'partial',
+                feedback:
+                  'Good: the early steps prepare glucose. But four is the total made; two were invested, so the net gain is two.',
+                misconceptions: [{ id: 'gross-as-net', evidence: 'nets four ATP' }],
+              }),
+            },
+          ],
+        });
+      }
+      return previous(input, init);
+    };
+  }, png);
+}
+
+test('Stage 3 demo: lecture → visual lesson → fal media → practice misconception → saved restart', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-demo-'));
+  let app: ElectronApplication | undefined;
+  try {
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    const provider = await fixtures(app, page);
+    await generatedFixtures(app, resolve('assets/icons/yoyo.png'));
+    await app.evaluate(({ dialog }, path) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
+    }, resolve('public/sample-lecture.pdf'));
+    // 1. Lecture explanation of energy investment.
+    await page.getByRole('button', { name: 'Lecture walkthrough', exact: true }).click();
+    await page.getByRole('button', { name: /Upload your lecture/ }).click();
+    await page.getByRole('button', { name: 'Run me through the lecture', exact: true }).click();
+    await expect(page.locator('.lecture-slide-image img')).toBeVisible();
+    await expect
+      .poll(async () => {
+        const s = await page.evaluate(() => window.yoteach.getState());
+        return s.ok && s.value.messages.some((m) => m.role === 'assistant');
+      })
+      .toBe(true);
+    await provider.tool('save_explanation', { title: 'Why ATP is invested' });
+    // 2. "Show me what happens": the interactive authored lesson.
+    await provider.tool('open_visual_lesson', { lesson: 'glucose-phosphorylation', step: 3 });
+    await expect(page.getByRole('slider', { name: 'Phosphate transfer' })).toBeVisible();
+    // 3. A genuine fal request path (fixture queue), shown and saved with the step.
+    const started = await provider.tool('generate_illustration', {
+      subject: 'a small glowing orb handed from a battery to a hexagonal tile like a relay baton',
+      kind: 'image',
+    });
+    expect(started.started).toBe(true);
+    await expect(page.getByRole('img', { name: /AI-generated visual analogy/ })).toBeVisible();
+    await expect
+      .poll(() =>
+        provider.messages.some(
+          (m) => m.type === 'contextual_update' && String(m.text).includes('is now displayed'),
+        ),
+      )
+      .toBe(true);
+    // 4. Yoyo asks; the student answers incorrectly in their own words.
+    const asked = await provider.tool('ask_practice_question', { question: 'why-invest' });
+    expect(asked.modelAnswer).toBeUndefined();
+    await expect(page.getByRole('heading', { name: /why does a cell “invest” ATP/ })).toBeVisible();
+    await page.evaluate(() =>
+      window.yoteach.tutor.intent({
+        type: 'text',
+        text: 'It gets the sugar ready, and glycolysis nets four ATP overall.',
+      }),
+    );
+    await expect
+      .poll(async () => {
+        const s = await page.evaluate(() => window.yoteach.getState());
+        return s.ok && s.value.messages.some((m) => m.text.includes('nets four ATP overall'));
+      })
+      .toBe(true);
+    const recorded = await provider.tool('record_practice_attempt', {
+      question: 'why-invest',
+      answer: 'glycolysis nets four ATP overall',
+    });
+    expect(recorded.answerSource).toBe('transcript');
+    expect(recorded.possibleMisconceptions[0].evidence).toBe('nets four ATP');
+    const feedback = page.locator('.practice-feedback');
+    await expect(feedback.getByText('Partly there')).toBeVisible();
+    await expect(
+      feedback.getByText('Possible misconception: Glycolysis nets four ATP per glucose.'),
+    ).toBeVisible();
+    await expect(feedback.getByText('From your answer: “nets four ATP”')).toBeVisible();
+    // 5. The student also practises in the app: a deterministic option question.
+    await page.getByRole('tab', { name: 'Question 1' }).click();
+    await page.getByLabel('One ATP is produced as glucose is phosphorylated.').check();
+    await page.getByRole('button', { name: 'Check answer', exact: true }).click();
+    await expect(feedback.getByText('Not yet')).toBeVisible();
+    await expect(page.locator('.practice-review li')).toHaveCount(2);
+    await page
+      .getByLabel('One ATP is consumed; its terminal phosphate is transferred to glucose.')
+      .check();
+    await page.getByRole('button', { name: 'Check new answer', exact: true }).click();
+    await expect(feedback.getByText('Correct', { exact: true })).toBeVisible();
+    await expect(page.locator('.practice-review li')).toHaveCount(1);
+    expect(
+      provider.messages.some(
+        (m) => m.type === 'contextual_update' && String(m.text).includes('practice question'),
+      ),
+    ).toBe(true);
+    await page.screenshot({ path: '.impeccable/review/practice-feedback.png' });
+    await page
+      .locator('.practice-review')
+      .getByRole('button', { name: 'Review step 6', exact: true })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Zoom out: investment and payoff' }),
+    ).toBeVisible();
+    // Playback time never creates practice evidence.
+    const graded = await app.evaluate(() => (globalThis as any).gradeRequests.length);
+    expect(graded).toBe(1);
+    await page.getByRole('button', { name: 'Back to lecture', exact: true }).click();
+    await page.getByRole('button', { name: 'End lecture', exact: true }).click();
+    // 6. Restart: everything is still there.
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
+    const saved = page.getByRole('dialog');
+    await expect(saved.getByRole('heading', { name: 'Why ATP is invested' })).toBeVisible();
+    await expect(
+      saved.getByRole('button', { name: /Why invest ATP in glucose.*Step 6/ }),
+    ).toBeVisible();
+    await expect(
+      saved.getByRole('button', { name: /Visual analogy · Lesson step 3/ }),
+    ).toBeVisible();
+    await expect(saved.getByText('3 saved answers')).toBeVisible();
+    await expect(
+      saved.getByText('Possible misconception: Glycolysis nets four ATP per glucose.'),
+    ).toBeVisible();
+    await expect(saved.getByText('Suggested: lesson step 6')).toBeVisible();
+    await page.screenshot({ path: '.impeccable/review/saved-after-restart.png' });
+    await saved.getByRole('button', { name: 'Open practice', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /why does a cell “invest” ATP/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

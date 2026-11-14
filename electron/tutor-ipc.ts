@@ -155,7 +155,10 @@ export function installTutor(
       open();
     }
     if (action.type === 'lesson-step') service.stepLesson(action.id, action.step);
+    if (action.type === 'practice-open') service.openPractice(action.question);
+    if (action.type === 'practice-close') service.closePractice();
     if (action.type === 'lesson-close') {
+      if (service.state.practice) service.closePractice();
       service.state.activeLessonId = null;
       service.emit();
     }
@@ -398,6 +401,22 @@ export function installTutor(
       const job = service.generate(input, 'student');
       void job.settled;
       return { id: job.id };
+    },
+    true,
+  );
+  handle(
+    'practice:answer',
+    (input) => {
+      const p = z.object({ questionId: z.string(), answer: z.unknown() }).parse(input);
+      return service.answerPractice(p.questionId, p.answer as any, 'student');
+    },
+    true,
+  );
+  handle(
+    'practice:remove',
+    (input) => {
+      store.deleteAttempt(Id.parse(input));
+      emit();
     },
     true,
   );

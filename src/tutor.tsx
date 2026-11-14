@@ -7,7 +7,9 @@ import { HoldAudio } from './audio/hold-audio';
 const Context = createContext<{
   runtime: TutorRuntime | null;
   act: (action: TutorIntent) => Promise<void>;
-}>({ runtime: null, act: async () => {} });
+  /** Send study data to a live tutor conversation, if one is open. */
+  inform: (text: string) => void;
+}>({ runtime: null, act: async () => {}, inform: () => {} });
 export const useTutor = () => useContext(Context);
 export function TutorProvider({ children }: { children: ReactNode }) {
   const [runtime, setRuntime] = useState<TutorRuntime | null>(null);
@@ -356,6 +358,8 @@ export function TutorProvider({ children }: { children: ReactNode }) {
               'open_visual_lesson',
               'navigate_visual_lesson',
               'generate_illustration',
+              'ask_practice_question',
+              'record_practice_attempt',
               'analyze_current_screen',
               'highlight_screen_region',
               'draw_annotation',
@@ -633,6 +637,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
         act: async (action) => {
           await unwrap(api.tutor.intent(action));
         },
+        inform: (text) => voice.current?.sendContextualUpdate(text),
       }}
     >
       {children}

@@ -40,11 +40,27 @@ Evidence:
 - New Electron fixture journey (`fal visual analogy …` in `tests/tutor.e2e.ts`): queue status shown, real PNG decoded in the lesson, auth header only on queue requests, per-step media, 402 explained with Retry, Saved material reopens after restart. E2E launches now pin `FAL_KEY=test-only-fal` so the local `.env` key is never used by fixtures.
 - **Live fal verification passed (14 Nov 2026):** one `fal-ai/flux/schnell` image through the real Electron main process from the lesson button — visible after 3.9 s, 1024×768 JPEG, 245 KB, saved with lesson step 3. Script `work/live-fal.mjs`, result `work/live-fal-result.json`, screenshot `work/live-fal.png` (all ignored).
 
-## Remaining chunks (not implemented)
+## Chunk 4 — practice, feedback and review memory
 
-4. Practice answers, evidence-backed feedback/misconception/review memory; coherent demo and final review.
+Implemented:
+- `shared/practice.ts`: six authored questions tied to lesson steps (four options, two written), model answers and rubrics, and a closed catalog of seven sourced misconceptions, each with a correction and review step. Wrong options name their misconception.
+- Grading: an option (clicked, or typed/spoken verbatim) is graded deterministically. Written answers go to Claude (`Providers.grade`, structured output, catalog-only misconception IDs) against the model answer and rubric. A misconception is kept only if its evidence is an actual quote from the answer (`groundMisconceptions`). Tutor-recorded answers are checked against the student's last saved words: `transcript` keeps evidence, `reported` (a paraphrase) saves the verdict but never a misconception.
+- Schema **6** (exact `.v5.backup`) adds `attempts`: question, answer, verdict, feedback, misconceptions with evidence, grader/model, origin, answer source, lesson, session and lecture page. Deleting a session deletes its attempts; deleting a PDF unlinks only the source. Students can delete any answer.
+- Review suggestions (`reviewSuggestions`) come only from each question's latest answer; a later correct answer clears them. Elapsed time, playback and attendance are never used. Tutor context includes recent answers and review items so Yoyo can resume.
+- UI: Practice inside the lesson (question tabs with latest status, options or a written box, feedback with possible misconception, evidence, correction, Review step N, model answer, grader note, Suggested review). Saved material has Practice & review. The tutor's lesson entry shows the review count. Answers in the app are sent to a live conversation as context.
+- Agent tools `ask_practice_question` and `record_practice_attempt` (`docs/agent-tools/`), with prompt guidance. The sync script includes them; **not synced to the hosted agent yet.**
 
-Do not claim Stage 3 complete at an intermediate checkpoint. Keep the lecture launch page at two controls and preserve the two-mode workspace. No wake phrase was implemented; always-listening support remains deferred.
+Evidence:
+- 33 unit tests (6 new in `tests/practice.test.ts`).
+- New Electron demo journey "Stage 3 demo: lecture → visual lesson → fal media → practice misconception → saved restart" (fixture providers, real UI). Screenshots in ignored `.impeccable/review/`.
+- **Live Claude grading passed:** `claude-sonnet-4-6`, 4.9 s. The answer "…glycolysis nets four ATP overall" was graded partial, with `gross-as-net` grounded on the exact quote. Files `work/live-grade.ts` and `work/live-grade-result.json`.
+
+## Remaining
+
+- Live voice practice through the hosted agent (after syncing tools).
+- The user's next request (14 Nov): Yoyo should teach mainly by drawing on the user's screen rather than opening the app window. Only the lecture stays in the app's PDF view.
+
+Do not claim Stage 3 complete until the user reviews it. Keep the lecture launch page at two controls and preserve the two-mode workspace. No wake phrase was implemented; always-listening support remains deferred.
 
 
 ## Resume instructions

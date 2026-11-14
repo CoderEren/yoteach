@@ -15,6 +15,8 @@ import { Companion } from './components/Companion';
 import { TutorWorkspace } from './components/TutorWorkspace';
 import { Modal } from './components/Modal';
 import { MediaView } from './components/GeneratedMedia';
+import { ReviewList } from './components/Practice';
+import { reviewSuggestions } from '../shared/practice';
 import { Yoyo } from './components/Yoyo';
 import { useTutor } from './tutor';
 import { LectureStage } from './components/LectureStage';
@@ -106,7 +108,10 @@ export default function App() {
   if (overlay) return <DesktopOverlay />;
   const lesson = data.lessons.find((l) => l.id === r?.activeLessonId);
   const media = data.media.find((m) => m.id === mediaId);
-  if (lesson) return <VisualLesson key={lesson.id} saved={lesson} media={data.media} />;
+  if (lesson)
+    return (
+      <VisualLesson key={lesson.id} saved={lesson} media={data.media} attempts={data.attempts} />
+    );
   if (r?.lecture) return <LectureStage media={data.media} />;
   const doc = data.documents.find((d) => d.id === viewer?.id);
   return (
@@ -312,6 +317,27 @@ export default function App() {
                 {lessonDefinition(l.key).title} · Step {l.step}
               </button>
             ))}
+            {data.attempts.length > 0 && (
+              <article className="saved-practice">
+                <h3>Practice & review</h3>
+                <p>
+                  {data.attempts.length} saved {data.attempts.length === 1 ? 'answer' : 'answers'} ·
+                  review is based only on your latest answer to each question.
+                </p>
+                <ReviewList items={reviewSuggestions(data.attempts)} />
+                <button
+                  className="button small"
+                  onClick={() => {
+                    setSaved(false);
+                    void act({ type: 'lesson-open', lesson: 'glucose-phosphorylation' }).then(() =>
+                      act({ type: 'practice-open' }),
+                    );
+                  }}
+                >
+                  Open practice
+                </button>
+              </article>
+            )}
             {[...data.media].reverse().map((m) => (
               <button
                 className="button"
@@ -360,6 +386,7 @@ export default function App() {
               ))}
             {!data.lessons.length &&
               !data.media.length &&
+              !data.attempts.length &&
               !data.documents.length &&
               !data.explanations.length &&
               !data.topics.some((t) => t.overview) && (

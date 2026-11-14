@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { LessonKey, LessonStep } from './lessons';
 import { MediaKind, Subject, type Generation } from './media';
+import { QuestionId } from './practice';
 const Uuid = z.uuid();
 export const Shape = z.enum(['highlight', 'arrow', 'circle', 'point', 'label']);
 export const Box = z
@@ -107,6 +108,7 @@ export type TutorRuntime = {
   latencyMs: number | null;
   error: string;
   generation: Generation | null;
+  practice: { questionId: QuestionId; checking: boolean } | null;
   config: {
     voice: boolean;
     vision: boolean;
@@ -127,6 +129,12 @@ export const ToolSchema = z.discriminatedUnion('name', [
     subject: Subject,
     kind: MediaKind.default('image'),
   }),
+  z.object({ name: z.literal('ask_practice_question'), question: QuestionId.optional() }),
+  z.object({
+    name: z.literal('record_practice_attempt'),
+    question: QuestionId,
+    answer: z.string().trim().min(1).max(2000),
+  }),
   z.object({
     name: z.literal('analyze_current_screen'),
     question: z.string().trim().min(1).max(2000),
@@ -146,6 +154,8 @@ export const IntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('lesson-step'), id: Uuid, step: LessonStep }),
   z.object({ type: z.literal('lesson-close') }),
   z.object({ type: z.literal('lesson-narrate') }),
+  z.object({ type: z.literal('practice-open'), question: QuestionId.optional() }),
+  z.object({ type: z.literal('practice-close') }),
   z.object({ type: z.literal('hold-start') }),
   z.object({ type: z.literal('hold-end') }),
   z.object({ type: z.literal('hold-cancel') }),

@@ -317,7 +317,7 @@ test('failed or cancelled generation saves nothing; v4 data migrates with an exa
     writeFileSync(join(w.store.mediaDir, `${randomUUID()}.jpg.tmp`), JPEG);
     writeFileSync(join(w.store.mediaDir, 'keep-me.txt'), 'not owned');
     const migrated = new Store(w.dir);
-    assert.equal(migrated.snapshot().version, 5);
+    assert.equal(migrated.snapshot().version, 6);
     assert.deepEqual(migrated.snapshot().media, []);
     assert.equal(migrated.snapshot().documents[0].id, w.doc.id);
     assert.equal(readFileSync(w.store.file + '.v4.backup', 'utf8'), bytes);

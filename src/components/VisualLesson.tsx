@@ -1,13 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Pause, Play, RotateCcw, Volume2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ClipboardCheck,
+  Pause,
+  Play,
+  RotateCcw,
+  Volume2,
+  X,
+} from 'lucide-react';
 import { lessonDefinition, type SavedLesson } from '../../shared/lessons';
 import { useTutor } from '../tutor';
 import { LessonScene } from './LessonScene';
 import { HoldButton } from './HoldButton';
 import { GenerationPanel } from './GeneratedMedia';
 import type { GeneratedMedia } from '../../shared/media';
+import type { PracticeAttempt } from '../../shared/practice';
+import { PracticePanel } from './Practice';
 
-export function VisualLesson({ saved, media }: { saved: SavedLesson; media: GeneratedMedia[] }) {
+export function VisualLesson({
+  saved,
+  media,
+  attempts,
+}: {
+  saved: SavedLesson;
+  media: GeneratedMedia[];
+  attempts: PracticeAttempt[];
+}) {
   const definition = lessonDefinition(saved.key),
     step = definition.steps[saved.step - 1];
   const { runtime: r, act } = useTutor();
@@ -15,6 +34,8 @@ export function VisualLesson({ saved, media }: { saved: SavedLesson; media: Gene
     [transfer, setTransfer] = useState(0),
     [error, setError] = useState('');
   const title = useRef<HTMLHeadingElement>(null);
+  const practicing = useRef(false);
+  practicing.current = !!r?.practice;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   async function go(number: number, keepPlaying = false) {
     if (!keepPlaying) setPlaying(false);
@@ -64,6 +85,13 @@ export function VisualLesson({ saved, media }: { saved: SavedLesson; media: Gene
         e.target.closest('button,input,textarea,select,a,[contenteditable]')
       )
         return;
+      if (practicing.current) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          void act({ type: 'practice-close' });
+        }
+        return;
+      }
       if (e.key === ' ' || e.key === 'ArrowRight') {
         e.preventDefault();
         void go(saved.step + 1);
@@ -105,46 +133,55 @@ export function VisualLesson({ saved, media }: { saved: SavedLesson; media: Gene
           </button>
         ))}
       </div>
-      <section className="lesson-body glass">
-        <div className="lesson-diagram">
-          <span className="lesson-diagram-label">Schematic · not to scale</span>
-          <LessonScene scene={step.scene} transfer={transfer} />
-          {step.scene === 'transfer' && (
-            <label className="lesson-scrubber">
-              Follow the phosphate{' '}
-              <input
-                aria-label="Phosphate transfer"
-                type="range"
-                min="0"
-                max="100"
-                value={transfer}
-                onChange={(e) => {
-                  setPlaying(false);
-                  setTransfer(Number(e.target.value));
-                }}
-              />
-              <span>{transfer === 100 ? 'Transferred' : `${Math.round(transfer)}%`}</span>
-            </label>
-          )}
-          {step.scene === 'products' && (
-            <small>Biochemical shorthand; proton balance and ionic forms are omitted.</small>
-          )}
-        </div>
-        <article className="lesson-explanation" aria-live="polite">
-          <p className="eyebrow">
-            Step {saved.step} of {definition.steps.length}
-          </p>
-          <h2>{step.title}</h2>
-          <p>{step.text}</p>
-          <blockquote>{step.takeaway}</blockquote>
-          <GenerationPanel
-            media={media}
-            subject={step.analogy}
-            lessonId={saved.id}
-            lessonStep={saved.step}
-          />
-        </article>
-      </section>
+      {r?.practice ? (
+        <PracticePanel
+          attempts={attempts}
+          onReview={(n) => {
+            void act({ type: 'practice-close' }).then(() => go(n));
+          }}
+        />
+      ) : (
+        <section className="lesson-body glass">
+          <div className="lesson-diagram">
+            <span className="lesson-diagram-label">Schematic · not to scale</span>
+            <LessonScene scene={step.scene} transfer={transfer} />
+            {step.scene === 'transfer' && (
+              <label className="lesson-scrubber">
+                Follow the phosphate{' '}
+                <input
+                  aria-label="Phosphate transfer"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={transfer}
+                  onChange={(e) => {
+                    setPlaying(false);
+                    setTransfer(Number(e.target.value));
+                  }}
+                />
+                <span>{transfer === 100 ? 'Transferred' : `${Math.round(transfer)}%`}</span>
+              </label>
+            )}
+            {step.scene === 'products' && (
+              <small>Biochemical shorthand; proton balance and ionic forms are omitted.</small>
+            )}
+          </div>
+          <article className="lesson-explanation" aria-live="polite">
+            <p className="eyebrow">
+              Step {saved.step} of {definition.steps.length}
+            </p>
+            <h2>{step.title}</h2>
+            <p>{step.text}</p>
+            <blockquote>{step.takeaway}</blockquote>
+            <GenerationPanel
+              media={media}
+              subject={step.analogy}
+              lessonId={saved.id}
+              lessonStep={saved.step}
+            />
+          </article>
+        </section>
+      )}
       {(error || r?.error) && (
         <div className="banner error" role="alert">
           {error || r?.error}
@@ -206,6 +243,16 @@ export function VisualLesson({ saved, media }: { saved: SavedLesson; media: Gene
               Stop voice
             </button>
           )}
+          <button
+            className="button"
+            aria-pressed={!!r?.practice}
+            onClick={() =>
+              void act(r?.practice ? { type: 'practice-close' } : { type: 'practice-open' })
+            }
+          >
+            <ClipboardCheck size={17} />
+            {r?.practice ? 'Back to lesson' : 'Practice'}
+          </button>
           <HoldButton />
         </div>
       </footer>

@@ -18,6 +18,7 @@ import {
   type Explanation,
 } from '../shared/tutor';
 import { LessonKey, LessonStep, type SavedLesson } from '../shared/lessons';
+import { AttemptSchema, type PracticeAttempt } from '../shared/practice';
 import {
   GeneratedMediaSchema,
   MediaFilename,
@@ -53,13 +54,14 @@ export class Store {
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, 'utf8'));
-        if ([1, 2, 3, 4].includes(raw.version)) {
+        if ([1, 2, 3, 4, 5].includes(raw.version)) {
           // Keep an exact pre-migration snapshot, including legacy notes and associations.
           const backup = this.file + `.v${raw.version}.backup`;
           if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
-          raw.version = 5;
+          raw.version = 6;
           raw.lessons ??= [];
           raw.media ??= [];
+          raw.attempts ??= [];
           raw.sessions ??= [];
           raw.messages ??= [];
           raw.explanations ??= [];
@@ -164,6 +166,29 @@ export class Store {
       throw error;
     }
     return media;
+  }
+  addAttempt(input: Omit<PracticeAttempt, 'id' | 'createdAt' | 'source'>) {
+    const n = this.snapshot();
+    const session = input.sessionId ? n.sessions.find((s) => s.id === input.sessionId) : null;
+    const lesson = input.lessonId ? n.lessons.find((l) => l.id === input.lessonId) : null;
+    if (input.lessonId && !lesson) throw new Error('This saved lesson is unavailable.');
+    const attempt = AttemptSchema.parse({
+      ...input,
+      id: randomUUID(),
+      sessionId: session ? session.id : null,
+      source: session?.documentId
+        ? { documentId: session.documentId, page: session.page }
+        : (lesson?.source ?? null),
+      createdAt: new Date().toISOString(),
+    });
+    n.attempts.push(attempt);
+    this.save(n);
+    return attempt;
+  }
+  deleteAttempt(id: string) {
+    const n = this.snapshot();
+    n.attempts = n.attempts.filter((a) => a.id !== id);
+    this.save(n);
   }
   readMedia(id: string): { bytes: Uint8Array; contentType: MediaType } {
     const media = this.state.media.find((m) => m.id === id);
@@ -344,10 +369,10 @@ export class Store {
     n.explanations.forEach((e) => {
       if (e.source && !n.documents.some((d) => d.id === e.source!.documentId)) e.source = null;
     });
-    n.media.forEach((m) => {
+    for (const m of [...n.media, ...n.attempts]) {
       if (m.source && !n.documents.some((d) => d.id === m.source!.documentId)) m.source = null;
       if (m.sessionId && !n.sessions.some((s) => s.id === m.sessionId)) m.sessionId = null;
-    });
+    }
     this.save(n);
     this.cleanupOrphans();
     return this.snapshot();
@@ -485,6 +510,7 @@ export class Store {
     n.messages = n.messages.filter((m) => m.sessionId !== id);
     n.explanations = n.explanations.filter((e) => e.sessionId !== id);
     n.media = n.media.filter((m) => m.sessionId !== id);
+    n.attempts = n.attempts.filter((a) => a.sessionId !== id);
     this.save(n);
     this.cleanupOrphans();
   }
