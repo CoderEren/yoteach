@@ -20,6 +20,9 @@ import { z } from 'zod';
 import { Id, ImportSchema } from '../shared/model';
 import { Store } from './store';
 import { installTutor } from './tutor-ipc';
+import { installDesktop } from './desktop';
+let desktop: ReturnType<typeof installDesktop> | undefined;
+let overlay: BrowserWindow | null = null;
 let tutoring: ReturnType<typeof installTutor> | undefined;
 const here = dirname(fileURLToPath(import.meta.url));
 const dev =
@@ -36,9 +39,7 @@ let workspace: BrowserWindow | null = null,
   companion: BrowserWindow | null = null,
   tray: Tray | null = null,
   store: Store,
-  quitting = false,
-  expanded = false;
-let moveTimer: ReturnType<typeof setTimeout> | undefined;
+  quitting = false;
 const pending = new Map<
   string,
   { bytes: Uint8Array; name: string; courseId: string | null; created: number }
@@ -82,6 +83,7 @@ function createWorkspace() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      backgroundThrottling: false,
       webSecurity: true,
     },
   });
@@ -107,22 +109,6 @@ function clampPosition(x: number, y: number, width: number, height: number) {
     y: Math.round(Math.max(area.y, Math.min(y, area.y + area.height - height))),
   };
 }
-function savePosition() {
-  if (!companion || companion.isDestroyed()) return;
-  const b = companion.getBounds();
-  const compact = { x: b.x + b.width - 200, y: b.y + b.height - 220 };
-  store.settings({ mascotPosition: compact });
-}
-function resizeCompanion(open: boolean) {
-  if (!companion) return;
-  const b = companion.getBounds(),
-    width = open ? 350 : 200,
-    height = open ? 540 : 220;
-  expanded = open;
-  const p = clampPosition(b.x + b.width - width, b.y + b.height - height, width, height);
-  companion.setBounds({ ...p, width, height });
-  savePosition();
-}
 function showCompanion(show: boolean) {
   if (!companion) return;
   store.settings({ mascotVisible: show });
@@ -132,8 +118,8 @@ function showCompanion(show: boolean) {
     if (process.platform === 'darwin' && companion.isSimpleFullScreen())
       companion.setSimpleFullScreen(false);
     if (companion.isMaximized()) companion.unmaximize();
-    const width = expanded ? 350 : 200,
-      height = expanded ? 540 : 220;
+    const width = 200,
+      height = 220;
     const current = companion.getBounds();
     const saved = store.snapshot().settings.mascotPosition;
     const x = current.width === width ? current.x : (saved?.x ?? current.x) + 200 - width;
@@ -159,6 +145,8 @@ function createCompanion() {
     width: 200,
     height: 220,
     frame: false,
+    type: 'panel',
+    focusable: false,
     transparent: true,
     backgroundColor: '#00000000',
     hasShadow: false,
@@ -179,7 +167,7 @@ function createCompanion() {
       webSecurity: true,
     },
   });
-  companion.setAlwaysOnTop(true, 'floating');
+  companion.setAlwaysOnTop(true, 'pop-up-menu');
   companion.on('enter-full-screen', () => companion?.setFullScreen(false));
   companion.on('leave-full-screen', () => {
     if (store.snapshot().settings.mascotVisible) showCompanion(true);
@@ -189,9 +177,8 @@ function createCompanion() {
   companion.once('ready-to-show', () => {
     if (store.snapshot().settings.mascotVisible) companion?.showInactive();
   });
-  companion.on('moved', () => {
-    clearTimeout(moveTimer);
-    moveTimer = setTimeout(savePosition, 250);
+  companion.on('closed', () => {
+    companion = null;
   });
   companion.on('close', (event) => {
     if (!quitting) {
@@ -224,7 +211,8 @@ function registerHandlers() {
           !owner ||
           !frame ||
           frame !== event.sender.mainFrame ||
-          ![workspace, companion].includes(owner) ||
+          ![workspace, companion, overlay].includes(owner) ||
+          (owner === overlay && !['workspace:get', 'tutor:get'].includes(channel)) ||
           (workspaceOnly && owner !== workspace)
         )
           throw new Error('This action is not available in this window.');
@@ -252,6 +240,7 @@ function registerHandlers() {
     () => companion,
     () => {
       sendState();
+      if (tutoring) desktop?.update(tutoring.service.get());
     },
     showWorkspace,
     resolve(here, '..'),
@@ -261,6 +250,7 @@ function registerHandlers() {
     'workspace:command',
     (input) => {
       store.command(input);
+      desktop?.keySettings();
       if (
         tutoring?.service.state.sessionId &&
         !store.snapshot().sessions.some((s) => s.id === tutoring!.service.state.sessionId)
@@ -340,6 +330,30 @@ function registerHandlers() {
     true,
   );
   handle('pdf:read', (input) => store.readPdf(Id.parse(input)), true);
+  handle('companion:drag', (input) => {
+    desktop?.drag(
+      z
+        .object({
+          phase: z.enum(['start', 'move', 'end']),
+          x: z.number().finite(),
+          y: z.number().finite(),
+        })
+        .parse(input),
+    );
+    return sendState();
+  });
+  handle(
+    'lecture:fullscreen',
+    (input) => {
+      const show = z.boolean().parse(input);
+      if (show) {
+        showWorkspace();
+        showCompanion(true);
+      }
+      workspace?.setFullScreen(show);
+    },
+    true,
+  );
   handle('companion:action', (input) => {
     switch (z.enum(['show', 'hide', 'expand', 'collapse', 'workspace']).parse(input)) {
       case 'show':
@@ -349,10 +363,8 @@ function registerHandlers() {
         showCompanion(false);
         break;
       case 'expand':
-        resizeCompanion(true);
-        break;
       case 'collapse':
-        resizeCompanion(false);
+        showCompanion(true);
         break;
       case 'workspace':
         showWorkspace();
@@ -409,6 +421,48 @@ else {
     hiddenCheck.unref();
     createWorkspace();
     createCompanion();
+    overlay = new BrowserWindow({
+      width: 200,
+      height: 200,
+      frame: false,
+      type: 'panel',
+      focusable: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      resizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      show: false,
+      webPreferences: {
+        preload: join(here, 'preload.cjs'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    overlay.on('closed', () => {
+      overlay = null;
+    });
+    overlay.setIgnoreMouseEvents(true);
+    overlay.setAlwaysOnTop(true, 'floating');
+    overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    load(overlay, '/overlay');
+    desktop = installDesktop({
+      store,
+      root: here,
+      pet: () => companion,
+      main: () => workspace,
+      overlay: () => overlay,
+      intent: (action) => tutoring?.intent(action),
+      keyError: (error) => {
+        if (tutoring && tutoring.service.state.hotkeyError !== error) {
+          tutoring.service.state.hotkeyError = error;
+          tutoring.service.emit();
+        }
+      },
+    });
+    desktop.keySettings();
     const image = nativeImage
       .createFromDataURL(
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAAAeUlEQVR4nO3UwQ6AIAwDUP7/p/HiiQji2mVV22QnYLxkhNacD6afJdGnD1XdxyCD0kHj+u4+KFdNZpDVxazvYwqMoMoxqagoRmZUqSAUQ0WxMDTUK0B32J2zNAwKglAGRUFlD9sgg1BQBooSKYwkiIFKiwzkKcz5Rw7B58pEFeJqLAAAAABJRU5ErkJggg==',
@@ -482,8 +536,7 @@ else {
   app.on('before-quit', () => {
     quitting = true;
     tutoring?.stopSession();
-    clearTimeout(moveTimer);
-    if (store) savePosition();
+    desktop?.returnHome();
   });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('window-all-closed', () => {

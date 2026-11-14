@@ -20,6 +20,17 @@ export const SnapshotSchema = z.object({
       name: z.string().max(240),
     }),
     z.object({ kind: z.literal('window'), id: z.string().max(200), name: z.string().max(240) }),
+    z.object({
+      kind: z.literal('screen'),
+      id: z.string().max(200),
+      name: z.string().max(240),
+      bounds: z.object({
+        x: z.number().int(),
+        y: z.number().int(),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+      }),
+    }),
   ]),
   image: z
     .string()
@@ -80,7 +91,11 @@ export type TutorRuntime = {
   mode: 'voice' | 'text';
   activity: 'idle' | 'listening' | 'thinking' | 'speaking' | 'pointing' | 'success' | 'error';
   mic: boolean;
-  sharing: 'off' | 'window' | 'pdf';
+  input: 'idle' | 'arming' | 'listening' | 'sending';
+  hotkeyError: string;
+  focusRegion: string | null;
+  focusRevision: number;
+  sharing: 'off' | 'window' | 'pdf' | 'screen';
   sourceName: string;
   epoch: number;
   snapshot: SharedSnapshot | null;
@@ -107,6 +122,9 @@ export const ToolSchema = z.discriminatedUnion('name', [
 ]);
 export type TutorTool = z.infer<typeof ToolSchema>;
 export const IntentSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('hold-start') }),
+  z.object({ type: z.literal('hold-end') }),
+  z.object({ type: z.literal('hold-cancel') }),
   z.object({
     type: z.literal('start'),
     topicId: Uuid.nullable().default(null),
@@ -127,6 +145,7 @@ export type TutorIntent = z.infer<typeof IntentSchema>;
 export const RuntimeUpdateSchema = z.object({
   sessionId: Uuid,
   lecturePreparing: z.boolean().optional(),
+  input: z.enum(['idle', 'arming', 'listening', 'sending']).optional(),
   status: z.enum(['connecting', 'connected', 'paused', 'error']).optional(),
   activity: z
     .enum(['idle', 'listening', 'thinking', 'speaking', 'pointing', 'success', 'error'])
@@ -153,6 +172,7 @@ export interface TutorApi {
     eventId: string,
   ): Promise<import('./model').Result<void>>;
   tool(sessionId: string, tool: TutorTool): Promise<import('./model').Result<unknown>>;
+  captureScreen(): Promise<import('./model').Result<void>>;
   windows(): Promise<import('./model').Result<WindowSource[]>>;
   selectWindow(id: string): Promise<import('./model').Result<number>>;
   validateWindow(id: string, epoch: number): Promise<import('./model').Result<boolean>>;

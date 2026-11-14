@@ -18,6 +18,7 @@ const api: DesktopApi = {
     transcript: (sessionId, role, text, eventId) =>
       ipcRenderer.invoke('tutor:transcript', { sessionId, role, text, eventId }),
     tool: (sessionId, tool) => ipcRenderer.invoke('tutor:tool', { sessionId, tool }),
+    captureScreen: () => ipcRenderer.invoke('tutor:capture-screen'),
     windows: () => ipcRenderer.invoke('tutor:windows'),
     selectWindow: (id) => ipcRenderer.invoke('tutor:select-window', id),
     validateWindow: (id, epoch) => ipcRenderer.invoke('tutor:validate-window', { id, epoch }),
@@ -46,6 +47,9 @@ const api: DesktopApi = {
   cancelImport: (token) => ipcRenderer.invoke('pdf:cancel', token),
   readPdf: (id) => ipcRenderer.invoke('pdf:read', id),
   companion: (action) => ipcRenderer.invoke('companion:action', action),
+  drag: (action) => ipcRenderer.invoke('companion:drag', action),
+  lectureFullScreen: (show) => ipcRenderer.invoke('lecture:fullscreen', show),
+  onPose: (fn) => listen('companion:pose', fn),
   onState: (callback) => {
     const listener = (_event: unknown, state: Parameters<typeof callback>[0]) => callback(state);
     ipcRenderer.on('workspace:changed', listener);

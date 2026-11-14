@@ -216,7 +216,8 @@ export class Store {
         break;
       }
       case 'settings.update':
-        n.settings.theme = cmd.theme;
+        if (cmd.theme) n.settings.theme = cmd.theme;
+        if (cmd.talkKey) n.settings.talkKey = cmd.talkKey;
         break;
     }
     if (!n.topics.some((t) => t.id === n.settings.lastTopicId)) n.settings.lastTopicId = null;

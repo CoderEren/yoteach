@@ -2832,3 +2832,206 @@ html:has(.companion-body),
     transition: none !important;
   }
 }
+
+/* The desktop companion is the interaction surface, without a separate panel or drag grip. */
+.companion-bare {
+  width: 200px;
+  height: 220px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+}
+.companion-bare .mascot-button {
+  position: relative;
+  width: 200px;
+  height: 220px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  -webkit-app-region: no-drag;
+  touch-action: none;
+  user-select: none;
+}
+.companion-bare .mascot-button:active {
+  cursor: grabbing;
+}
+.companion-bare .yoyo {
+  width: 200px;
+  height: 210px;
+  pointer-events: none;
+}
+.listening-halo {
+  position: absolute;
+  inset: 25px 25px 31px 14px;
+  border: 3px solid transparent;
+  border-radius: 50%;
+  transition:
+    border-color 0.18s,
+    box-shadow 0.18s;
+}
+.input-listening .listening-halo {
+  border-color: #89e6d6;
+  box-shadow:
+    0 0 18px #84e3dc88,
+    inset 0 0 16px #94efe766;
+  animation: listening-ring 1.2s ease-in-out infinite;
+}
+.input-arming .listening-halo,
+.input-sending .listening-halo {
+  border-color: #bca6f0;
+  border-style: dashed;
+}
+@keyframes listening-ring {
+  50% {
+    box-shadow:
+      0 0 27px #8de9dfbb,
+      inset 0 0 20px #94efe755;
+  }
+}
+.yoyo-string {
+  transition: d 0.25s ease;
+}
+.yoyo-pointing .yoyo-string {
+  animation: none;
+}
+.yoyo--pointing .yoyo-string {
+  animation: none;
+}
+.yoyo--listening .yoyo-face {
+  transform: translateY(-2px);
+}
+.tutor-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.hold-button {
+  touch-action: none;
+  user-select: none;
+  min-width: 155px;
+}
+.hold-button.is-listening {
+  background: #246f68;
+  box-shadow: 0 0 0 4px #86d9cb44;
+}
+.lecture-launch {
+  min-height: calc(100vh - 160px);
+  max-width: 660px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 24px;
+}
+.lecture-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 280px;
+  padding: 36px;
+  border: 1px dashed #b5aed2;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+.lecture-upload strong {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.lecture-upload span {
+  font-size: 13px;
+}
+.lecture-run {
+  align-self: center;
+  min-width: 260px;
+  min-height: 46px;
+}
+.lecture-stage {
+  width: 100vw;
+  height: 100vh;
+  background: #0c1020;
+  color: #f4f7ff;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 76px;
+}
+.lecture-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+.lecture-slide-image {
+  position: relative;
+  max-height: 100%;
+}
+.lecture-slide-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.lecture-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+.lecture-error {
+  position: absolute;
+  bottom: 12px;
+  max-width: 650px;
+  padding: 12px;
+  background: #371d28;
+  border-radius: 12px;
+}
+.desktop-overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+}
+.desktop-overlay .annotation-layer {
+  width: 100%;
+  height: 100%;
+}
+.desktop-overlay .annotation {
+  filter: drop-shadow(0 1px 2px #19133799);
+}
+.talk-key-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.talk-key-setting select {
+  padding: 10px;
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+@media (prefers-reduced-motion: reduce) {
+  .listening-halo,
+  .yoyo-string {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.yoyo-face {
+  transition: transform 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yoyo-face {
+    transition: none;
+  }
+}

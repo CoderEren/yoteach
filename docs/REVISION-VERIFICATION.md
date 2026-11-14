@@ -1,3 +1,5 @@
+> Historical lecture-restructuring verification. For the current hold-to-talk UI, desktop overlays and final checks, see [HOLD-TO-TALK-VERIFICATION.md](HOLD-TO-TALK-VERIFICATION.md).
+
 # Stage 2 lecture workflow verification — 14 November 2026
 
 ## Implementation

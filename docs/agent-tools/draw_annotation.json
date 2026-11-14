@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "draw_annotation",
-  "description": "Change a grounded region to an arrow, circle, point, label or highlight. Never invent coordinates or region identifiers.",
+  "description": "Point out a grounded region with an arrow, circle, point, label or highlight on the full-screen lecture or desktop overlay. Yoyo moves beside it and returns home. Never invent coordinates or region identifiers.",
   "expects_response": true,
   "response_timeout_secs": 60,
   "parameters": {

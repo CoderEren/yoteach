@@ -4,15 +4,17 @@ import type { MascotState } from '../../shared/model';
 export function Yoyo({
   state = 'idle',
   className = '',
+  direction = null,
 }: {
   state?: MascotState;
   className?: string;
+  direction?: 'left' | 'right' | null;
 }) {
   const id = useId().replace(/:/g, '');
   return (
     <svg
       viewBox="0 0 240 245"
-      className={`yoyo yoyo--${state} ${className}`}
+      className={`yoyo yoyo--${state} ${direction ? 'yoyo-pointing' : ''} ${className}`}
       role="img"
       aria-label={`Yoyo, ${state}`}
     >
@@ -80,8 +82,10 @@ export function Yoyo({
         <path
           className="yoyo-string"
           d={
-            state === 'pointing'
-              ? 'M171 158 Q172 211 126 211 Q84 214 124 184 Q163 151 222 135 L213 132 M222 135 L216 144'
+            direction || state === 'pointing'
+              ? direction === 'left'
+                ? 'M72 173 Q40 176 14 124'
+                : 'M163 181 Q190 161 225 123'
               : state === 'success'
                 ? 'M171 158 Q177 204 139 210 Q99 218 73 201 Q37 175 23 203'
                 : 'M171 158 Q180 205 143 215 Q112 223 74 203 Q38 182 27 200 Q14 224 73 217 Q102 213 90 207'
@@ -92,6 +96,19 @@ export function Yoyo({
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+        {(direction || state === 'pointing') && (
+          <path
+            d={
+              direction === 'left'
+                ? 'M5 108 l-2 -8 M17 103 l1 -8 M27 109 l5 -5'
+                : 'M221 107 l-1 -8 M232 111 l5 -6 M235 123 l5 -1'
+            }
+            stroke="#9c8bda"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+        )}
         <g className="yoyo-face" fill="#313050">
           {state === 'success' ? (
             <path

@@ -10,3 +10,5 @@ cpSync(
   'node_modules/@alexanderolsen/libsamplerate-js/dist/libsamplerate.worklet.js',
   'public/voice/libsamplerate.js',
 );
+
+cpSync('src/audio/hold-recorder.worklet.js', 'public/voice/hold-recorder.js');

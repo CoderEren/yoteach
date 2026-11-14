@@ -15,6 +15,8 @@ import { TutorWorkspace } from './components/TutorWorkspace';
 import { Modal } from './components/Modal';
 import { Yoyo } from './components/Yoyo';
 import { useTutor } from './tutor';
+import { LectureStage } from './components/LectureStage';
+import { DesktopOverlay } from './components/DesktopOverlay';
 const PdfViewer = lazy(() =>
   import('./components/PdfViewer').then((m) => ({ default: m.PdfViewer })),
 );
@@ -27,8 +29,9 @@ export default function App() {
   const [settings, setSettings] = useState(false),
     [saved, setSaved] = useState(false);
   const [viewer, setViewer] = useState<{ id: string; page: number } | null>(null);
-  const { runtime: r } = useTutor();
+  const { runtime: r, act } = useTutor();
   const companion = location.hash === '#/companion';
+  const overlay = location.hash === '#/overlay';
   useEffect(() => {
     if (!api) {
       setError('Launch the desktop app with npm run dev.');
@@ -40,7 +43,7 @@ export default function App() {
     return api.onState(setData);
   }, []);
   useEffect(() => {
-    document.body.classList.toggle('companion-body', companion);
+    document.body.classList.toggle('companion-body', companion || overlay);
     const media = matchMedia('(prefers-color-scheme: dark)');
     const apply = () =>
       (document.documentElement.dataset.theme =
@@ -95,6 +98,8 @@ export default function App() {
       </div>
     );
   if (companion) return <Companion data={data} />;
+  if (overlay) return <DesktopOverlay />;
+  if (r?.lecture) return <LectureStage />;
   const doc = data.documents.find((d) => d.id === viewer?.id);
   return (
     <div className="app-shell">
@@ -172,74 +177,91 @@ export default function App() {
               {busy}
             </div>
           )}
-          {mode === 'lecture' && !r?.sessionId && (
-            <section className="lecture-library glass">
-              <div>
-                <h1>Your lecture, explained.</h1>
-                <p>
-                  Upload your slides as a PDF. Yoyo teaches each slide and makes room for your
-                  questions.
+          {mode === 'lecture' ? (
+            <section className="lecture-launch">
+              <button
+                className="lecture-upload glass"
+                disabled={!!busy}
+                onClick={() => void importPdf()}
+              >
+                <Upload size={30} />
+                <strong>
+                  {data.documents.find((d) => d.id === lectureId)?.originalName ??
+                    'Upload your lecture'}
+                </strong>
+                <span>
+                  {lectureId ? 'Click to replace · PDF' : 'Choose a PDF of your lecture slides'}
+                </span>
+              </button>
+              <button
+                className="button primary lecture-run"
+                disabled={
+                  !lectureId ||
+                  !!busy ||
+                  !r?.config.voice ||
+                  !r?.config.vision ||
+                  r?.status === 'connecting'
+                }
+                onClick={() =>
+                  void act({
+                    type: 'start',
+                    topicId: null,
+                    documentId: lectureId,
+                    page: data.sessions.filter((s) => s.documentId === lectureId).at(-1)?.page ?? 1,
+                    mode: 'voice',
+                  })
+                }
+              >
+                {r?.status === 'connecting' ? 'Opening lecture…' : 'Run me through the lecture'}
+              </button>
+              {r?.error && (
+                <p role="alert" className="error-message">
+                  {r.error}
                 </p>
-                <p className="privacy-caption">
-                  PDF only · Export PowerPoint or Keynote slides to PDF first.
-                </p>
-              </div>
-              <div className="source-actions">
-                <button
-                  className="button primary"
-                  disabled={!!busy}
-                  onClick={() => void importPdf()}
-                >
-                  <Upload size={17} />
-                  Upload lecture PDF
-                </button>
-                <button
-                  className="text-button"
-                  disabled={!!busy}
-                  onClick={() => void importPdf(true)}
-                >
-                  Try a sample lecture
-                </button>
-              </div>
-              {!!data.documents.length && (
-                <label>
-                  Choose your lecture
-                  <select
-                    aria-label="Choose your lecture"
-                    value={lectureId}
-                    onChange={(e) => setLectureId(e.target.value)}
-                  >
-                    <option value="">Select a PDF</option>
-                    {data.documents.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.originalName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {lectureId && (
-                <button
-                  className="text-button"
-                  onClick={() => setViewer({ id: lectureId, page: 1 })}
-                >
-                  Preview lecture slides
-                </button>
               )}
             </section>
-          )}
-          {(mode === 'tutor' || lectureId) && (
-            <TutorWorkspace
-              key={mode}
-              data={data}
-              lectureId={mode === 'lecture' ? lectureId : undefined}
-              onOpenPdf={(id, page) => setViewer({ id, page })}
-            />
+          ) : (
+            <TutorWorkspace data={data} onOpenPdf={(id, page) => setViewer({ id, page })} />
           )}
         </div>
       </main>
       {settings && (
         <Modal title="Make yourself at home." onClose={() => setSettings(false)}>
+          <h3>Hold to talk</h3>
+          <label className="talk-key-setting">
+            Global talk key
+            <select
+              aria-label="Global talk key"
+              value={data.settings.talkKey}
+              onChange={(e) =>
+                void unwrap(
+                  api.command({
+                    type: 'settings.update',
+                    talkKey: e.target.value as AppState['settings']['talkKey'],
+                  }),
+                ).then(setData)
+              }
+            >
+              <option value="control">Control</option>
+              <option value="right-control">Right Control</option>
+              <option value="fn">Fn / Globe</option>
+              <option value="right-option">Right Option</option>
+              <option value="f8">F8</option>
+            </select>
+          </label>
+          <p>
+            Hold to listen; release to send. You can also hold Yoyo. Drag Yoyo to choose where it
+            returns after pointing.
+          </p>
+          {r?.hotkeyError && (
+            <p role="alert" className="error-message">
+              {r.hotkeyError}
+            </p>
+          )}
+          <p>
+            Fn may also trigger the macOS Globe action. Choose “Do Nothing” for that key in macOS
+            Keyboard settings if needed.
+          </p>
           <h3>Appearance</h3>
           <div className="source-actions">
             {(['system', 'light', 'dark'] as const).map((theme) => (
@@ -255,9 +277,10 @@ export default function App() {
             ))}
           </div>
           <p>
-            Microphone audio and conversation text go to ElevenLabs. Explicitly shared slide or
-            window images go to Anthropic for analysis. Transcripts and saved explanations stay on
-            this Mac; provider retention follows your account settings.
+            Released voice questions and conversation text go to ElevenLabs. Holding the talk key or
+            Yoyo captures the display under your pointer; that image goes to Anthropic when your
+            question needs it. Lecture slides are analyzed directly. Transcripts and saved
+            explanations stay on this Mac; provider retention follows your account settings.
           </p>
           <p>
             macOS may attribute development permissions to Electron or the terminal that launched
@@ -273,6 +296,8 @@ export default function App() {
                 className="button"
                 key={d.id}
                 onClick={() => {
+                  setLectureId(d.id);
+                  setMode('lecture');
                   setViewer({ id: d.id, page: 1 });
                   setSaved(false);
                 }}

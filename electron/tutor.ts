@@ -57,11 +57,15 @@ export class TutorService {
       mode: 'text',
       activity: 'idle',
       mic: false,
+      input: 'idle',
+      hotkeyError: '',
+      focusRevision: 0,
       sharing: 'off',
       sourceName: '',
       epoch: 0,
       snapshot: null,
       annotations: [],
+      focusRegion: null,
       analysis: '',
       latencyMs: null,
       error: '',
@@ -125,6 +129,8 @@ export class TutorService {
     } catch (e) {
       if (!ctl.signal.aborted) {
         this.state.status = 'error';
+        this.state.activity = 'error';
+        this.state.input = 'idle';
         this.state.error = e instanceof Error ? e.message : 'Session could not start.';
         this.emit();
       }
@@ -150,6 +156,7 @@ export class TutorService {
       sessionId: null,
       lecture: null,
       status: 'idle',
+      input: 'idle',
       mic: false,
       activity: 'idle',
     });
@@ -177,6 +184,7 @@ export class TutorService {
       lecturePreparing: false,
       snapshot: null,
       annotations: [],
+      focusRegion: null,
       analysis: '',
       latencyMs: null,
       epoch: this.state.epoch + 1,
@@ -218,9 +226,15 @@ export class TutorService {
       this.state.sharing = 'pdf';
       this.state.lecturePreparing = preparing;
       this.state.sourceName = `${document.originalName} · p. ${source.page}`;
-    } else if (this.state.sharing !== 'window') throw new Error('Window sharing is off.');
+    } else if (this.state.sharing !== s.source.kind) throw new Error('Screen sharing is off.');
     this.abort?.abort();
-    Object.assign(this.state, { snapshot: s, annotations: [], analysis: '', latencyMs: null });
+    Object.assign(this.state, {
+      snapshot: s,
+      annotations: [],
+      focusRegion: null,
+      analysis: '',
+      latencyMs: null,
+    });
     this.emit();
   }
   async tool(sessionId: string, input: TutorTool) {
@@ -232,7 +246,7 @@ export class TutorService {
         const snapshot = this.state.snapshot;
         if (!snapshot || this.state.sharing === 'off')
           throw new Error(
-            'Nothing is shared. Ask the student to share a PDF page or choose a window.',
+            'No current screen is available. Ask the student to hold Yoyo or their talk key again, or check Screen Recording access in Settings.',
           );
         this.abort?.abort();
         const ctl = new AbortController();
@@ -259,7 +273,7 @@ export class TutorService {
           this.state.annotations = groundRegions(snapshot, answer);
           this.state.analysis = answer.explanation;
           this.state.latencyMs = Date.now() - started;
-          this.state.activity = this.state.annotations.length ? 'pointing' : 'idle';
+          this.state.activity = this.state.mic ? 'listening' : 'thinking';
           this.emit();
           return {
             explanation: answer.explanation,
@@ -270,7 +284,7 @@ export class TutorService {
               evidence: a.evidence,
               precision: a.precision,
             })),
-            note: 'Annotations are visible in the shared-page panel. Vision-estimated regions may be approximate.',
+            note: 'Call highlight_screen_region or draw_annotation to point out a grounded region on the screen. Vision-estimated regions are approximate.',
           };
         } catch (e) {
           if (!ctl.signal.aborted && epoch === this.state.epoch) {
@@ -289,6 +303,8 @@ export class TutorService {
         if (!region)
           throw new Error('Choose a grounded region returned by analyze_current_screen.');
         region.shape = tool.name === 'highlight_screen_region' ? 'highlight' : tool.shape;
+        this.state.focusRegion = region.id;
+        this.state.focusRevision++;
         this.state.activity = 'pointing';
         this.emit();
         return { shown: region.label };
@@ -296,7 +312,7 @@ export class TutorService {
       case 'navigate_slide': {
         const lecture = this.state.lecture;
         if (!lecture || this.state.sharing === 'off')
-          throw new Error('Start or resume a lecture with sharing consent first.');
+          throw new Error('Start or resume a lecture first.');
         if (this.state.lecturePreparing)
           throw new Error('The current slide is still being prepared.');
         this.store.setSlide(sessionId, tool.page);

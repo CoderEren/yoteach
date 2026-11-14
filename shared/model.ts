@@ -48,6 +48,7 @@ export const SettingsSchema = z.object({
   mascotVisible: z.boolean(),
   mascotPosition: z.object({ x: z.number().int(), y: z.number().int() }).nullable(),
   lastTopicId: Id.nullable(),
+  talkKey: z.enum(['control', 'fn', 'right-control', 'right-option', 'f8']).default('control'),
 });
 export const ActivitySchema = z.object({
   id: Id,
@@ -96,7 +97,11 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('topic.delete'), id: Id }),
   z.object({ type: z.literal('topic.open'), id: Id }),
   z.object({ type: z.literal('document.delete'), id: Id }),
-  z.object({ type: z.literal('settings.update'), theme: SettingsSchema.shape.theme }),
+  z.object({
+    type: z.literal('settings.update'),
+    theme: SettingsSchema.shape.theme.optional(),
+    talkKey: SettingsSchema.shape.talkKey.optional(),
+  }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 export const ImportSchema = z.object({
@@ -118,6 +123,9 @@ export interface DesktopApi {
   cancelImport(token: string): Promise<Result<void>>;
   readPdf(id: string): Promise<Result<Uint8Array>>;
   companion(action: 'show' | 'hide' | 'expand' | 'collapse' | 'workspace'): Promise<Result<void>>;
+  drag(action: { phase: 'start' | 'move' | 'end'; x: number; y: number }): Promise<Result<void>>;
+  lectureFullScreen(show: boolean): Promise<Result<void>>;
+  onPose(callback: (pose: { direction: 'left' | 'right' | null }) => void): () => void;
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
@@ -129,5 +137,11 @@ export const freshState = (): AppState => ({
   topics: [],
   documents: [],
   activities: [],
-  settings: { theme: 'system', mascotVisible: true, mascotPosition: null, lastTopicId: null },
+  settings: {
+    theme: 'system',
+    mascotVisible: true,
+    mascotPosition: null,
+    lastTopicId: null,
+    talkKey: 'control',
+  },
 });

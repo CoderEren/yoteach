@@ -18,7 +18,7 @@ async function launch(dir: string) {
   await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
   return { app, page };
 }
-test('two modes, PDF persistence, companion restore and all yo-yo states', async () => {
+test('two modes, minimal lecture setup, saved PDFs, draggable companion and restore', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yoteach-desktop-'));
   let app: ElectronApplication | undefined;
   mkdirSync('.impeccable/review', { recursive: true });
@@ -35,11 +35,15 @@ test('two modes, PDF persistence, companion restore and all yo-yo states', async
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, resolve('public/sample-lecture.pdf'));
-    await page.getByRole('button', { name: 'Upload lecture PDF' }).click();
-    await expect(page.getByLabel('Choose your lecture')).not.toHaveValue('');
+    await page.getByRole('button', { name: /Upload your lecture/ }).click();
+    await expect(page.locator('.lecture-upload')).toContainText('sample-lecture.pdf');
+    await expect(page.locator('.lecture-launch button')).toHaveCount(2);
+    await expect(page.getByRole('checkbox')).toHaveCount(0);
+    await expect(page.getByLabel('Ask Yoyo')).toHaveCount(0);
     const state = await page.evaluate(() => window.yoteach.getState());
     expect(state.ok && state.value.topics.length).toBe(0);
-    await page.getByRole('button', { name: 'Preview lecture slides' }).click();
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
+    await page.getByRole('button', { name: 'sample-lecture.pdf', exact: true }).click();
     await expect(page.locator('canvas')).toBeVisible();
     await page.getByRole('button', { name: 'Next page', exact: true }).click();
     await expect(page.getByLabel('Page number')).toHaveValue('2');
@@ -49,6 +53,7 @@ test('two modes, PDF persistence, companion restore and all yo-yo states', async
     await page.screenshot({ path: '.impeccable/review/lecture-library.png' });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Dark', exact: true }).click();
+    await page.getByLabel('Global talk key').selectOption('f8');
     await page.getByRole('button', { name: 'Close dialog' }).click();
     await page.screenshot({ path: '.impeccable/review/lecture-dark.png' });
     const pet = app.windows().find((w) => w.url().includes('/companion'))!;
@@ -78,24 +83,16 @@ test('two modes, PDF persistence, companion restore and all yo-yo states', async
         .getBounds(),
     );
     expect([bounds.width, bounds.height]).toEqual([200, 220]);
-    await pet.getByRole('button', { name: 'Expand Yoyo panel' }).click();
-    await pet.getByText('Preview expressions', { exact: true }).click();
-    for (const [label, state] of [
-      ['Listening', 'listening'],
-      ['Thinking', 'thinking'],
-      ['Speaking', 'speaking'],
-      ['Pointing', 'pointing'],
-      ['Celebrating', 'success'],
-      ['Unavailable', 'error'],
-      ['Idle', 'idle'],
-    ]) {
-      await pet.getByRole('button', { name: label, exact: true }).click();
-      await expect(pet.locator(`.yoyo--${state}`)).toBeVisible();
-      await pet.screenshot({
-        path: `.impeccable/review/yoyo-${state}.png`,
-        animations: 'disabled',
-      });
-    }
+    await expect(pet.getByRole('button')).toHaveCount(1);
+    await expect(pet.locator('.drag-grip, .yoyo-caption, .companion-panel')).toHaveCount(0);
+    await pet.evaluate(async () => {
+      await window.yoteach.drag({ phase: 'start', x: 100, y: 100 });
+      await window.yoteach.drag({ phase: 'move', x: 300, y: 240 });
+      await window.yoteach.drag({ phase: 'end', x: 300, y: 240 });
+    });
+    const position = await page.evaluate(() => window.yoteach.getState());
+    expect(position.ok && position.value.settings.mascotPosition).toBeTruthy();
+    await pet.screenshot({ path: '.impeccable/review/yoyo-idle.png', animations: 'disabled' });
     await pet.emulateMedia({ reducedMotion: 'reduce' });
     expect(
       await pet.locator('.yoyo-float').evaluate((el) => getComputedStyle(el).animationName),
@@ -119,6 +116,11 @@ test('two modes, PDF persistence, companion restore and all yo-yo states', async
     await expect(
       page.getByRole('button', { name: 'sample-lecture.pdf', exact: true }),
     ).toBeVisible();
+    const restored = await page.evaluate(() => window.yoteach.getState());
+    expect(restored.ok && restored.value.settings.talkKey).toBe('f8');
+    expect(restored.ok && restored.value.settings.mascotPosition).toEqual(
+      position.ok && position.value.settings.mascotPosition,
+    );
     expect(errors).toEqual([]);
   } finally {
     await app?.close();

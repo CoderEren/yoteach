@@ -20,6 +20,7 @@ import { useTutor } from '../tutor';
 import { api, unwrap } from '../api';
 import { Yoyo } from './Yoyo';
 import { Modal } from './Modal';
+import { HoldButton } from './HoldButton';
 export function AnnotationLayer({ annotations }: { annotations: Annotation[] }) {
   return (
     <svg
@@ -82,8 +83,7 @@ export function TutorWorkspace({
   onOpenPdf: (id: string, page: number) => void;
 }) {
   const { runtime: r, act } = useTutor();
-  const [consent, setConsent] = useState(false),
-    [text, setText] = useState(''),
+  const [text, setText] = useState(''),
     [error, setError] = useState(''),
     [windows, setWindows] = useState<WindowSource[] | null>(null),
     [busy, setBusy] = useState(false),
@@ -149,77 +149,30 @@ export function TutorWorkspace({
           </button>
         </div>
       )}
-      {!ready && (
-        <section className="session-start glass">
-          <div>
-            <label className="consent-check">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              <span>
-                Send conversation text to ElevenLabs. For a lecture walkthrough, also send each
-                slide image to Anthropic and its explanation to ElevenLabs. Keep a transcript on
-                this Mac.
-              </span>
-            </label>
-            <p className="privacy-caption">
-              Voice also sends microphone audio. A shared page or window image goes to Anthropic
-              only when Yoyo analyzes it. Provider retention follows your account settings.
-            </p>
-          </div>
-          <div className="session-start-actions">
-            <button
-              className="button primary"
-              disabled={
-                !consent ||
-                (!!lectureId && !r.config.vision) ||
-                !r.config.voice ||
-                r.status === 'connecting' ||
-                busy
-              }
-              onClick={() =>
-                void run(() =>
-                  act({
-                    type: 'start',
-                    topicId: null,
-                    documentId: lectureId,
-                    page: data.sessions.filter((s) => s.documentId === lectureId).at(-1)?.page ?? 1,
-                    mode: 'voice',
-                  }),
-                )
-              }
-            >
-              <Mic size={17} />
-              {lectureId ? 'Run me through the lecture.' : 'Start voice session'}
-            </button>
+      <section className="session-start glass">
+        <div>
+          <h2>Hold. Ask. Release.</h2>
+          <p>Hold Yoyo or your talk key to ask about the screen in front of you.</p>
+        </div>
+        <div className="session-start-actions">
+          <HoldButton />
+          {!ready && (
             <button
               className="button"
-              disabled={
-                !consent ||
-                (!!lectureId && !r.config.vision) ||
-                !r.config.voice ||
-                r.status === 'connecting' ||
-                busy
-              }
-              onClick={() =>
-                void run(() =>
-                  act({ type: 'start', topicId: null, documentId: lectureId, mode: 'text' }),
-                )
-              }
+              disabled={!r.config.voice || r.status === 'connecting'}
+              onClick={() => void act({ type: 'start', topicId: null, mode: 'text' })}
             >
               <MessageSquare size={17} />
               Start with text
             </button>
-            {r.status === 'connecting' && (
-              <button className="text-button" onClick={() => void act({ type: 'end' })}>
-                Cancel connection
-              </button>
-            )}
-          </div>
-        </section>
-      )}
+          )}
+          {r.status === 'connecting' && (
+            <button className="text-button" onClick={() => void act({ type: 'end' })}>
+              Cancel connection
+            </button>
+          )}
+        </div>
+      </section>
       {!r.config.voice && (
         <div className="connection-setup">
           <h2>Connect Yoyo’s voice</h2>
@@ -269,11 +222,6 @@ export function TutorWorkspace({
             {r.sharing !== 'off' ? <MonitorUp size={14} /> : <MonitorOff size={14} />}Sharing{' '}
             {r.sharing === 'off' ? 'off' : 'on'}
           </span>
-          {r.mode === 'voice' && (
-            <button className="button small" onClick={() => void act({ type: 'mute' })}>
-              {r.mic ? 'Mute' : 'Unmute'}
-            </button>
-          )}
           <button className="button small" onClick={() => void act({ type: 'pause' })}>
             <Pause size={14} />
             Pause
@@ -284,7 +232,7 @@ export function TutorWorkspace({
           </button>
         </div>
       )}
-      <div className="tutor-columns">
+      <div className="tutor-columns tutor-single">
         <section className="conversation-panel glass" aria-label="Study conversation">
           <header>
             <h2>
@@ -339,8 +287,8 @@ export function TutorWorkspace({
                 <MessageSquare size={26} />
                 <h3>Start with what’s on your mind.</h3>
                 <p>
-                  Ask a question, share the page you’re reading, or talk through a tricky idea. You
-                  can interrupt Yoyo and ask a follow-up.
+                  Ask a question about your screen, or talk through a tricky idea. You can interrupt
+                  Yoyo and ask a follow-up.
                 </p>
               </div>
             )}
@@ -378,94 +326,6 @@ export function TutorWorkspace({
               <Send size={19} />
             </button>
           </form>
-        </section>
-        <section className="shared-panel glass" aria-label="Shared study material">
-          <header>
-            <h2>{snapshot ? 'What Yoyo can see' : 'Bring the source closer.'}</h2>
-            {r.sharing !== 'off' && (
-              <button
-                className="text-button danger-subtle"
-                onClick={() => void act({ type: 'stop-sharing' })}
-              >
-                <MonitorOff size={14} />
-                Stop sharing
-              </button>
-            )}
-          </header>
-          {snapshot ? (
-            <>
-              <div className="shared-source-name">
-                <strong>{r.sourceName}</strong>
-                <span>
-                  Still image ·{' '}
-                  {new Date(snapshot.capturedAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-              <div className="shared-image">
-                <img src={snapshot.image} alt={`Shared ${r.sourceName}`} />
-                <AnnotationLayer annotations={r.annotations} />
-              </div>
-              {r.annotations.length > 0 && (
-                <ol className="annotation-key">
-                  {r.annotations.map((a) => (
-                    <li key={a.id}>
-                      <strong>{a.label}</strong>
-                      <span>
-                        “{a.evidence}” ·{' '}
-                        {a.precision === 'pdf-text'
-                          ? 'PDF text anchor'
-                          : 'Approximate visual region'}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {r.analysis && (
-                <details className="analysis-result">
-                  <summary>
-                    Read the visual explanation
-                    {r.latencyMs ? ` · ${(r.latencyMs / 1000).toFixed(1)}s` : ''}
-                  </summary>
-                  <p>{r.analysis}</p>
-                </details>
-              )}
-            </>
-          ) : (
-            <div className="sharing-empty">
-              <MonitorUp size={30} />
-              <h3>
-                {r.sharing === 'window' ? 'Window sharing is on.' : 'You decide what to share.'}
-              </h3>
-              <p>
-                {r.sharing === 'window'
-                  ? `Yoyo will capture ${r.sourceName} when you ask about it. No image has been analyzed yet.`
-                  : 'Open a saved PDF and choose “Share this page”, or select a study window. Yoyo only analyzes images when you ask.'}
-              </p>
-            </div>
-          )}
-          <div className="source-actions">
-            {chosen && (
-              <button className="button" onClick={() => onOpenPdf(chosen.id, r.lecture?.page ?? 1)}>
-                Open lecture PDF
-              </button>
-            )}
-            <button
-              className="button"
-              disabled={!connected || !r.config.vision || busy}
-              onClick={() => void run(async () => setWindows(await unwrap(api.tutor.windows())))}
-            >
-              <MonitorUp size={16} />
-              Choose window
-            </button>
-          </div>
-          {!r.config.vision && (
-            <p className="privacy-caption source-note">
-              Add <code>ANTHROPIC_API_KEY</code> to enable visual explanations.
-            </p>
-          )}
         </section>
       </div>
       <section className="session-history">
@@ -512,40 +372,6 @@ export function TutorWorkspace({
           <p>Your conversations will appear here after your first session.</p>
         )}
       </section>
-      {windows && (
-        <Modal title="Share a study window" onClose={() => setWindows(null)}>
-          <p className="share-consent">
-            Yoyo can capture this window while sharing is on. Images are sent to Anthropic only on
-            an analysis request. Browser and private-labelled windows are excluded; use the internal
-            PDF viewer for browser documents.
-          </p>
-          <div className="window-choices">
-            {windows.length ? (
-              windows.map((w) => (
-                <button
-                  key={w.id}
-                  className="window-choice"
-                  onClick={() =>
-                    void run(async () => {
-                      await act({ type: 'share-window', id: w.id });
-                      setWindows(null);
-                    })
-                  }
-                >
-                  <MonitorUp size={18} />
-                  <span>{w.name}</span>
-                </button>
-              ))
-            ) : (
-              <p>
-                No eligible windows found. Open a study document in Preview or share a PDF inside
-                yoteach. If needed, enable the app named by macOS under Screen Recording and
-                restart.
-              </p>
-            )}
-          </div>
-        </Modal>
-      )}
       {remove && (
         <Modal title="Delete this study session?" onClose={() => setRemove(null)}>
           <p>

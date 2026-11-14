@@ -1,3 +1,5 @@
+> Hold-to-talk refinement: the companion is a bare draggable yo-yo with automatic expressions and a listening ring. No grip, caption, expression picker or popup. Dragging saves its home; contextual pointing returns there. Lecture setup has only upload and the walkthrough button, followed by full-screen slides. These requirements supersede historical companion and lecture controls below.
+
 > Stage 2 lecture revision (14 November 2026): the approved color, typography, glass and accessibility tokens below remain authoritative. Historical course/roadmap/tab and pear-shaped mascot descriptions are superseded: exactly AI tutor and Lecture walkthrough, with saved material/settings/history; twin-disc yo-yo and expressive string from the supplied reference. See `.impeccable/lecture-revision.md`.
 
 ---

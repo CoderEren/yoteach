@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "highlight_screen_region",
-  "description": "Highlight an existing grounded region from the most recent analyze_current_screen result.",
+  "description": "Highlight a grounded region on the full-screen lecture or desktop overlay and move Yoyo beside it. Use returned snapshotId and regionId only.",
   "expects_response": true,
   "response_timeout_secs": 60,
   "parameters": {
