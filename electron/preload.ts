@@ -8,7 +8,10 @@ function listen<T>(channel: string, fn: (value: T) => void) {
   };
 }
 const api: DesktopApi = {
-  overlay: { interactive: (on) => ipcRenderer.invoke('overlay:interactive', on) },
+  overlay: {
+    interactive: (on) => ipcRenderer.invoke('overlay:interactive', on),
+    focus: (box) => ipcRenderer.invoke('overlay:focus', box),
+  },
   tutor: {
     get: () => ipcRenderer.invoke('tutor:get'),
     intent: (action) => ipcRenderer.invoke('tutor:intent', action),

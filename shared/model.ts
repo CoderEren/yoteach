@@ -142,7 +142,11 @@ export interface PracticeApi {
 }
 export interface DesktopApi {
   /** Only the on-screen layer uses this: make the area under the pointer clickable. */
-  overlay: { interactive(on: boolean): Promise<Result<void>> };
+  overlay: {
+    interactive(on: boolean): Promise<Result<void>>;
+    /** Ask Yoyo to fly beside a box on the overlay (normalized). */
+    focus(box: { x: number; y: number; width: number; height: number }): Promise<Result<void>>;
+  };
   tutor: TutorApi;
   media: MediaApi;
   practice: PracticeApi;

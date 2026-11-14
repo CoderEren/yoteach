@@ -577,6 +577,29 @@ test('Yoyo teaches on the screen: draws on regions, sketches, and opens lesson a
     });
     await expect(layer.getByRole('img', { name: 'Investment then payoff' })).toBeVisible();
     await expect(layer.locator('.diagram-node')).toHaveCount(3);
+    // Yoyo flies beside what it just drew, and celebrates when asked.
+    const petBounds = () =>
+      app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().includes('/companion'))!
+          .getBounds(),
+      );
+    const before = await petBounds();
+    await provider.tool('sketch_on_screen', {
+      title: 'Head to tail',
+      elements: [
+        { type: 'arrow', from: [10, 60], to: [45, 30], label: 'A' },
+        { type: 'arrow', from: [45, 30], to: [85, 50], label: 'B' },
+      ],
+    });
+    await expect
+      .poll(async () => JSON.stringify(await petBounds()))
+      .not.toBe(JSON.stringify(before));
+    const companion = app.windows().find((w) => w.url().includes('/companion'))!;
+    await provider.tool('celebrate', { reason: 'understood vector addition' });
+    await expect(companion.locator('.yoyo--success')).toBeVisible();
+    await expect(companion.locator('.yoyo-burst i')).toHaveCount(10);
+    await expect(companion.locator('.yoyo--success')).toHaveCount(0, { timeout: 5000 });
     // The lesson opens as a card on the screen, not in the app.
     const opened = await provider.tool('open_visual_lesson', {
       lesson: 'glucose-phosphorylation',

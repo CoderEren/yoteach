@@ -207,6 +207,7 @@ const overlayChannels = new Set([
   'tutor:get',
   'tutor:intent',
   'overlay:interactive',
+  'overlay:focus',
   'practice:answer',
   'media:generate',
   'media:cancel',
@@ -258,6 +259,10 @@ function registerHandlers() {
     resolve(here, '..'),
   );
   handle('workspace:get', () => store.snapshot());
+  handle('overlay:focus', (input) => {
+    const n = z.number().min(0).max(1);
+    desktop?.pointAt(z.object({ x: n, y: n, width: n, height: n }).parse(input));
+  });
   handle('overlay:interactive', (input) => {
     // Click-through everywhere except over a card the pointer is on.
     overlay?.setIgnoreMouseEvents(!z.boolean().parse(input), { forward: true });

@@ -108,7 +108,10 @@ function penEase(path: SVGGeometryElement) {
  * Draw every `.ink` stroke in document order like handwriting, popping each `.ink-label` in
  * after the stroke before it. Then a calm hand-drawn "boil" keeps the ink alive.
  */
-export function drawOn(root: SVGSVGElement | HTMLElement, opts: { reduced?: boolean } = {}) {
+export function drawOn(
+  root: SVGSVGElement | HTMLElement,
+  opts: { reduced?: boolean; delay?: number } = {},
+) {
   const items = Array.from(
     root.querySelectorAll<SVGGeometryElement | HTMLElement>('.ink, .ink-label'),
   );
@@ -116,7 +119,9 @@ export function drawOn(root: SVGSVGElement | HTMLElement, opts: { reduced?: bool
     gsap.set(items, { clearProps: 'all', opacity: 1 });
     return () => {};
   }
-  const tl = gsap.timeline();
+  // Hide everything first, so nothing shows before its turn (e.g. while Yoyo flies over).
+  items.forEach((el) => gsap.set(el, { opacity: 0 }));
+  const tl = gsap.timeline({ delay: opts.delay ?? 0 });
   let at = 0;
   for (const el of items) {
     if (el.classList.contains('ink-label') || el.classList.contains('dashed')) {
@@ -129,7 +134,8 @@ export function drawOn(root: SVGSVGElement | HTMLElement, opts: { reduced?: bool
     const L = path.getTotalLength?.() ?? 0;
     if (!(L > 0)) continue;
     const dur = Math.min(0.85, Math.max(0.22, L / 900));
-    gsap.set(path, { strokeDasharray: L, strokeDashoffset: L, opacity: 1 });
+    gsap.set(path, { strokeDasharray: L, strokeDashoffset: L });
+    tl.set(path, { opacity: 1 }, at);
     tl.to(path, { strokeDashoffset: 0, duration: dur, ease: penEase(path) }, at);
     at += dur * 0.85;
   }

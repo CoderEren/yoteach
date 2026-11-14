@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, ClipboardCheck, Volume2, X } from 'lucide-react';
 import type { AppState } from '../../shared/model';
+import type { TutorRuntime } from '../../shared/tutor';
 import type { ScreenDrawing } from '../../shared/drawing';
 import { layoutDiagram, type Diagram, type Sketch, type SketchElement } from '../../shared/drawing';
 import { freeSpot, labelSpot } from '../../shared/grounding';
@@ -67,6 +68,8 @@ export function DrawingLayer({
     if (!svg.current || !drawing || !w) return;
     return drawOn(svg.current, {
       reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      // Yoyo flies to the first mark first; the ink starts as it arrives.
+      delay: drawing.marks.length || drawing.connections.length ? 0.5 : 0,
     });
   }, [drawing?.revision, w > 0]);
   if (!drawing) return <div className="drawing-layer" ref={ref} aria-hidden="true" />;
@@ -590,8 +593,12 @@ function ScreenLesson({ data, side }: { data: AppState; side: 'left' | 'right' }
 }
 /** Yoyo's drawing surface over the user's own screen. Clicks pass through except on cards. */
 export function DesktopOverlay({ data }: { data: AppState }) {
-  const { runtime: r, act } = useTutor();
+  const { runtime: r } = useTutor();
   if (!r || r.lecture) return <main className="desktop-overlay" />;
+  return <ScreenLayer data={data} r={r} />;
+}
+function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
+  const { act } = useTutor();
   const onScreen = r.snapshot?.source.kind === 'screen';
   const lesson = !!r.activeLessonId && r.lessonSurface === 'screen';
   const media = !lesson && !!r.generation && r.generation.origin === 'tutor' && !r.activeLessonId;
@@ -626,6 +633,12 @@ export function DesktopOverlay({ data }: { data: AppState }) {
         near ?? undefined,
       )
     : null;
+  // Yoyo flies beside each new sketch, diagram or card it puts on screen.
+  const focusKey = `${r.drawing?.revision ?? ''}:${spot ? 'panel' : ''}:${lesson ? r.activeLessonId : ''}:${media ? r.generation?.id : ''}`;
+  useEffect(() => {
+    if (spot && (r.drawing?.sketch || r.drawing?.diagram)) void api.overlay.focus(spot);
+    else if (cardBox && (lesson || media)) void api.overlay.focus(cardBox);
+  }, [focusKey]);
   const place = spot
     ? { left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, maxWidth: `${panel!.width * 100}%` }
     : undefined;

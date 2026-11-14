@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Play, RotateCcw, Trash2, Upload } from 'lucide-react';
 import type { AppState } from '../../shared/model';
 import type { Chat } from '../../shared/tutor';
@@ -21,15 +21,23 @@ export function Lectures({
   const { runtime: r, act } = useTutor();
   const [replay, setReplay] = useState<Chat | null>(null),
     [error, setError] = useState('');
+  // Start failures (microphone permission, connection) used to vanish; show them here.
+  useEffect(() => {
+    const fn = (e: Event) => setError((e as CustomEvent<string>).detail);
+    window.addEventListener('tutor-error', fn);
+    return () => window.removeEventListener('tutor-error', fn);
+  }, []);
   const walkthroughs = data.chats
     .filter((c) => c.kind === 'lecture' && data.documents.some((d) => d.id === c.documentId))
     .filter((c) => data.messages.some((m) => m.chatId === c.id && m.role === 'assistant'))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   if (replay) return <LectureReplay data={data} chat={replay} onClose={() => setReplay(null)} />;
-  const start = (documentId: string, page = 1) =>
+  const start = (documentId: string, page = 1) => {
+    setError('');
     void act({ type: 'start', topicId: null, documentId, page, mode: 'voice' }).catch((e) =>
       setError(String(e)),
     );
+  };
   const chosen = data.documents.find((d) => d.id === lectureId);
   return (
     <section className="lectures page-enter">

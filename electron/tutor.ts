@@ -73,6 +73,7 @@ export class TutorService {
   private abort?: AbortController;
   private connecting?: AbortController;
   private generating?: AbortController;
+  private celebrating?: ReturnType<typeof setTimeout>;
   private inventory?: {
     snapshotId: string;
     done: Promise<void>;
@@ -822,6 +823,19 @@ export class TutorService {
           where: near ? 'beside the region on screen' : 'in free space on the screen',
           note: 'It draws itself element by element. Talk through it in the same order.',
         };
+      }
+      case 'celebrate': {
+        // A short happy bounce; the companion returns to idle by itself.
+        this.state.activity = 'success';
+        this.emit();
+        clearTimeout(this.celebrating);
+        this.celebrating = setTimeout(() => {
+          if (this.state.activity === 'success') {
+            this.state.activity = 'idle';
+            this.emit();
+          }
+        }, 2600);
+        return { celebrated: true };
       }
       case 'clear_screen':
         this.clearDrawing();

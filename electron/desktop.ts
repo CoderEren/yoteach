@@ -279,5 +279,20 @@ export function installDesktop(options: {
   });
   screen.on('display-metrics-changed', returnHome);
   screen.on('display-removed', returnHome);
-  return { update, drag, returnHome, keySettings };
+  /** Fly beside something Yoyo just put on screen (a sketch or a card), then come home. */
+  function pointAt(box: { x: number; y: number; width: number; height: number }) {
+    const layer = overlay();
+    if (!layer || dragging || !store.snapshot().settings.mascotVisible) return;
+    const area = layer.getBounds();
+    const target = pointBeside(box, area);
+    if (!pointed) home = store.snapshot().settings.mascotPosition ?? pet()?.getBounds() ?? null;
+    pointed = true;
+    stopTour();
+    pet()?.showInactive();
+    pet()?.webContents.send('companion:pose', { direction: target.direction });
+    animate(target.x, target.y);
+    clearTimeout(returnTimer);
+    returnTimer = setTimeout(returnHome, 8000);
+  }
+  return { update, drag, returnHome, keySettings, pointAt };
 }

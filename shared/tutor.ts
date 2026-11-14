@@ -190,6 +190,10 @@ export const ToolSchema = z.discriminatedUnion('name', [
   }),
   z.object({ name: z.literal('sketch_diagram'), diagram: DiagramSchema }),
   z.object({ name: z.literal('clear_screen') }),
+  z.object({
+    name: z.literal('celebrate'),
+    reason: z.string().trim().max(120).optional(),
+  }),
   SketchSchema.extend({ name: z.literal('sketch_on_screen'), near: Uuid.optional() }),
   z.object({ name: z.literal('ask_practice_question'), question: QuestionId.optional() }),
   z.object({

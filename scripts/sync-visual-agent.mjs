@@ -38,6 +38,7 @@ for (const name of [
   'sketch_diagram',
   'clear_screen',
   'sketch_on_screen',
+  'celebrate',
 ]) {
   const tool_config = JSON.parse(readFileSync(`docs/agent-tools/${name}.json`, 'utf8'));
   const existing = attached.find((tool) => tool.tool_config.name === name);

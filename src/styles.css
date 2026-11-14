@@ -4443,3 +4443,48 @@ kbd {
     opacity: 1;
   }
 }
+/* Celebrate: a quick, clean sparkle burst around Yoyo. */
+.yoyo-burst {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.yoyo-burst i {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px;
+  border-radius: 50%;
+  background: #8a63f2;
+  opacity: 0;
+  animation: yoyo-burst 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) var(--d) 2 forwards;
+}
+.yoyo-burst i:nth-child(3n) {
+  background: #c8b6ff;
+  width: 5px;
+  height: 5px;
+}
+.yoyo-burst i:nth-child(4n) {
+  background: #ffd36e;
+}
+@keyframes yoyo-burst {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-40px) scale(0.4);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateY(-88px) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yoyo-burst {
+    display: none;
+  }
+}

@@ -36,15 +36,17 @@ export function Companion({ data: _data }: { data: AppState }) {
   const state =
     input === 'listening'
       ? 'listening'
-      : input === 'arming'
-        ? 'thinking'
-        : r?.activity === 'speaking'
-          ? 'speaking'
-          : input === 'sending'
-            ? 'thinking'
-            : r?.activity === 'pointing' && !direction
-              ? 'idle'
-              : (r?.activity ?? 'idle');
+      : r?.activity === 'success'
+        ? 'success'
+        : input === 'arming'
+          ? 'thinking'
+          : r?.activity === 'speaking'
+            ? 'speaking'
+            : input === 'sending'
+              ? 'thinking'
+              : r?.activity === 'pointing' && !direction
+                ? 'idle'
+                : (r?.activity ?? 'idle');
   return (
     <main className={`companion companion-bare input-${input}`}>
       <button
@@ -108,6 +110,16 @@ export function Companion({ data: _data }: { data: AppState }) {
           }
         />
       </button>
+      {state === 'success' && (
+        <span className="yoyo-burst" aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => (
+            <i
+              key={i}
+              style={{ ['--a' as string]: `${i * 36}deg`, ['--d' as string]: `${(i % 3) * 0.05}s` }}
+            />
+          ))}
+        </span>
+      )}
       {r?.notice && (
         <span className="companion-notice" role="status">
           {r.notice}
