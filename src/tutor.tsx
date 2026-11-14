@@ -399,6 +399,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
               'draw_on_screen',
               'sketch_diagram',
               'clear_screen',
+              'sketch_on_screen',
               'generate_illustration',
               'ask_practice_question',
               'record_practice_attempt',

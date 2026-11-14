@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -352,5 +352,17 @@ test('the screen map is ready by release, merges with deeper analysis, and sketc
     assert.equal(await f.service.screenMap(), null);
   } finally {
     f.cleanup();
+  }
+});
+
+test('every agent tool in docs/agent-tools is registered as a client tool and validated', () => {
+  const client = readFileSync('src/tutor.tsx', 'utf8');
+  for (const file of readdirSync('docs/agent-tools')) {
+    const name = JSON.parse(readFileSync(`docs/agent-tools/${file}`, 'utf8')).name;
+    assert.ok(client.includes(`'${name}'`), `${name} is not registered in src/tutor.tsx`);
+    assert.ok(
+      ToolSchema.options.some((o) => o.shape.name.value === name),
+      `${name} has no ToolSchema entry`,
+    );
   }
 });
