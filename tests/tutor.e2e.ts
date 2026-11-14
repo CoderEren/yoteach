@@ -280,7 +280,7 @@ test('full-screen lecture teaches, grounds six tools, accepts questions and pres
   }
 });
 
-test('held microphone buffers until release, captures screen, cancels drag and stops on pause', async () => {
+test('held microphone streams only while held, captures screen, cancels drag and stops on pause', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yoteach-hold-'));
   let app: ElectronApplication | undefined;
   try {
@@ -295,13 +295,23 @@ test('held microphone buffers until release, captures screen, cancels drag and s
     await page.mouse.down();
     await expect.poll(async () => (await runtime(page)).input).toBe('listening');
     await expect.poll(async () => (await runtime(page)).snapshot?.source.kind).toBe('screen');
-    await page.waitForTimeout(450);
-    expect(provider.chunks()).toBe(0);
+    // The question streams live while held, flagged as the student still speaking, so
+    // little is left to send on release.
+    await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
+    await expect
+      .poll(() => provider.messages.filter((m) => m.type === 'user_activity').length)
+      .toBeGreaterThan(0);
     const pet = app.windows().find((w) => w.url().includes('/companion'))!;
     await expect(pet.locator('.input-listening')).toBeVisible();
+    await page.waitForTimeout(500);
+    const held = provider.chunks();
     await page.mouse.up();
-    await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
+    await expect.poll(() => provider.chunks()).toBeGreaterThan(held);
     await expect.poll(async () => (await runtime(page)).input).toBe('idle');
+    // Nothing more leaves once the hold is over.
+    const after = provider.chunks();
+    await page.waitForTimeout(600);
+    expect(provider.chunks()).toBe(after);
     expect(
       await page.evaluate(() =>
         (window as any).__testStreams.every((s: MediaStream) =>
@@ -548,8 +558,8 @@ test('Yoyo teaches on the screen: draws on regions, sketches, and opens lesson a
       clear: true,
     });
     await expect.poll(overlayVisible).toBe(true);
-    await expect(layer.locator('.mark-circle ellipse')).toHaveCount(1);
-    await expect(layer.locator('.mark-label', { hasText: 'ATP is spent here' })).toBeVisible();
+    await expect(layer.locator('.mark-circle path.ink:not(.leader)')).toHaveCount(1);
+    await expect(layer.locator('.ink-label', { hasText: 'ATP is spent here' })).toBeVisible();
     await provider.tool('sketch_diagram', {
       diagram: {
         title: 'Investment then payoff',

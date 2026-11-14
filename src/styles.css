@@ -10,7 +10,7 @@
   --text: #172034;
   --muted: #657188;
   --subtle: #758099;
-  --iris: #5f4fc4;
+  --iris: #6a45d8;
   --iris-soft: #edeafd;
   --panel: rgba(255, 255, 255, 0.72);
   --solid: #fff;
@@ -2782,10 +2782,10 @@ html:has(.companion-body),
   flex-wrap: wrap;
 }
 .yoyo-eyes {
-  transform-origin: 108px 122px;
+  transform-origin: 106px 120px;
 }
 .yoyo--speaking .yoyo-mouth {
-  transform-origin: 107px 150px;
+  transform-origin: 106px 149px;
 }
 .yoyo--error .yoyo-smile {
   transform: none;
@@ -4326,5 +4326,120 @@ kbd {
   }
   .ring-listening .yoyo-ripple {
     opacity: 0.7;
+  }
+}
+/* Saved explanations: readable cards with source and an Unsave action. */
+.saved-heading {
+  margin: 14px 0 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.saved-explanation {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+.saved-explanation header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.saved-explanation h4 {
+  margin: 0;
+  font-size: 15px;
+}
+.saved-explanation small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.saved-explanation p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.saved-material {
+  padding: 16px 20px 22px;
+  display: grid;
+  gap: 10px;
+}
+/* Hand-drawn ink (HyperFrames-style): GSAP draws each stroke; CSS only sets the look. */
+@font-face {
+  font-family: 'Caveat';
+  src: url('/fonts/Caveat-700-latin.woff2') format('woff2');
+  font-weight: 700;
+  font-display: block;
+}
+.drawing-layer .ink,
+.diagram-sketch .ink {
+  animation: none;
+  opacity: 0;
+}
+.drawing-layer .ink {
+  fill: none;
+  stroke: #6a45d8;
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 2.5px rgba(255, 255, 255, 0.55));
+}
+.drawing-layer .ink.marker {
+  stroke: rgba(138, 99, 242, 0.26);
+  stroke-linecap: butt;
+  mix-blend-mode: multiply;
+  filter: none;
+}
+.drawing-layer .ink.leader {
+  stroke-width: 2;
+  opacity: 0;
+}
+.drawing-layer .ink.dot {
+  fill: #6a45d8;
+  stroke: none;
+}
+.drawing-layer .ink-label,
+.sketch-canvas .ink-label,
+.diagram-sketch .ink-label {
+  animation: none;
+  opacity: 0;
+}
+.drawing-layer .ink-label {
+  font:
+    700 27px/1 'Caveat',
+    'Bradley Hand',
+    'Marker Felt',
+    cursive;
+  fill: #5531c8;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+.sketch-label {
+  font-family: 'Caveat', 'Bradley Hand', cursive;
+  font-weight: 700;
+  font-size: 3.6px;
+}
+.diagram-text {
+  font-family: 'Caveat', 'Bradley Hand', cursive;
+  font-weight: 700;
+  font-size: 18px;
+}
+.diagram-sketch figcaption span {
+  font-family: 'Caveat', 'Bradley Hand', cursive;
+  font-size: 22px;
+}
+.screen-sketch {
+  top: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawing-layer .ink,
+  .drawing-layer .ink-label {
+    opacity: 1;
   }
 }

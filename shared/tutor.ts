@@ -50,6 +50,11 @@ export const SnapshotSchema = z.object({
   height: z.number().int().min(1).max(1920),
   capturedAt: z.string().datetime(),
   textBoxes: z.array(z.object({ text: z.string().max(2000), box: Box })).max(2000),
+  /** Recognised words with exact boxes (screen captures), for precise anchoring. */
+  words: z
+    .array(z.object({ text: z.string().max(200), box: Box, line: z.number().int().min(0) }))
+    .max(6000)
+    .optional(),
 });
 export type SharedSnapshot = z.infer<typeof SnapshotSchema>;
 export const AnnotationSchema = z.object({
@@ -59,7 +64,9 @@ export const AnnotationSchema = z.object({
   box: Box,
   label: z.string().max(100),
   evidence: z.string().max(500),
-  precision: z.enum(['pdf-text', 'vision-estimate']),
+  precision: z.enum(['pdf-text', 'screen-text', 'vision-estimate']),
+  /** Per-line boxes when the anchored text wraps. */
+  parts: z.array(Box).max(4).optional(),
 });
 export type Annotation = z.infer<typeof AnnotationSchema>;
 export const StudySessionSchema = z.object({
@@ -289,4 +296,15 @@ export interface TutorApi {
   onChange(fn: (state: TutorRuntime) => void): () => void;
   onIntent(fn: (action: TutorIntent) => void): () => void;
   onNavigate(fn: (topicId: string) => void): () => void;
+}
+/**
+ * Remove expressive voice tags (e.g. "[happy]", "[accent]") that the voice model speaks but a
+ * reader should never see, and tidy the spacing they leave behind.
+ */
+export function cleanSpeech(text: string) {
+  return text
+    .replace(/\[(?:[a-z][a-z' -]{0,30})\]\s*/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .trim();
 }

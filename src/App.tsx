@@ -8,6 +8,7 @@ import {
   FileText,
   ArrowRight,
   Sparkles,
+  BookmarkX,
 } from 'lucide-react';
 import type { AppState } from '../shared/model';
 import { api, unwrap } from './api';
@@ -18,6 +19,26 @@ import { Modal } from './components/Modal';
 import { MediaView } from './components/GeneratedMedia';
 import { ReviewList } from './components/Practice';
 import { reviewSuggestions } from '../shared/practice';
+import { cleanSpeech } from '../shared/tutor';
+
+/** Split a spoken explanation into readable paragraphs of two or three sentences. */
+function paragraphs(text: string) {
+  const given = text
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (given.length > 1) return given;
+  const sentences = text.match(/[^.!?]+[.!?]+["”’)]*\s*|[^.!?]+$/g) ?? [text];
+  const out: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3)
+    out.push(
+      sentences
+        .slice(i, i + 3)
+        .join('')
+        .trim(),
+    );
+  return out.filter(Boolean);
+}
 import { Yoyo } from './components/Yoyo';
 import { useTutor } from './tutor';
 import { LectureStage } from './components/LectureStage';
@@ -346,12 +367,35 @@ export default function App() {
                 {d.originalName}
               </button>
             ))}
-            {data.explanations.map((e) => (
-              <article key={e.id}>
-                <h3>{e.title}</h3>
-                <p>{e.text}</p>
-              </article>
-            ))}
+            {data.explanations.length > 0 && <h3 className="saved-heading">Saved explanations</h3>}
+            {[...data.explanations].reverse().map((e) => {
+              const doc = e.source && data.documents.find((d) => d.id === e.source!.documentId);
+              return (
+                <article key={e.id} className="saved-explanation">
+                  <header>
+                    <div>
+                      <h4>{e.title}</h4>
+                      <small>
+                        {new Date(e.createdAt).toLocaleDateString([], {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                        {doc ? ` · ${doc.originalName}, slide ${e.source!.page}` : ''}
+                      </small>
+                    </div>
+                    <button
+                      className="button small"
+                      onClick={() => void unwrap(api.tutor.deleteExplanation(e.id))}
+                    >
+                      <BookmarkX size={14} /> Unsave
+                    </button>
+                  </header>
+                  {paragraphs(cleanSpeech(e.text)).map((p, i) => (
+                    <p key={i}>{p}</p>
+                  ))}
+                </article>
+              );
+            })}
             {data.topics
               .filter((t) => t.overview)
               .map((t) => (

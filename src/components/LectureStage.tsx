@@ -33,7 +33,10 @@ export function LectureStage({ media }: { media: GeneratedMedia[] }) {
                 (a) => a.id === r.focusRegion && !r.drawing?.marks.some((m) => m.regionId === a.id),
               )}
             />
-            <DrawingLayer drawing={r.drawing?.snapshotId === snapshot.id ? r.drawing : null} />
+            <DrawingLayer
+              drawing={r.drawing?.snapshotId === snapshot.id ? r.drawing : null}
+              avoid={snapshot.textBoxes.map((t) => t.box)}
+            />
           </div>
         ) : (
           <p role="status">Preparing slide {r.lecture.page}…</p>

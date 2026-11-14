@@ -55,3 +55,37 @@ export function hasSpeech(frames: Float32Array[], rate: number) {
   const threshold = Math.max(0.015, Math.min(floor * 3, 0.04));
   return levels.filter((l) => l > threshold).length * 0.03 >= 0.25;
 }
+/** Float frames to 16-bit PCM at the provider's rate (linear resampling). */
+export function toPcm16(frames: Float32Array[], fromRate: number, toRate: number) {
+  const count = frames.reduce((sum, f) => sum + f.length, 0);
+  const source = new Float32Array(count);
+  let offset = 0;
+  for (const f of frames) {
+    source.set(f, offset);
+    offset += f.length;
+  }
+  const size = Math.floor((count * toRate) / fromRate);
+  const pcm = new Int16Array(size);
+  for (let i = 0; i < size; i++) {
+    const position = (i * fromRate) / toRate,
+      left = Math.floor(position),
+      fraction = position - left;
+    const sample = Math.max(
+      -1,
+      Math.min(
+        1,
+        source[left] * (1 - fraction) + (source[Math.min(left + 1, count - 1)] ?? 0) * fraction,
+      ),
+    );
+    pcm[i] = Math.round(sample * (sample < 0 ? 32768 : 32767));
+  }
+  return pcm;
+}
+/** 25 ms chunks of little-endian PCM bytes. */
+export function pcmBytesChunks(pcm: Int16Array, rate: number) {
+  const bytes = new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength),
+    size = Math.round(rate * 0.025) * 2,
+    chunks: Uint8Array[] = [];
+  for (let i = 0; i < bytes.length; i += size) chunks.push(bytes.slice(i, i + size));
+  return chunks;
+}

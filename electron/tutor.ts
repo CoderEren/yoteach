@@ -4,6 +4,7 @@ import {
   SnapshotSchema,
   ToolSchema,
   RuntimeUpdateSchema,
+  cleanSpeech,
   type TutorRuntime,
   type SharedSnapshot,
   type Annotation,
@@ -14,6 +15,7 @@ import { Providers, type VisionAnswer } from './providers';
 import { FalClient } from './fal';
 import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
 import type { ScreenDrawing } from '../shared/drawing';
+import { anchor } from '../shared/grounding';
 import {
   AnswerSchema,
   QuestionId,
@@ -28,17 +30,29 @@ import {
   type Answer,
 } from '../shared/practice';
 export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): Annotation[] {
+  const lines = snapshot.textBoxes,
+    words = snapshot.words ?? [];
   return answer.regions.flatMap((region) => {
-    if (region.confidence < 0.7) return [];
-    let box = region.box;
-    if (snapshot.source.kind === 'pdf' && snapshot.textBoxes.length) {
+    if (region.confidence < 0.6) return [];
+    let box = region.box,
+      parts: Annotation['parts'],
+      precision: Annotation['precision'] = 'vision-estimate';
+    if (snapshot.source.kind === 'pdf' && lines.length) {
       const needle = region.evidence.replace(/\s+/g, ' ').trim();
-      const matches = snapshot.textBoxes.filter((t) =>
-        t.text.replace(/\s+/g, ' ').includes(needle),
-      );
+      const matches = lines.filter((t) => t.text.replace(/\s+/g, ' ').includes(needle));
       // Ambiguous duplicate phrases are not precise anchors.
       if (matches.length !== 1) return [];
       box = matches[0].box;
+      precision = 'pdf-text';
+    } else if (lines.length) {
+      // Screens: snap to the recognised words the model quoted; its box only breaks ties.
+      const found = anchor(region.evidence, region.box, words, lines);
+      if (found) {
+        box = found.box;
+        parts = found.parts.length > 1 ? found.parts.slice(0, 4) : undefined;
+        precision = 'screen-text';
+      } else if (lines.some((l) => region.evidence.length > 3 && l.text.includes(region.evidence)))
+        return [];
     }
     return [
       {
@@ -48,10 +62,8 @@ export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): A
         box,
         label: region.label,
         evidence: region.evidence,
-        precision:
-          snapshot.source.kind === 'pdf' && snapshot.textBoxes.length
-            ? ('pdf-text' as const)
-            : ('vision-estimate' as const),
+        precision,
+        ...(parts ? { parts } : {}),
       },
     ];
   });
@@ -483,8 +495,10 @@ export class TutorService {
     this.emit();
   }
   private filing?: Promise<void>;
-  transcript(sessionId: string, role: 'user' | 'assistant', text: string, eventId: string) {
+  transcript(sessionId: string, role: 'user' | 'assistant', raw: string, eventId: string) {
     this.require(sessionId);
+    // Voice tags are for speech only; store what a reader should see.
+    const text = role === 'assistant' ? cleanSpeech(raw) || raw : raw;
     if (!this.state.chatId) {
       this.state.chatId = this.store.createChat('chat', 'New chat', sessionId).id;
     }
@@ -731,6 +745,7 @@ export class TutorService {
               shape: m.shape,
               label: m.label ?? null,
               box: region(m.regionId).box,
+              parts: region(m.regionId).parts,
             })),
           ],
           connections: [
@@ -910,7 +925,7 @@ export class TutorService {
         const e = this.store.saveExplanation(
           sessionId,
           tool.title,
-          answer,
+          cleanSpeech(answer) || answer,
           source?.kind === 'pdf' ? { documentId: source.documentId, page: source.page } : null,
         );
         this.state.activity = 'success';
@@ -931,8 +946,14 @@ export class TutorService {
       m = d.messages.find((m) => m.id === id && m.role === 'assistant');
     if (!m) throw new Error('Choose an assistant explanation to save.');
     const s = d.sessions.find((s) => s.id === m.sessionId)!;
-    const title = d.topics.find((t) => t.id === s.topicId)?.title ?? 'Saved explanation';
-    this.store.saveExplanation(s.id, title, m.text, null);
+    const chat = d.chats.find((c) => c.id === m.chatId);
+    const title = chat?.title ?? d.topics.find((t) => t.id === s.topicId)?.title ?? 'Explanation';
+    this.store.saveExplanation(
+      s.id,
+      title,
+      cleanSpeech(m.text) || m.text,
+      m.page && chat?.documentId ? { documentId: chat.documentId, page: m.page } : null,
+    );
     this.emit();
   }
 }

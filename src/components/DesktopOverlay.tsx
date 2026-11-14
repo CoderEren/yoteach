@@ -3,10 +3,19 @@ import { ArrowLeft, ArrowRight, ClipboardCheck, Volume2, X } from 'lucide-react'
 import type { AppState } from '../../shared/model';
 import type { ScreenDrawing } from '../../shared/drawing';
 import { layoutDiagram, type Diagram, type Sketch, type SketchElement } from '../../shared/drawing';
+import { freeSpot, labelSpot } from '../../shared/grounding';
 import { lessonDefinition } from '../../shared/lessons';
 import { api } from '../api';
 import { useTutor } from '../tutor';
 import { AnnotationLayer } from './TutorWorkspace';
+import {
+  drawOn,
+  handArrow,
+  handBox,
+  handLine,
+  handUnderline,
+  wobbleEllipse,
+} from '../drawing/hand';
 import { LessonScene } from './LessonScene';
 import { GenerationPanel } from './GeneratedMedia';
 import { PracticePanel } from './Practice';
@@ -33,101 +42,141 @@ function arrowHead(x: number, y: number, angle: number, size = 14) {
     b = angle + Math.PI + 0.45;
   return `M ${x + size * Math.cos(a)} ${y + size * Math.sin(a)} L ${x} ${y} L ${x + size * Math.cos(b)} ${y + size * Math.sin(b)}`;
 }
-/** Marks and connections on grounded regions, in pixels of whatever surface it covers. */
-export function DrawingLayer({ drawing }: { drawing: ScreenDrawing | null }) {
+/** Label size in pixels, measured in the handwriting font. */
+let ruler: CanvasRenderingContext2D | null = null;
+const labelSize = (text: string) => {
+  ruler ??= document.createElement('canvas').getContext('2d');
+  if (ruler) ruler.font = "700 27px Caveat, 'Bradley Hand', cursive";
+  const w = ruler ? ruler.measureText(text).width : text.length * 11.5;
+  return { w: w + 16, h: 32 };
+};
+/**
+ * Marks and connections on grounded regions, drawn by hand in pixels of whatever surface it
+ * covers. Labels go where they cover no recognised text and no other label.
+ */
+export function DrawingLayer({
+  drawing,
+  avoid = [],
+}: {
+  drawing: ScreenDrawing | null;
+  avoid?: { x: number; y: number; width: number; height: number }[];
+}) {
   const [ref, { w, h }] = useSize<HTMLDivElement>();
-  const px = (b: Box) => ({ x: b.x * w, y: b.y * h, w: b.width * w, h: b.height * h });
+  const svg = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (!svg.current || !drawing || !w) return;
+    return drawOn(svg.current, {
+      reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    });
+  }, [drawing?.revision, w > 0]);
+  if (!drawing) return <div className="drawing-layer" ref={ref} aria-hidden="true" />;
+  const px = (b: { x: number; y: number; width: number; height: number }) => ({
+    x: b.x * w,
+    y: b.y * h,
+    w: b.width * w,
+    h: b.height * h,
+  });
+  // Text and earlier labels are obstacles for each new label (normalized space).
+  const taken = [...avoid, ...drawing.marks.map((m) => m.box)];
+  const seed = (i: number) => (drawing.revision * 17 + i * 7) % 97;
   return (
     <div className="drawing-layer" ref={ref} aria-hidden="true">
-      {w > 0 && drawing && (
-        <svg width={w} height={h} key={drawing.revision}>
+      {w > 0 && (
+        <svg width={w} height={h} key={drawing.revision} ref={svg}>
           {drawing.marks.map((m, i) => {
             const b = px(m.box),
               cx = b.x + b.w / 2,
-              cy = b.y + b.h / 2,
-              pad = 8;
-            const labelRight = b.x + b.w + 230 < w;
-            const lx = labelRight ? b.x + b.w + 14 : b.x - 14,
-              ly = Math.max(24, b.y - 10);
+              cy = b.y + b.h / 2;
+            const size = m.label ? labelSize(m.label) : null;
+            const spot = size
+              ? labelSpot(m.box, { width: size.w / w, height: size.h / h }, taken)
+              : null;
+            if (spot) taken.push(spot);
+            const lx = spot ? spot.x * w : 0,
+              ly = spot ? spot.y * h : 0;
+            // Arrows start from their label (or a free point) and end at the mark's edge.
+            const tail = spot
+              ? { x: lx + size!.w / 2, y: ly + size!.h / 2 }
+              : { x: Math.max(12, b.x - 110), y: Math.max(12, cy - 70) };
+            const arrow =
+              m.shape === 'arrow'
+                ? handArrow(tail.x, tail.y, tail.x < cx ? b.x - 6 : b.x + b.w + 6, cy, seed(i))
+                : null;
             return (
-              <g key={m.id} className={`mark mark-${m.shape}`}>
-                {m.shape === 'highlight' && (
-                  <rect
-                    className="draw fill"
-                    style={stroke(i)}
-                    x={b.x - 3}
-                    y={b.y - 2}
-                    width={b.w + 6}
-                    height={b.h + 4}
-                    rx={4}
-                    pathLength={1}
-                  />
-                )}
+              <g key={m.id} className={`mark mark-${m.shape} boil`}>
+                {m.shape === 'highlight' &&
+                  (m.parts ?? [m.box])
+                    .map(px)
+                    .map((p, k) => (
+                      <path
+                        key={k}
+                        className="ink marker"
+                        d={handLine(
+                          p.x - 3,
+                          p.y + p.h / 2,
+                          p.x + p.w + 3,
+                          p.y + p.h / 2,
+                          seed(i) + k,
+                          0.01,
+                        )}
+                        style={{ strokeWidth: Math.max(10, p.h * 1.05) }}
+                      />
+                    ))}
                 {m.shape === 'box' && (
-                  <rect
-                    className="draw"
-                    style={stroke(i)}
-                    x={b.x - pad}
-                    y={b.y - pad}
-                    width={b.w + pad * 2}
-                    height={b.h + pad * 2}
-                    rx={8}
-                    pathLength={1}
+                  <path
+                    className="ink"
+                    d={handBox(b.x - 6, b.y - 5, b.w + 12, b.h + 10, seed(i))}
                   />
                 )}
                 {m.shape === 'circle' && (
-                  <ellipse
-                    className="draw"
-                    style={stroke(i)}
-                    cx={cx}
-                    cy={cy}
-                    rx={b.w / 2 + 18}
-                    ry={b.h / 2 + 14}
-                    pathLength={1}
-                  />
-                )}
-                {m.shape === 'underline' && (
                   <path
-                    className="draw"
-                    style={stroke(i)}
-                    d={`M ${b.x} ${b.y + b.h + 5} q ${b.w / 4} 5 ${b.w / 2} 0 t ${b.w / 2} 0`}
-                    pathLength={1}
+                    className="ink"
+                    d={wobbleEllipse(
+                      cx,
+                      cy,
+                      b.w / 2 + Math.max(12, b.h * 0.5),
+                      b.h / 2 + Math.max(9, b.h * 0.55),
+                      seed(i),
+                    )}
                   />
                 )}
-                {m.shape === 'arrow' && (
+                {m.shape === 'underline' &&
+                  (m.parts ?? [m.box])
+                    .map(px)
+                    .map((p, k) => (
+                      <path
+                        key={k}
+                        className="ink"
+                        d={handUnderline(p.x, p.y + p.h + 4, p.w, seed(i) + k)}
+                      />
+                    ))}
+                {arrow && (
                   <>
-                    <path
-                      className="draw"
-                      style={stroke(i)}
-                      d={`M ${Math.max(10, b.x - 110)} ${Math.max(10, cy - 70)} Q ${b.x - 70} ${cy - 5} ${b.x - 8} ${cy}`}
-                      pathLength={1}
-                    />
-                    <path
-                      className="draw"
-                      style={stroke(i + 0.6)}
-                      d={arrowHead(b.x - 8, cy, Math.atan2(5, 62))}
-                      pathLength={1}
-                    />
+                    <path className="ink" d={arrow.shaft} />
+                    <path className="ink" d={arrow.head} />
                   </>
                 )}
                 {m.shape === 'point' && (
-                  <circle
-                    className="draw dot"
-                    style={stroke(i)}
-                    cx={cx}
-                    cy={cy}
-                    r={8}
-                    pathLength={1}
+                  <>
+                    <circle className="ink dot" cx={cx} cy={cy} r={7} />
+                    <path className="ink" d={wobbleEllipse(cx, cy, 15, 15, seed(i), 6)} />
+                  </>
+                )}
+                {m.label && spot && m.shape !== 'arrow' && (
+                  <path
+                    className="ink leader"
+                    d={handLine(
+                      lx < b.x ? lx + size!.w : lx > b.x + b.w ? lx : lx + size!.w / 2,
+                      ly + size!.h / 2,
+                      lx < b.x ? b.x - 4 : lx > b.x + b.w ? b.x + b.w + 4 : cx,
+                      ly + size!.h / 2 < b.y ? b.y - 4 : ly > b.y + b.h ? b.y + b.h + 4 : cy,
+                      seed(i) + 5,
+                      0.12,
+                    )}
                   />
                 )}
-                {m.label && (
-                  <text
-                    className="mark-label"
-                    style={stroke(i + 0.5)}
-                    x={lx}
-                    y={ly}
-                    textAnchor={labelRight ? 'start' : 'end'}
-                  >
+                {m.label && spot && (
+                  <text className="ink-label" x={lx + 7} y={ly + size!.h * 0.72}>
                     {m.label}
                   </text>
                 )}
@@ -142,42 +191,33 @@ export function DrawingLayer({ drawing }: { drawing: ScreenDrawing | null }) {
             const dx = t.x - s.x,
               dy = t.y - s.y,
               len = Math.hypot(dx, dy) || 1;
-            // Start and end just outside each region so the text stays readable.
             const out = (p: { x: number; y: number }, r: { w: number; h: number }, dir: number) => {
               const k =
                 Math.min(
                   r.w / 2 / Math.abs(dx / len || 1e-6),
                   r.h / 2 / Math.abs(dy / len || 1e-6),
-                ) + 10;
+                ) + 12;
               return { x: p.x + (dx / len) * k * dir, y: p.y + (dy / len) * k * dir };
             };
             const p = out(s, a, 1),
               q = out(t, b, -1);
-            const mx = (p.x + q.x) / 2 - (dy / len) * 40,
-              my = (p.y + q.y) / 2 + (dx / len) * 40;
-            const n = drawing.marks.length + i;
+            const arrow = handArrow(p.x, p.y, q.x, q.y, seed(i + 40));
+            const size = c.label ? labelSize(c.label) : null;
+            const mid = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+            const spot = size
+              ? labelSpot(
+                  { x: mid.x / w - 0.005, y: mid.y / h - 0.005, width: 0.01, height: 0.01 },
+                  { width: size.w / w, height: size.h / h },
+                  taken,
+                )
+              : null;
+            if (spot) taken.push(spot);
             return (
-              <g key={c.id} className="connection">
-                <path
-                  className="draw"
-                  style={stroke(n)}
-                  d={`M ${p.x} ${p.y} Q ${mx} ${my} ${q.x} ${q.y}`}
-                  pathLength={1}
-                />
-                <path
-                  className="draw"
-                  style={stroke(n + 0.6)}
-                  d={arrowHead(q.x, q.y, Math.atan2(q.y - my, q.x - mx))}
-                  pathLength={1}
-                />
-                {c.label && (
-                  <text
-                    className="mark-label"
-                    style={stroke(n + 0.7)}
-                    x={mx}
-                    y={my}
-                    textAnchor="middle"
-                  >
+              <g key={c.id} className="connection boil">
+                <path className="ink" d={arrow.shaft} />
+                <path className="ink" d={arrow.head} />
+                {c.label && spot && (
+                  <text className="ink-label" x={spot.x * w + 7} y={spot.y * h + size!.h * 0.72}>
                     {c.label}
                   </text>
                 )}
@@ -207,11 +247,17 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
   const s = stroke(i);
   const label = (x: number, y: number, text?: string, anchor: 'start' | 'middle' = 'middle') =>
     text ? (
-      <text className="sketch-label" style={stroke(i + 0.5)} x={x} y={y} textAnchor={anchor}>
+      <text
+        className="sketch-label ink-label"
+        style={stroke(i + 0.5)}
+        x={x}
+        y={y}
+        textAnchor={anchor}
+      >
         {text}
       </text>
     ) : null;
-  const dash = (d?: boolean) => (d ? 'draw dashed' : 'draw');
+  const dash = (d?: boolean) => (d ? 'draw ink dashed' : 'draw ink');
   switch (e.type) {
     case 'arrow':
     case 'line': {
@@ -228,7 +274,7 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
           />
           {e.type === 'arrow' && (
             <path
-              className="draw"
+              className="draw ink"
               style={stroke(i + 0.4)}
               d={arrowHead(x2, y2, angle, 2.6)}
               pathLength={1}
@@ -252,7 +298,7 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
     case 'circle':
       return (
         <g className={tone(e.tone)}>
-          <circle className="draw" style={s} cx={e.at[0]} cy={e.at[1]} r={e.r} pathLength={1} />
+          <circle className="draw ink" style={s} cx={e.at[0]} cy={e.at[1]} r={e.r} pathLength={1} />
           {label(e.at[0], e.at[1] + 1.2, e.label)}
         </g>
       );
@@ -260,7 +306,7 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
       return (
         <g className={tone(e.tone)}>
           <rect
-            className="draw"
+            className="draw ink"
             style={s}
             x={e.at[0]}
             y={e.at[1]}
@@ -275,7 +321,14 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
     case 'dot':
       return (
         <g className={tone(e.tone)}>
-          <circle className="draw dot" style={s} cx={e.at[0]} cy={e.at[1]} r={0.9} pathLength={1} />
+          <circle
+            className="draw ink dot"
+            style={s}
+            cx={e.at[0]}
+            cy={e.at[1]}
+            r={0.9}
+            pathLength={1}
+          />
           {label(e.at[0] + 1.8, e.at[1] - 1.4, e.label, 'start')}
         </g>
       );
@@ -285,15 +338,20 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
       const [x, y] = e.origin;
       return (
         <g className="tone-muted">
-          <path className="draw" style={s} d={`M ${x} 2 L ${x} ${y} L 98 ${y}`} pathLength={1} />
           <path
-            className="draw"
+            className="draw ink"
+            style={s}
+            d={`M ${x} 2 L ${x} ${y} L 98 ${y}`}
+            pathLength={1}
+          />
+          <path
+            className="draw ink"
             style={stroke(i + 0.3)}
             d={arrowHead(x, 2, -Math.PI / 2, 2)}
             pathLength={1}
           />
           <path
-            className="draw"
+            className="draw ink"
             style={stroke(i + 0.3)}
             d={arrowHead(98, y, 0, 2)}
             pathLength={1}
@@ -307,6 +365,13 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
 }
 /** Yoyo's free-form drawing: vectors, graphs, geometry. Drawn element by element. */
 export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: () => void }) {
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (ref.current)
+      return drawOn(ref.current, {
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      });
+  }, [sketch]);
   return (
     <figure className="diagram-sketch sketch-canvas">
       <figcaption>
@@ -317,7 +382,14 @@ export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: ()
           </button>
         )}
       </figcaption>
-      <svg viewBox="-2 -2 104 74" width={560} height={400} role="img" aria-label={sketch.title}>
+      <svg
+        ref={ref}
+        viewBox="-2 -2 104 74"
+        width={560}
+        height={400}
+        role="img"
+        aria-label={sketch.title}
+      >
         {sketch.elements.map((e, i) => (
           <SketchItem key={i} e={e} i={i} />
         ))}
@@ -328,6 +400,13 @@ export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: ()
 /** A concept sketch laid out by the app, drawn in node by node. */
 export function DiagramSketch({ diagram, onClose }: { diagram: Diagram; onClose?: () => void }) {
   const l = layoutDiagram(diagram);
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (ref.current)
+      return drawOn(ref.current, {
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      });
+  }, [diagram]);
   return (
     <figure className="diagram-sketch">
       <figcaption>
@@ -339,6 +418,7 @@ export function DiagramSketch({ diagram, onClose }: { diagram: Diagram; onClose?
         )}
       </figcaption>
       <svg
+        ref={ref}
         viewBox={`0 0 ${l.width} ${l.height}`}
         width={l.width}
         height={l.height}
@@ -348,7 +428,7 @@ export function DiagramSketch({ diagram, onClose }: { diagram: Diagram; onClose?
         {l.nodes.map((n, i) => (
           <g key={n.id} className="diagram-node">
             <rect
-              className="draw"
+              className="draw ink"
               style={stroke(i)}
               x={n.x - n.w / 2}
               y={n.y - n.h / 2}
@@ -363,17 +443,15 @@ export function DiagramSketch({ diagram, onClose }: { diagram: Diagram; onClose?
               width={n.w - 12}
               height={n.h - 8}
             >
-              <div className="diagram-text" style={stroke(i + 0.4)}>
-                {n.label}
-              </div>
+              <div className="diagram-text ink-label">{n.label}</div>
             </foreignObject>
           </g>
         ))}
         {l.edges.map((e, i) => (
           <g key={i} className="diagram-edge">
-            <path className="draw" style={stroke(l.nodes.length + i)} d={e.d} pathLength={1} />
+            <path className="draw ink" style={stroke(l.nodes.length + i)} d={e.d} pathLength={1} />
             <path
-              className="draw"
+              className="draw ink"
               style={stroke(l.nodes.length + i + 0.5)}
               d={arrowHead(e.tip.x, e.tip.y, e.tip.angle, 11)}
               pathLength={1}
@@ -396,11 +474,20 @@ export function DiagramSketch({ diagram, onClose }: { diagram: Diagram; onClose?
   );
 }
 /** Clickable island in an otherwise click-through layer. */
-function Interactive({ className, children }: { className: string; children: ReactNode }) {
+function Interactive({
+  className,
+  children,
+  style,
+}: {
+  className: string;
+  children: ReactNode;
+  style?: React.CSSProperties;
+}) {
   useEffect(() => () => void api.overlay.interactive(false), []);
   return (
     <section
       className={className}
+      style={style}
       onMouseEnter={() => void api.overlay.interactive(true)}
       onMouseLeave={() => void api.overlay.interactive(false)}
     >
@@ -509,24 +596,39 @@ export function DesktopOverlay({ data }: { data: AppState }) {
   const lesson = !!r.activeLessonId && r.lessonSurface === 'screen';
   const media = !lesson && !!r.generation && r.generation.origin === 'tutor' && !r.activeLessonId;
   const card = lesson || media;
-  // Cards and sketches never cover what Yoyo is marking: the card takes the side without
-  // marks, and the sketch takes the other side, dropping to the bottom when marks are there.
+  // Sketches and cards go where they cover the least text and none of Yoyo's marks.
   const marks = onScreen ? (r.drawing?.marks ?? []) : [];
+  const text = onScreen ? (r.snapshot?.textBoxes.map((t) => t.box) ?? []) : [];
   const centre = (b: { x: number; width: number }) => b.x + b.width / 2;
   const markedRight = marks.length
     ? marks.reduce((s, m) => s + centre(m.box), 0) / marks.length >= 0.5
     : false;
   const cardSide = markedRight ? 'left' : 'right';
-  const sketchSide = card
-    ? cardSide === 'left'
-      ? 'right'
-      : 'left'
-    : markedRight
-      ? 'left'
-      : 'right';
-  const sketchLow = marks.some((m) =>
-    sketchSide === 'left' ? centre(m.box) < 0.5 : centre(m.box) >= 0.5,
-  );
+  const vw = window.innerWidth || 1440,
+    vh = window.innerHeight || 900;
+  const cardBox = card
+    ? { x: cardSide === 'left' ? 0.02 : 1 - 0.02 - 460 / vw, y: 0.08, width: 460 / vw, height: 0.8 }
+    : null;
+  const panel = r.drawing?.sketch
+    ? { width: 600 / vw, height: 470 / vh }
+    : r.drawing?.diagram
+      ? (() => {
+          const l = layoutDiagram(r.drawing!.diagram!);
+          const scale = Math.min(1, (vw * 0.46) / (l.width + 34), (vh * 0.6) / (l.height + 70));
+          return { width: ((l.width + 34) * scale) / vw, height: ((l.height + 70) * scale) / vh };
+        })()
+      : null;
+  const near = r.drawing?.sketch?.near ?? null;
+  const spot = panel
+    ? freeSpot(
+        panel,
+        [...text, ...marks.map((m) => m.box), ...(cardBox ? [cardBox, cardBox, cardBox] : [])],
+        near ?? undefined,
+      )
+    : null;
+  const place = spot
+    ? { left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, maxWidth: `${panel!.width * 100}%` }
+    : undefined;
   return (
     <main className="desktop-overlay">
       <AnnotationLayer
@@ -542,9 +644,10 @@ export function DesktopOverlay({ data }: { data: AppState }) {
         drawing={
           onScreen ? r.drawing : r.drawing ? { ...r.drawing, marks: [], connections: [] } : null
         }
+        avoid={text}
       />
       {r.drawing?.diagram && (
-        <Interactive className={`screen-sketch ${sketchSide}${sketchLow ? ' low' : ''}`}>
+        <Interactive className="screen-sketch" style={place}>
           <DiagramSketch
             diagram={r.drawing.diagram}
             onClose={() => void act({ type: 'screen-clear' })}
@@ -552,15 +655,7 @@ export function DesktopOverlay({ data }: { data: AppState }) {
         </Interactive>
       )}
       {r.drawing?.sketch && (
-        <Interactive
-          className={`screen-sketch ${
-            r.drawing.sketch.near
-              ? r.drawing.sketch.near.x + r.drawing.sketch.near.width / 2 < 0.5
-                ? 'right'
-                : 'left'
-              : sketchSide
-          }${!r.drawing.sketch.near && sketchLow ? ' low' : ''}`}
-        >
+        <Interactive className="screen-sketch" style={place}>
           <SketchCanvas
             sketch={r.drawing.sketch}
             onClose={() => void act({ type: 'screen-clear' })}

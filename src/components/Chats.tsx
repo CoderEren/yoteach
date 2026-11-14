@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bookmark, MessageSquare, Send, Trash2 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, MessageSquare, Send, Trash2 } from 'lucide-react';
 import type { AppState } from '../../shared/model';
-import type { Chat } from '../../shared/tutor';
+import { cleanSpeech, type Chat } from '../../shared/tutor';
 import { api, unwrap } from '../api';
 import { useTutor } from '../tutor';
 import { GenerationPanel } from './GeneratedMedia';
@@ -139,12 +139,14 @@ export function Chats({ data }: { data: AppState }) {
         <div className="chat-messages" aria-live="polite">
           {messages.length ? (
             messages.map((m) => {
-              const saved = data.explanations.some(
-                (e) => e.sessionId === m.sessionId && e.text === m.text,
+              const saved = data.explanations.find(
+                (e) =>
+                  e.sessionId === m.sessionId &&
+                  (e.text === m.text || e.text === cleanSpeech(m.text)),
               );
               return (
                 <article key={m.id} className={`bubble bubble-${m.role}`}>
-                  <p>{m.text}</p>
+                  <p>{m.role === 'assistant' ? cleanSpeech(m.text) : m.text}</p>
                   <footer>
                     <time>
                       {new Date(m.createdAt).toLocaleTimeString([], {
@@ -155,12 +157,14 @@ export function Chats({ data }: { data: AppState }) {
                     {m.role === 'assistant' && (
                       <button
                         className="text-button"
-                        disabled={saved}
+                        aria-pressed={!!saved}
                         onClick={() =>
-                          void unwrap(api.tutor.save(m.id)).catch((e) => setError(String(e)))
+                          void unwrap(
+                            saved ? api.tutor.deleteExplanation(saved.id) : api.tutor.save(m.id),
+                          ).catch((e) => setError(String(e)))
                         }
                       >
-                        <Bookmark size={13} />
+                        {saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
                         {saved ? 'Saved' : 'Save'}
                       </button>
                     )}

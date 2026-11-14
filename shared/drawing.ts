@@ -60,6 +60,8 @@ export type ScreenDrawing = {
     shape: z.infer<typeof MarkShape>;
     label: string | null;
     box: Box;
+    /** Per-line boxes when the marked text wraps. */
+    parts?: Box[];
   }[];
   connections: { id: string; from: Box; to: Box; label: string | null }[];
   diagram: Diagram | null;

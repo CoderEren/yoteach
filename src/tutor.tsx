@@ -249,6 +249,8 @@ export function TutorProvider({ children }: { children: ReactNode }) {
           mic: turn.held,
           activity: turn.held ? 'listening' : 'thinking',
         });
+        // Stream the rest of the question live while the key stays down.
+        if (turn.held) heldAudio.current.streamLive(() => !turn.cancelled && hold.current === turn);
         if (live.current?.activeLessonId && live.current.lessonSurface === 'app') {
           const saved = (await unwrap(api.getState())).lessons.find(
             (l) => l.id === live.current?.activeLessonId,
@@ -371,6 +373,10 @@ export function TutorProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (action.type === 'start') {
+      // A lecture replaces whatever chat is open: the tutor is always on, so a connection usually
+      // exists already. Without this the lecture button silently did nothing.
+      if ((sessionId.current || voice.current) && action.documentId && !live.current?.lecture)
+        await disconnect();
       if (sessionId.current || voice.current) return;
       const token = ++generation.current;
       let id: string | undefined;

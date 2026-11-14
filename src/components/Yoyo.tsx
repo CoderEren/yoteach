@@ -20,20 +20,20 @@ export function Yoyo({
     >
       <defs>
         <linearGradient id={`${id}-glass`} x1="0" y1="0" x2=".9" y2="1">
-          <stop stopColor="#f2e8ff" />
-          <stop offset=".42" stopColor="#c5b2ed" />
-          <stop offset=".8" stopColor="#b6d8f2" />
-          <stop offset="1" stopColor="#d9fcfa" />
+          <stop stopColor="#f3eeff" />
+          <stop offset=".42" stopColor="#b9a1ff" />
+          <stop offset=".8" stopColor="#8a63f2" />
+          <stop offset="1" stopColor="#dccfff" />
         </linearGradient>
         <radialGradient id={`${id}-shine`} cx="25%" cy="20%" r="85%">
           <stop stopColor="#fff" stopOpacity=".8" />
           <stop offset=".55" stopColor="#fff" stopOpacity=".04" />
-          <stop offset="1" stopColor="#aaa0df" stopOpacity=".35" />
+          <stop offset="1" stopColor="#6342c4" stopOpacity=".3" />
         </radialGradient>
         <linearGradient id={`${id}-edge`}>
-          <stop stopColor="#e1d5ff" />
-          <stop offset=".5" stopColor="#9886ce" />
-          <stop offset="1" stopColor="#ceeef9" />
+          <stop stopColor="#e6dcff" />
+          <stop offset=".5" stopColor="#6e48d6" />
+          <stop offset="1" stopColor="#d2c3ff" />
         </linearGradient>
         <filter id={`${id}-blur`}>
           <feGaussianBlur stdDeviation="5" />
@@ -45,7 +45,7 @@ export function Yoyo({
         cy="222"
         rx="65"
         ry="9"
-        fill="#7161a0"
+        fill="#6342c4"
         opacity=".19"
         filter={`url(#${id}-blur)`}
       />
@@ -63,7 +63,7 @@ export function Yoyo({
           rx="68"
           ry="84"
           fill={`url(#${id}-glass)`}
-          stroke="#e8eeff"
+          stroke="#faf7ff"
           strokeWidth="3"
         />
         <ellipse cx="132" cy="120" rx="63" ry="80" fill={`url(#${id}-edge)`} />
@@ -74,7 +74,7 @@ export function Yoyo({
           rx="73"
           ry="85"
           fill={`url(#${id}-glass)`}
-          stroke="#f8f5ff"
+          stroke="#faf7ff"
           strokeWidth="2.5"
         />
         <ellipse cx="108" cy="122" rx="70" ry="82" fill={`url(#${id}-shine)`} />
@@ -98,7 +98,7 @@ export function Yoyo({
                 : 'M171 158 Q180 205 143 215 Q112 223 74 203 Q38 182 27 200 Q14 224 73 217 Q102 213 90 207'
           }
           fill="none"
-          stroke="#b6a0dc"
+          stroke="#9c7ef5"
           strokeWidth="5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -110,41 +110,36 @@ export function Yoyo({
                 ? 'M5 108 l-2 -8 M17 103 l1 -8 M27 109 l5 -5'
                 : 'M221 107 l-1 -8 M232 111 l5 -6 M235 123 l5 -1'
             }
-            stroke="#9c8bda"
+            stroke="#9c7ef5"
             strokeWidth="3"
             strokeLinecap="round"
             fill="none"
           />
         )}
-        <g className="yoyo-face" fill="#313050">
+        <g className="yoyo-face" fill="#262a3d">
           {state === 'success' ? (
             <path
-              d="M72 122 Q79 108 86 122 M123 122 Q130 108 137 122"
+              d="M76 124 Q83.5 112 91 124 M120 124 Q127.5 112 135 124"
               fill="none"
-              stroke="#313050"
-              strokeWidth="4"
+              stroke="#262a3d"
+              strokeWidth="4.5"
               strokeLinecap="round"
             />
           ) : (
             <g className="yoyo-eyes">
-              <ellipse cx="80" cy="122" rx="7" ry="12" transform="rotate(10 80 122)" />
-              <ellipse cx="131" cy="122" rx="7" ry="12" transform="rotate(10 131 122)" />
-              <circle cx="82" cy="117" r="2.5" fill="white" />
-              <circle cx="133" cy="117" r="2.5" fill="white" />
+              <rect x="78" y="108" width="11" height="24" rx="5.5" />
+              <rect x="122" y="108" width="11" height="24" rx="5.5" />
             </g>
           )}
           <path
             className="yoyo-smile"
-            d={state === 'error' ? 'M98 150 Q107 141 116 150' : 'M98 147 Q107 160 116 147'}
-            stroke="#bd719f"
-            strokeWidth="3.5"
+            d={state === 'error' ? 'M98 150 Q106 144 114 150' : 'M98 146 Q106 153 114 146'}
+            stroke="#262a3d"
+            strokeWidth="3.6"
             fill="none"
             strokeLinecap="round"
           />
-          <ellipse className="yoyo-mouth" cx="107" cy="150" rx="7" ry="8" fill="#9a557e" />
-          {state === 'error' && (
-            <path d="M73 103 L86 108 M125 108 L138 103" stroke="#655b8a" strokeWidth="2.5" />
-          )}
+          <ellipse className="yoyo-mouth" cx="106" cy="149" rx="5" ry="5.5" fill="#262a3d" />
         </g>
       </g>
     </svg>

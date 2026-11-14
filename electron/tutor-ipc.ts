@@ -57,6 +57,17 @@ export function installTutor(
   let holdActive = false;
   let captureAbort: AbortController | undefined;
   let captureDisplay: ReturnType<typeof screen.getPrimaryDisplay> | undefined;
+  type Display = ReturnType<typeof screen.getPrimaryDisplay>;
+  let earlyCapture: { display: Display; result: Promise<any> } | null = null;
+  /** Screenshot plus on-device text recognition for one display. */
+  function runCapture(display: Display, signal?: AbortSignal) {
+    return promisify(execFile)(join(root, 'dist-electron/capture-screen'), [String(display.id)], {
+      encoding: 'utf8',
+      timeout: 15000,
+      maxBuffer: 16_000_000,
+      signal,
+    }).then(({ stdout }) => JSON.parse(stdout));
+  }
   const privateName =
     /(incognito|inprivate|private browsing|private window|password|1password|bitwarden|keychain|safari|chrome|chromium|firefox|microsoft edge|brave|opera|arc browser)/i;
   async function sources() {
@@ -173,6 +184,14 @@ export function installTutor(
       if (holdActive || service.state.input === 'sending') return;
       holdActive = true;
       captureDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+      // Capture and read the screen the instant the key goes down, before the voice
+      // connection is even ready; the session picks it up when it asks.
+      earlyCapture =
+        service.state.lecture ||
+        (service.state.activeLessonId && service.state.lessonSurface === 'app')
+          ? null
+          : { display: captureDisplay, result: runCapture(captureDisplay) };
+      earlyCapture?.result.catch(() => {});
       service.state.input = 'arming';
       service.state.error = '';
       service.emit();
@@ -185,6 +204,7 @@ export function installTutor(
       service.state.mic = false;
       if (action.type === 'hold-cancel') service.state.activity = 'idle';
       if (action.type === 'hold-cancel') {
+        earlyCapture = null;
         if (action.reason === 'silent') {
           service.state.notice = 'I didn’t hear anything. Hold and speak.';
           setTimeout(() => {
@@ -238,14 +258,12 @@ export function installTutor(
       const ctl = new AbortController();
       captureAbort = ctl;
       try {
-        const { stdout } = await promisify(execFile)(
-          join(root, 'dist-electron/capture-screen'),
-          [String(display.id)],
-          { encoding: 'utf8', timeout: 15000, maxBuffer: 8_000_000, signal: ctl.signal },
-        );
+        // Usually already done: the capture started when the key went down.
+        const early = earlyCapture && earlyCapture.display.id === display.id ? earlyCapture : null;
+        earlyCapture = null;
+        const image = await (early ? early.result : runCapture(display, ctl.signal));
         if (ctl.signal.aborted || service.state.sessionId !== id || service.state.epoch !== epoch)
           return;
-        const image = JSON.parse(stdout);
         const snapshot = SnapshotSchema.parse({
           ...image,
           id: randomUUID(),
@@ -257,7 +275,8 @@ export function installTutor(
             bounds: display.bounds,
           },
           capturedAt: new Date().toISOString(),
-          textBoxes: [],
+          textBoxes: image.textBoxes ?? [],
+          words: image.words ?? [],
         });
         service.state.sharing = 'screen';
         service.state.sourceName = 'Current screen';
