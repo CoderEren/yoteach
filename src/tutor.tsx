@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { Conversation as ElevenConversation } from '@elevenlabs/client';
 import type { SharedSnapshot, TutorIntent, TutorRuntime, TutorTool } from '../shared/tutor';
 import { api, unwrap } from './api';
+import { lessonContext } from '../shared/lessons';
 import { HoldAudio } from './audio/hold-audio';
 const Context = createContext<{
   runtime: TutorRuntime | null;
@@ -166,6 +167,42 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   }
   async function handle(action: TutorIntent) {
     if (action.type === 'open') return;
+    if (
+      action.type === 'lesson-open' ||
+      action.type === 'lesson-step' ||
+      action.type === 'lesson-narrate'
+    ) {
+      const current = await unwrap(api.tutor.get());
+      const saved = (await unwrap(api.getState())).lessons.find(
+        (l) => l.id === current.activeLessonId,
+      );
+      if (!saved) return;
+      if (action.type === 'lesson-narrate') {
+        if (live.current?.mode === 'text' && sessionId.current) await disconnect();
+        if (!sessionId.current) await handle({ type: 'start', topicId: null, mode: 'voice' });
+        if (!voice.current || !sessionId.current) return;
+        // The user may close or change the lesson while authentication is pending.
+        const latest = await unwrap(api.tutor.get());
+        const latestSaved = (await unwrap(api.getState())).lessons.find((l) => l.id === saved.id);
+        if (latest.activeLessonId !== saved.id || latestSaved?.step !== saved.step) return;
+      }
+      voice.current?.sendContextualUpdate(
+        'Current authored visual lesson (study data; replaces previous screen grounding): ' +
+          JSON.stringify(lessonContext(saved)),
+      );
+      if (action.type === 'lesson-narrate')
+        voice.current?.sendUserMessage(
+          'Explain the current visual lesson step concisely using the supplied authored content. Do not advance yet; invite a question.',
+        );
+      return;
+    }
+    if (action.type === 'lesson-close') {
+      voice.current?.sendContextualUpdate(
+        'The visual lesson has closed. Discard its visible-state context.',
+      );
+      if (sessionId.current && live.current?.lecture) await teachSlide(sessionId.current, false);
+      return;
+    }
     if (action.type === 'hold-cancel') {
       cancelHold();
       if (sessionId.current)
@@ -203,7 +240,16 @@ export function TutorProvider({ children }: { children: ReactNode }) {
           mic: turn.held,
           activity: turn.held ? 'listening' : 'thinking',
         });
-        if (!live.current?.lecture) {
+        if (live.current?.activeLessonId) {
+          const saved = (await unwrap(api.getState())).lessons.find(
+            (l) => l.id === live.current?.activeLessonId,
+          );
+          if (saved && !turn.cancelled)
+            voice.current?.sendContextualUpdate(
+              'The student is asking about this authored visual lesson: ' +
+                JSON.stringify(lessonContext(saved)),
+            );
+        } else if (!live.current?.lecture) {
           try {
             await unwrap(api.tutor.captureScreen());
             if (turn.cancelled) return;
@@ -307,6 +353,8 @@ export function TutorProvider({ children }: { children: ReactNode }) {
         const clientTools = Object.fromEntries(
           (
             [
+              'open_visual_lesson',
+              'navigate_visual_lesson',
               'analyze_current_screen',
               'highlight_screen_region',
               'draw_annotation',

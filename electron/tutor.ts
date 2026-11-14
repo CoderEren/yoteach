@@ -1,3 +1,4 @@
+import { lessonContext } from '../shared/lessons';
 import { randomUUID } from 'node:crypto';
 import {
   SnapshotSchema,
@@ -47,9 +48,10 @@ export class TutorService {
     readonly store: Store,
     readonly providers: Providers,
     private changed: () => void,
-    private navigate: (id: string) => void,
+    private openWorkspace: () => void,
   ) {
     this.state = {
+      activeLessonId: null,
       sessionId: null,
       lecture: null,
       lecturePreparing: false,
@@ -84,6 +86,7 @@ export class TutorService {
     const topic = d.topics.find((t) => t.id === (topicId ?? s?.topicId));
     const doc = d.documents.find((d) => d.id === (documentId ?? s?.documentId));
     return JSON.stringify({
+      visualLesson: this.lessonContext(),
       mode: doc ? 'lecture' : 'tutor',
       lecture: doc ? { name: doc.originalName, page: s?.page ?? page, total: doc.pageCount } : null,
       legacyNotes: topic?.overview.slice(0, 6000),
@@ -94,6 +97,24 @@ export class TutorService {
       screenSharing: this.state.sharing,
       source: this.state.sourceName,
     });
+  }
+  lessonContext() {
+    const lesson = this.store.snapshot().lessons.find((l) => l.id === this.state.activeLessonId);
+    return lesson ? lessonContext(lesson) : null;
+  }
+  openLesson(savedId?: string) {
+    const lesson = this.store.openLesson('glucose-phosphorylation', this.state.sessionId, savedId);
+    this.stopSharing(false);
+    this.state.activeLessonId = lesson.id;
+    this.emit();
+    return this.lessonContext();
+  }
+  stepLesson(id: string, step: number) {
+    if (id !== this.state.activeLessonId)
+      throw new Error('Open this lesson before changing its step.');
+    this.store.setLessonStep(id, step);
+    this.emit();
+    return this.lessonContext();
   }
   async start(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
     if (this.state.sessionId || this.connecting)
@@ -242,6 +263,15 @@ export class TutorService {
     if (this.state.status === 'paused') throw new Error('The session is paused.');
     const tool = ToolSchema.parse(input);
     switch (tool.name) {
+      case 'open_visual_lesson': {
+        this.openLesson();
+        this.openWorkspace();
+        return this.stepLesson(this.state.activeLessonId!, tool.step);
+      }
+      case 'navigate_visual_lesson': {
+        if (!this.state.activeLessonId) throw new Error('Open a visual lesson first.');
+        return this.stepLesson(this.state.activeLessonId, tool.step);
+      }
       case 'analyze_current_screen': {
         const snapshot = this.state.snapshot;
         if (!snapshot || this.state.sharing === 'off')
@@ -310,6 +340,8 @@ export class TutorService {
         return { shown: region.label };
       }
       case 'navigate_slide': {
+        if (this.state.activeLessonId)
+          throw new Error('Close the visual lesson to return to lecture slides.');
         const lecture = this.state.lecture;
         if (!lecture || this.state.sharing === 'off')
           throw new Error('Start or resume a lecture first.');

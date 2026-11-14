@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SavedLessonSchema } from './lessons';
 import { StudySessionSchema, MessageSchema, ExplanationSchema, type TutorApi } from './tutor';
 export const Id = z.uuid();
 export const Title = z
@@ -58,7 +59,8 @@ export const ActivitySchema = z.object({
   createdAt: Stamp,
 });
 export const StateSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
+  lessons: z.array(SavedLessonSchema),
   sessions: z.array(StudySessionSchema),
   messages: z.array(MessageSchema),
   explanations: z.array(ExplanationSchema),
@@ -129,7 +131,8 @@ export interface DesktopApi {
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
-  version: 3,
+  version: 4,
+  lessons: [],
   sessions: [],
   messages: [],
   explanations: [],

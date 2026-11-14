@@ -17,6 +17,7 @@ import {
   type TutorMessage,
   type Explanation,
 } from '../shared/tutor';
+import { LessonKey, LessonStep, type SavedLesson } from '../shared/lessons';
 import { randomUUID } from 'node:crypto';
 import {
   AppState,
@@ -42,11 +43,12 @@ export class Store {
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, 'utf8'));
-        if (raw.version === 1 || raw.version === 2) {
+        if (raw.version === 1 || raw.version === 2 || raw.version === 3) {
           // Keep an exact pre-migration snapshot, including legacy notes and associations.
           const backup = this.file + `.v${raw.version}.backup`;
           if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
-          raw.version = 3;
+          raw.version = 4;
+          raw.lessons ??= [];
           raw.sessions ??= [];
           raw.messages ??= [];
           raw.explanations ??= [];
@@ -67,6 +69,43 @@ export class Store {
       this.save(this.state);
     }
     this.cleanupOrphans();
+  }
+  openLesson(key: SavedLesson['key'], sessionId: string | null, savedId?: string) {
+    LessonKey.parse(key);
+    const n = this.snapshot();
+    if (savedId) {
+      const saved = n.lessons.find((l) => l.id === savedId);
+      if (!saved) throw new Error('This saved lesson is unavailable.');
+      return saved;
+    }
+    const session = sessionId ? n.sessions.find((s) => s.id === sessionId && !s.endedAt) : null;
+    if (sessionId && !session) throw new Error('This study session has ended.');
+    const existing = n.lessons.find((l) => l.key === key && l.sessionId === sessionId);
+    if (existing) return existing;
+    const now = new Date().toISOString();
+    const lesson: SavedLesson = {
+      id: randomUUID(),
+      key,
+      revision: 1,
+      step: 1,
+      sessionId,
+      source: session?.documentId ? { documentId: session.documentId, page: session.page } : null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    n.lessons.push(lesson);
+    this.save(n);
+    return lesson;
+  }
+  setLessonStep(id: string, step: number) {
+    LessonStep.parse(step);
+    const n = this.snapshot(),
+      lesson = n.lessons.find((l) => l.id === id);
+    if (!lesson) throw new Error('This saved lesson is unavailable.');
+    lesson.step = step;
+    lesson.updatedAt = new Date().toISOString();
+    this.save(n);
+    return lesson;
   }
   snapshot() {
     return structuredClone(this.state);

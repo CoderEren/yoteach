@@ -1,3 +1,5 @@
+> Stage 3 update: the current prompt now supports authored visual lessons. Add `open_visual_lesson` and `navigate_visual_lesson` from `agent-tools/` to the six tools documented below. The existing agent was updated and read back on 14 November 2026; voice, model, authentication and override settings are unchanged. See `STAGE-3-HANDOFF.md`.
+
 # Stage 2 lecture workflow setup
 
 Use the existing agent identified by the local `ELEVENLABS_AGENT_ID`. The local app requires an ElevenLabs key with conversation signing access and an Anthropic key with access to `claude-sonnet-4-6` (or a compatible vision/structured-output model).

@@ -16,6 +16,8 @@ import { Modal } from './components/Modal';
 import { Yoyo } from './components/Yoyo';
 import { useTutor } from './tutor';
 import { LectureStage } from './components/LectureStage';
+import { VisualLesson } from './components/VisualLesson';
+import { lessonDefinition } from '../shared/lessons';
 import { DesktopOverlay } from './components/DesktopOverlay';
 const PdfViewer = lazy(() =>
   import('./components/PdfViewer').then((m) => ({ default: m.PdfViewer })),
@@ -99,6 +101,8 @@ export default function App() {
     );
   if (companion) return <Companion data={data} />;
   if (overlay) return <DesktopOverlay />;
+  const lesson = data.lessons.find((l) => l.id === r?.activeLessonId);
+  if (lesson) return <VisualLesson key={lesson.id} saved={lesson} />;
   if (r?.lecture) return <LectureStage />;
   const doc = data.documents.find((d) => d.id === viewer?.id);
   return (
@@ -291,6 +295,19 @@ export default function App() {
       {saved && (
         <Modal title="Saved material" onClose={() => setSaved(false)}>
           <div className="saved-material">
+            {data.lessons.map((l) => (
+              <button
+                className="button"
+                key={l.id}
+                onClick={() => {
+                  setSaved(false);
+                  void act({ type: 'lesson-open', lesson: l.key, savedId: l.id });
+                }}
+              >
+                <BookOpen size={16} />
+                {lessonDefinition(l.key).title} · Step {l.step}
+              </button>
+            ))}
             {data.documents.map((d) => (
               <button
                 className="button"
@@ -321,7 +338,8 @@ export default function App() {
                   <small>Preserved note from your previous workspace</small>
                 </article>
               ))}
-            {!data.documents.length &&
+            {!data.lessons.length &&
+              !data.documents.length &&
               !data.explanations.length &&
               !data.topics.some((t) => t.overview) && (
                 <p>Your PDFs, saved explanations and preserved notes will appear here.</p>

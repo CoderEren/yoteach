@@ -1,3 +1,5 @@
+> Current status (14 November 2026): the user has now explicitly authorized Stage 3 and incremental commits/pushes. See `docs/STAGE-3-HANDOFF.md` for the live checkpoint. Historical stop instructions below are superseded.
+
 # Historical specification — read the handoff first
 
 The latest user instructions in HANDOFF.md supersede conflicting roadmap, navigation, mascot and workflow requirements below. Stage 1 was approved. Stage 2 revisions are authorized. Stage 3 is NOT yet authorized.

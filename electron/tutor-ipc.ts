@@ -44,10 +44,7 @@ export function installTutor(
     for (const w of [main(), pet()])
       if (w && !w.isDestroyed()) w.webContents.send('tutor:changed', service.get());
   };
-  const service = new TutorService(store, providers, emit, (id) => {
-    open();
-    main()?.webContents.send('tutor:navigate', id);
-  });
+  const service = new TutorService(store, providers, emit, open);
   let selected: { id: string; epoch: number } | null = null;
   let displayGrant = false;
   let holdActive = false;
@@ -147,6 +144,15 @@ export function installTutor(
   function intent(input: unknown) {
     const action = IntentSchema.parse(input);
     if (action.type === 'open') open();
+    if (action.type === 'lesson-open') {
+      service.openLesson(action.savedId);
+      open();
+    }
+    if (action.type === 'lesson-step') service.stepLesson(action.id, action.step);
+    if (action.type === 'lesson-close') {
+      service.state.activeLessonId = null;
+      service.emit();
+    }
     if (action.type === 'hold-start') {
       if (holdActive || service.state.input === 'sending') return;
       holdActive = true;
@@ -195,7 +201,7 @@ export function installTutor(
         !['arming', 'listening', 'sending'].includes(service.state.input)
       )
         throw new Error('Hold the talk key or Yoyo to capture your screen.');
-      if (service.state.lecture) return;
+      if (service.state.lecture || service.state.activeLessonId) return;
       const id = service.state.sessionId,
         display = captureDisplay ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       service.stopSharing();

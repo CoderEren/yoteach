@@ -242,6 +242,12 @@ test('full-screen lecture teaches, grounds six tools, accepts questions and pres
     await provider.tool('record_learning_interaction', { note: 'Asked about ATP investment.' });
     await provider.tool('navigate_slide', { page: 2 });
     await expect(page.getByText('Slide 2 / 5', { exact: true })).toBeVisible();
+    await provider.tool('open_visual_lesson', { lesson: 'glucose-phosphorylation', step: 3 });
+    await expect(page.getByRole('slider', { name: 'Phosphate transfer' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to lecture', exact: true }).click();
+    await expect(page.locator('.lecture-slide-image img')).toBeVisible();
+    await expect(page.getByText('Slide 2 / 5', { exact: true })).toBeVisible();
+
     mkdirSync('.impeccable/review', { recursive: true });
     await page.screenshot({ path: '.impeccable/review/lecture-fullscreen.png' });
     await page.getByRole('button', { name: 'Pause', exact: true }).click();
@@ -433,6 +439,127 @@ test('failed voice startup releases listening and the next hold can connect', as
         ),
       ),
     ).toBe(true);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('authored visual lesson supports keyboard, manipulation, playback and saved restart', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-visual-'));
+  let app: ElectronApplication | undefined;
+  try {
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
+    await page.getByRole('button', { name: /Why invest ATP in glucose/ }).click();
+    await expect(page.getByRole('heading', { name: 'Why invest ATP in glucose?' })).toBeVisible();
+    await page.keyboard.press('Space');
+    await expect(
+      page.getByRole('heading', { name: 'Hexokinase brings the partners together' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Next step', exact: true }).click();
+    const slider = page.getByRole('slider', { name: 'Phosphate transfer' });
+    await slider.fill('100');
+    await expect(page.getByText('Transferred', { exact: true })).toBeVisible();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.screenshot({ path: '.impeccable/review/visual-lesson-transfer.png' });
+    await page.getByRole('button', { name: 'Replay lesson', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Start with glucose and ATP' })).toBeVisible();
+    await page.clock.install();
+    await page.getByRole('button', { name: 'Play lesson', exact: true }).click();
+    await page.clock.fastForward(9100);
+    await expect(
+      page.getByRole('heading', { name: 'Hexokinase brings the partners together' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Pause lesson', exact: true }).click();
+    await page.clock.fastForward(10000);
+    await expect(
+      page.getByRole('heading', { name: 'Hexokinase brings the partners together' }),
+    ).toBeVisible();
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
+    await page.getByRole('button', { name: /Why invest ATP in glucose.*Step 2/ }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Hexokinase brings the partners together' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Back to tutor', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('agent opens and navigates a visual lesson while narration and held questions remain available', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-visual-voice-'));
+  let app: ElectronApplication | undefined;
+  try {
+    const boot = await launch(dir);
+    app = boot.app;
+    const page = boot.page;
+    const provider = await fixtures(app, page);
+    await page.evaluate(() =>
+      window.yoteach.tutor.intent({ type: 'start', topicId: null, mode: 'voice' }),
+    );
+    await expect.poll(async () => (await runtime(page)).status).toBe('connected');
+    const opened = await provider.tool('open_visual_lesson', {
+      lesson: 'glucose-phosphorylation',
+      step: 3,
+    });
+    expect(opened.scene).toBe('transfer');
+    await expect(page.getByRole('slider', { name: 'Phosphate transfer' })).toBeVisible();
+    await provider.tool('navigate_visual_lesson', { step: 4 });
+    await expect(page.getByRole('heading', { name: 'Meet the products' })).toBeVisible();
+    await page.getByRole('button', { name: 'Explain this step', exact: true }).click();
+    await expect
+      .poll(() =>
+        provider.messages.some(
+          (m) => m.type === 'user_message' && m.text.includes('visual lesson step'),
+        ),
+      )
+      .toBe(true);
+    const button = page.getByRole('button', { name: 'Hold to speak', exact: true });
+    await button.hover();
+    await page.mouse.down();
+    await expect.poll(async () => (await runtime(page)).input).toBe('listening');
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+    await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
+    await expect.poll(async () => (await runtime(page)).input).toBe('idle');
+    expect(await app.evaluate(() => (globalThis as any).__captures ?? 0)).toBe(0);
+    await page.getByRole('button', { name: 'Stop voice', exact: true }).click();
+    await expect.poll(async () => (await runtime(page)).sessionId).toBeNull();
+    await expect(page.getByRole('heading', { name: 'Meet the products' })).toBeVisible();
+    const narrationRequests = () =>
+      provider.messages.filter(
+        (m) => m.type === 'user_message' && m.text.includes('visual lesson step'),
+      ).length;
+    const before = narrationRequests();
+    await app.evaluate(() => {
+      const original = globalThis.fetch;
+      globalThis.fetch = async (...args) => {
+        if (String(args[0]).includes('get-signed-url'))
+          await new Promise<void>((resolve) => {
+            (globalThis as any).__resumeAuth = resolve;
+          });
+        return original(...args);
+      };
+    });
+    await page.getByRole('button', { name: 'Explain this step', exact: true }).click();
+    await expect
+      .poll(() => app!.evaluate(() => typeof (globalThis as any).__resumeAuth))
+      .toBe('function');
+    await page.getByRole('button', { name: 'Back to tutor', exact: true }).click();
+    await app.evaluate(() => (globalThis as any).__resumeAuth());
+    await expect.poll(async () => (await runtime(page)).status).toBe('connected');
+    await page.waitForTimeout(150);
+    expect(narrationRequests()).toBe(before);
+    await page.evaluate(() => window.yoteach.tutor.intent({ type: 'end' }));
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

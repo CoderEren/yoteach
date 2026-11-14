@@ -1,3 +1,5 @@
+> Current status (14 November 2026): the user has now explicitly authorized Stage 3 and incremental commits/pushes. See `docs/STAGE-3-HANDOFF.md` for the live checkpoint. Historical stop instructions below are superseded.
+
 # Yoteach — continuation prompt
 
 You are taking over development of my macOS app, yoteach, on a different laptop. Read this entire prompt and the repository before making changes. Implement the revisions below, verify them, commit and push a dedicated revision branch, then stop for my approval before Stage 3. Do not merely produce a plan. Do not merge into the default branch.

@@ -8,7 +8,7 @@ Node 22.12 or newer is required.
 
 ```sh
 cd ~/Desktop/YoTeach
-git switch stage-2-lecture-workflow
+git switch stage-3-visual-learning
 npm install --cache ./work/npm-cache
 # On a new clone only: cp .env.example .env
 npm run dev
@@ -25,9 +25,10 @@ For a production build: `npm run build`, then `npm start`. Restart after changin
 - **Move Yoyo:** drag the mascot itself. That position becomes its saved home. A steady hold speaks; moving more than seven pixels cancels recording and starts a drag. Yoyo points with a simple left/right string during grounded explanations and returns home. Click the app’s Dock icon to open the workspace.
 - **Screen questions:** a held question automatically captures one still of the display under the pointer. The native capture excludes Yoteach’s own windows. The agent analyzes that still when needed and can highlight, circle, underline or point to grounded regions in a click-through desktop overlay. The marks expire after nine seconds or the spoken turn ends; they are approximate on screen images and do not track content that moves afterward.
 - **Lecture walkthrough:** upload a PDF and press **Run me through the lecture**. Slides open full screen and the agent starts teaching from actual slide analysis. Hold to interrupt with a question. The lesson has Previous/Next, hold-to-talk, Pause and End controls. The agent can also navigate slides. No chat or consent panel appears on the lecture page.
+- **Visual lesson:** choose “Why invest ATP in glucose?” in AI tutor, or ask Yoyo to show glucose phosphorylation during a conversation. Six authored steps include a phosphate-transfer slider and ATP balance. Space/arrow keys, Previous/Next, Play/Pause and Replay control the visuals. Explain this step uses the existing ElevenLabs voice connection; Stop voice ends it while keeping the lesson open. Hold to ask questions. Playback pauses when listening or speaking. Saved material reopens the last step. Back to lecture restores the current slide.
 - **Pause/End:** disconnects the conversation, stops audio/capture, cancels pending analysis and exits lecture full screen. Lecture position is saved. Select the PDF in Saved material to reuse it or upload another lecture; resuming creates a new transcript.
 
-- **Saved material:** imported PDFs, saved explanations and preserved notes. Conversation history is below the tutor. No generated roadmaps, heading extraction, course navigation or future-feature tabs.
+- **Saved material:** visual lessons with their last step, imported PDFs, saved explanations and preserved notes. Conversation history is below the tutor. No generated roadmaps, heading extraction, course navigation or future-feature tabs.
 
 PDF is the supported lecture format (up to 50 MB / 500 pages). Export PowerPoint or Keynote files to PDF first. Scanned pages can be analyzed visually; uncertain regions are labelled approximate.
 
@@ -54,15 +55,15 @@ Closing the workspace leaves the floating conversation usable. Pause, End, app H
 
 The Electron main process holds keys and obtains short-lived ElevenLabs signed WebSocket URLs. Only the main workspace renderer owns the actual ElevenLabs SDK/audio connection; the companion sends controls to it. Narrow validated IPC, renderer sandboxing, context isolation and the local protocol remain enabled.
 
-Conversation text and released audio go to ElevenLabs. Screen snapshots and lecture slides go to Anthropic's Messages API with structured JSON output, then pass runtime validation and grounding. During a walkthrough each requested slide is sent for analysis. The app does not continuously capture windows. Stop/revoke cancels analysis and rejects late results. Screenshots and annotation coordinates are runtime-only. Provider retention follows your accounts' policies.
+Conversation text and released audio go to ElevenLabs. Screen snapshots and lecture slides go to Anthropic's Messages API with structured JSON output, then pass runtime validation and grounding. During a walkthrough each requested slide is sent for analysis. The app does not continuously capture windows. While a visual lesson is open, held questions use its authored step context instead of capturing the external desktop. Stop/revoke cancels analysis and rejects late results. Screenshots and annotation coordinates are runtime-only. Provider retention follows your accounts' policies.
 
 Unique PDF text evidence maps to actual rotated text geometry. Unmatched/duplicate evidence is omitted. Scanned/screen estimates are approximate. Grounded annotations appear over the full-screen slide or as temporary click-through desktop marks. The mascot moves beside the chosen region without changing its saved home.
 
-Data lives in `~/Library/Application Support/yoteach/`. Schema 3 migrates versions 1/2, retains legacy courses/topics/notes/PDFs/sessions/explanations, and makes a pre-migration `workspace.json.v1.backup` or `.v2.backup`. Imported PDFs are retained. New sessions have optional legacy IDs and a lecture document/page association where applicable. Legacy structures are storage compatibility, not product navigation.
+Data lives in `~/Library/Application Support/yoteach/`. Schema 4 migrates versions 1/2/3, retains legacy courses/topics/notes/PDFs/sessions/explanations, and makes a pre-migration `workspace.json.v1.backup` , `.v2.backup` or `.v3.backup`. Imported PDFs are retained. New sessions have optional legacy IDs and a lecture document/page association where applicable. Legacy structures are storage compatibility, not product navigation.
 
 ## Agent configuration and verification
 
-See [setup](docs/STAGE-2-SETUP.md), the [complete replacement prompt](docs/YOYO-AGENT-PROMPT.md), and the six [tool definitions](docs/agent-tools). `navigate_slide` replaces `open_topic`; the other five tools retain their names. Only text-only conversation override is needed. Prompt/voice/model/first-message overrides remain disabled.
+See [setup](docs/STAGE-2-SETUP.md), the [complete replacement prompt](docs/YOYO-AGENT-PROMPT.md), and the eight [tool definitions](docs/agent-tools). `navigate_slide` replaces `open_topic`. Stage 3 adds `open_visual_lesson` and `navigate_visual_lesson`; the previous six tools are preserved. Only text-only conversation override is needed. Prompt/voice/model/first-message overrides remain disabled.
 
 ```sh
 npm run check
@@ -72,12 +73,14 @@ npm run build
 # Build the optional packaged-app smoke-test target:
 # npm run package:mac
 npx playwright test
+# Also exercise Vite prebundling (voice regression):
+YOTEACH_TEST_DEV=1 npx playwright test tests/tutor.e2e.ts
 ```
 
-Electron UI tests need an ordinary logged-in macOS GUI session. They use isolated temporary workspaces and HTTP/WebSocket fixtures with the real ElevenLabs client. The synthetic voice test does not prove physical-microphone or live-provider quality. See `docs/HOLD-TO-TALK-VERIFICATION.md` for this revision's actual results.
+Electron UI tests need an ordinary logged-in macOS GUI session. They use isolated temporary workspaces and HTTP/WebSocket fixtures with the real ElevenLabs client. The synthetic voice test does not prove physical-microphone or live-provider quality. See `docs/STAGE-3-HANDOFF.md` for current results and `docs/HOLD-TO-TALK-VERIFICATION.md` for the previous revision.
 
 The ElevenLabs SDK remains responsible for hosted conversations, recognition, output audio, tools and turn-taking. The SDK is pinned to 1.36.1 because the hold adapter reuses its platform output classes. A bounded local AudioWorklet records at most one minute and releases PCM chunks at the provider’s real-time cadence followed by silence for hosted end-of-turn detection. The microphone track stops on release/cancel. Sending therefore takes roughly the recorded question’s duration, then the hosted agent replies. Changing SDK versions requires rerunning the held-audio and interruption tests.
 
 “Yo teach” wake-word activation is **not implemented**. Reliable background wake detection needs a separate always-listening engine and permission/CPU work; browser speech recognition is not a reliable drop-in for this Electron app.
 
-Stage 3 visual lessons, generated media and practice engines remain outside this revision.
+Stage 3 is in progress. The authored visual lesson is implemented; fal generation, practice/feedback memory and final demo acceptance remain. See [the resumable checkpoint](docs/STAGE-3-HANDOFF.md). A live fal call will require `FAL_KEY` entered locally when that integration is added.

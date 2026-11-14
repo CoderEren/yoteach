@@ -173,12 +173,23 @@ export function TutorWorkspace({
           )}
         </div>
       </section>
+      <button
+        className="visual-lesson-entry glass"
+        onClick={() => void act({ type: 'lesson-open', lesson: 'glucose-phosphorylation' })}
+      >
+        <BookOpen size={23} />
+        <span>
+          <strong>Why invest ATP in glucose?</strong>
+          <small>Explore a visual lesson · 6 steps</small>
+        </span>
+        <ArrowUpRight size={20} />
+      </button>
       {!r.config.voice && (
         <div className="connection-setup">
           <h2>Connect Yoyo’s voice</h2>
           <p>
             Add <code>ELEVENLABS_API_KEY</code> and <code>ELEVENLABS_AGENT_ID</code> to the app’s{' '}
-            <code>.env</code> file, then restart. The agent needs Yoyo’s six client tools from{' '}
+            <code>.env</code> file, then restart. The agent needs Yoyo’s client tools from{' '}
             <code>docs/STAGE-2-SETUP.md</code>.
           </p>
           <span>

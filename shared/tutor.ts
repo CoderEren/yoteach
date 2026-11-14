@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LessonKey, LessonStep } from './lessons';
 const Uuid = z.uuid();
 export const Shape = z.enum(['highlight', 'arrow', 'circle', 'point', 'label']);
 export const Box = z
@@ -84,6 +85,7 @@ export type StudySession = z.infer<typeof StudySessionSchema>;
 export type TutorMessage = z.infer<typeof MessageSchema>;
 export type Explanation = z.infer<typeof ExplanationSchema>;
 export type TutorRuntime = {
+  activeLessonId: string | null;
   sessionId: string | null;
   lecturePreparing: boolean;
   lecture: { documentId: string; page: number; total: number } | null;
@@ -108,6 +110,12 @@ export type TutorRuntime = {
 export type WindowSource = { id: string; name: string };
 export const ToolSchema = z.discriminatedUnion('name', [
   z.object({
+    name: z.literal('open_visual_lesson'),
+    lesson: LessonKey,
+    step: LessonStep.default(1),
+  }),
+  z.object({ name: z.literal('navigate_visual_lesson'), step: LessonStep }),
+  z.object({
     name: z.literal('analyze_current_screen'),
     question: z.string().trim().min(1).max(2000),
   }),
@@ -122,6 +130,10 @@ export const ToolSchema = z.discriminatedUnion('name', [
 ]);
 export type TutorTool = z.infer<typeof ToolSchema>;
 export const IntentSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('lesson-open'), lesson: LessonKey, savedId: Uuid.optional() }),
+  z.object({ type: z.literal('lesson-step'), id: Uuid, step: LessonStep }),
+  z.object({ type: z.literal('lesson-close') }),
+  z.object({ type: z.literal('lesson-narrate') }),
   z.object({ type: z.literal('hold-start') }),
   z.object({ type: z.literal('hold-end') }),
   z.object({ type: z.literal('hold-cancel') }),
