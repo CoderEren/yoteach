@@ -408,6 +408,16 @@ export function installTutor(
     true,
   );
   handle(
+    'tutor:delete-chat',
+    (input) => {
+      const id = Id.parse(input);
+      if (service.state.chatId === id) service.state.chatId = null;
+      store.deleteChat(id);
+      emit();
+    },
+    true,
+  );
+  handle(
     'tutor:delete-explanation',
     (input) => {
       store.deleteExplanation(Id.parse(input));

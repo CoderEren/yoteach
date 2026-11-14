@@ -25,6 +25,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   const audioTracks = useRef(new Set<MediaStreamTrack>());
   const agentMode = useRef<'listening' | 'speaking'>('listening');
   const owner = !['#/companion', '#/overlay'].includes(location.hash);
+  const lastActive = useRef(Date.now());
   const heldAudio = useRef(new HoldAudio());
   const hold = useRef<{
     held: boolean;
@@ -222,6 +223,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (action.type === 'hold-start') {
+      lastActive.current = Date.now();
       if (hold.current) return;
       if (live.current?.mode === 'text' && sessionId.current) await disconnect();
       const turn = {
@@ -560,8 +562,14 @@ export function TutorProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (action.type === 'text') {
+      lastActive.current = Date.now();
+      // Yoyo is always available: typing connects on demand.
+      if (!sessionId.current && live.current?.status !== 'connecting')
+        await handle({ type: 'start', topicId: null, mode: 'text' });
+      for (let i = 0; i < 150 && live.current?.status !== 'connected'; i++)
+        await new Promise((resolve) => setTimeout(resolve, 100));
       if (!voice.current || !sessionId.current || live.current?.status !== 'connected')
-        throw new Error('Start a connected voice or text session first.');
+        throw new Error('Yoyo could not connect. Check your connection and try again.');
       voice.current.sendUserActivity();
       voice.current.sendUserMessage(action.text);
       pendingTexts.current.push(action.text);
@@ -621,6 +629,16 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!api) return;
     let announced = '';
+    // There is no Pause or End: an idle conversation closes quietly and reopens on demand.
+    const idle = owner
+      ? setInterval(() => {
+          const s = live.current;
+          if (!s || !sessionId.current || s.lecture) return;
+          if (s.input !== 'idle' || ['speaking', 'thinking', 'pointing'].includes(s.activity))
+            lastActive.current = Date.now();
+          else if (Date.now() - lastActive.current > 4 * 60_000) void disconnect();
+        }, 15_000)
+      : undefined;
     const update = (state: TutorRuntime) => {
       const g = state.generation;
       // Tell the tutor when media settles. It never sees the pixels, only the outcome.
@@ -667,6 +685,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
     return () => {
       off();
       offIntent();
+      clearInterval(idle);
       if (owner) void disconnect();
     };
   }, []);

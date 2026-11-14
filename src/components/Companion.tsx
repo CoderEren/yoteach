@@ -96,8 +96,17 @@ export function Companion({ data: _data }: { data: AppState }) {
           }
         }}
       >
-        <span className="listening-halo" aria-hidden="true" />
-        <Yoyo state={state} direction={direction} />
+        <Yoyo
+          state={state}
+          direction={direction}
+          className={
+            input === 'listening'
+              ? 'ring-listening'
+              : input !== 'idle' || state === 'thinking'
+                ? 'ring-thinking'
+                : ''
+          }
+        />
       </button>
       {r?.notice && (
         <span className="companion-notice" role="status">

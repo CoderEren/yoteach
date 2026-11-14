@@ -97,7 +97,7 @@ test('Stage 1 migration preserves notes and persists the current version safely'
     delete (old as any).explanations;
     writeFileSync(f.store.file, JSON.stringify(old));
     const next = new Store(f.dir).snapshot();
-    assert.equal(next.version, 6);
+    assert.equal(next.version, 7);
     assert.equal(next.documents[0].id, f.doc.id);
     assert.deepEqual(next.sessions, []);
   } finally {

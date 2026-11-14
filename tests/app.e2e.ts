@@ -15,10 +15,10 @@ async function launch(dir: string) {
   const app = await electron.launch({ args: ['.'], env });
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
   const page = app.windows().find((w) => w.url().endsWith('#/'))!;
-  await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
   return { app, page };
 }
-test('two modes, minimal lecture setup, saved PDFs, draggable companion and restore', async () => {
+test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'yoteach-desktop-'));
   let app: ElectronApplication | undefined;
   mkdirSync('.impeccable/review', { recursive: true });
@@ -31,15 +31,17 @@ test('two modes, minimal lecture setup, saved PDFs, draggable companion and rest
     await expect(page.locator('.primary-nav button')).toHaveCount(2);
     await expect(page.getByText('Study with Yoyo', { exact: true })).toHaveCount(0);
     await page.screenshot({ path: '.impeccable/review/ai-tutor.png' });
-    await page.getByRole('button', { name: 'Lecture walkthrough', exact: true }).click();
+    await page.getByRole('button', { name: 'Lectures', exact: true }).click();
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, resolve('public/sample-lecture.pdf'));
-    await page.getByRole('button', { name: /Upload your lecture/ }).click();
+    await page.getByRole('button', { name: /Upload a lecture PDF/ }).click();
     await expect(page.locator('.lecture-upload')).toContainText('sample-lecture.pdf');
-    await expect(page.locator('.lecture-launch button')).toHaveCount(2);
+    await expect(page.locator('.lecture-new button')).toHaveCount(2);
     await expect(page.getByRole('checkbox')).toHaveCount(0);
     await expect(page.getByLabel('Ask Yoyo')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Why invest ATP/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0);
     const state = await page.evaluate(() => window.yoteach.getState());
     expect(state.ok && state.value.topics.length).toBe(0);
     await page.getByRole('button', { name: 'Saved material', exact: true }).click();
@@ -52,7 +54,12 @@ test('two modes, minimal lecture setup, saved PDFs, draggable companion and rest
     await page.getByRole('button', { name: 'Close dialog' }).click();
     await page.screenshot({ path: '.impeccable/review/lecture-library.png' });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Dark', exact: true }).click();
+    await page.getByRole('radio', { name: 'Dark', exact: true }).click();
+    await expect(page.getByRole('radio', { name: 'Dark', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await page.screenshot({ path: '.impeccable/review/settings.png' });
     await page.getByLabel('Global talk key').selectOption('f8');
     await page.getByRole('button', { name: 'Close dialog' }).click();
     await page.screenshot({ path: '.impeccable/review/lecture-dark.png' });
@@ -152,7 +159,7 @@ test('packaged Yoteach starts with its own identity and isolated data', async ()
     });
     await expect.poll(() => app!.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
     const page = app.windows().find((w) => w.url().endsWith('#/'))!;
-    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
     const info = await app.evaluate(({ app }) => ({
       packaged: app.isPackaged,
       name: app.getName(),

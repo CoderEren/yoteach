@@ -12,7 +12,8 @@ import {
 import type { AppState } from '../shared/model';
 import { api, unwrap } from './api';
 import { Companion } from './components/Companion';
-import { TutorWorkspace } from './components/TutorWorkspace';
+import { Chats } from './components/Chats';
+import { Lectures } from './components/Lectures';
 import { Modal } from './components/Modal';
 import { MediaView } from './components/GeneratedMedia';
 import { ReviewList } from './components/Practice';
@@ -28,7 +29,7 @@ const PdfViewer = lazy(() =>
 );
 export default function App() {
   const [data, setData] = useState<AppState | null>(null),
-    [mode, setMode] = useState<'tutor' | 'lecture'>('tutor');
+    [mode, setMode] = useState<'chats' | 'lectures'>('chats');
   const [lectureId, setLectureId] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState('');
@@ -67,7 +68,7 @@ export default function App() {
     if (!api || companion) return;
     return api.tutor.onIntent((a) => {
       if (a.type === 'open') {
-        setMode(r?.lecture ? 'lecture' : 'tutor');
+        setMode(r?.lecture ? 'lectures' : 'chats');
         if (r?.lecture) setLectureId(r.lecture.documentId);
       }
     });
@@ -118,31 +119,27 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="titlebar-space" />
-        <button className="brand" aria-label="yoteach home" onClick={() => setMode('tutor')}>
+        <button className="brand" aria-label="yoteach home" onClick={() => setMode('chats')}>
           yoteach<span className="brand-period">.</span>
         </button>
         <nav className="primary-nav" aria-label="Main navigation">
           <button
-            className={mode === 'tutor' ? 'active' : ''}
-            disabled={!!r?.sessionId && !!r.lecture}
-            onClick={() => setMode('tutor')}
+            className={mode === 'chats' ? 'active' : ''}
+            aria-current={mode === 'chats' ? 'page' : undefined}
+            onClick={() => setMode('chats')}
           >
             <MessageSquare size={18} />
-            AI tutor
+            Chats
           </button>
           <button
-            className={mode === 'lecture' ? 'active' : ''}
-            disabled={!!r?.sessionId && !r.lecture}
-            onClick={() => setMode('lecture')}
+            className={mode === 'lectures' ? 'active' : ''}
+            aria-current={mode === 'lectures' ? 'page' : undefined}
+            onClick={() => setMode('lectures')}
           >
             <BookOpen size={18} />
-            Lecture walkthrough
+            Lectures
           </button>
         </nav>
-        <div className="sidebar-empty">
-          A question or a whole lecture.
-          <br />A little more clarity.
-        </div>
         <div className="sidebar-bottom">
           <div className="sidebar-companion">
             <div className="mini-yoyo">
@@ -172,12 +169,6 @@ export default function App() {
         </div>
       </aside>
       <main className="main-shell">
-        <header className="topbar">
-          <div className="breadcrumbs">{mode === 'tutor' ? 'AI tutor' : 'Lecture walkthrough'}</div>
-          <button className="topbar-yoyo" onClick={() => void api.companion('show')}>
-            Show Yoyo
-          </button>
-        </header>
         <div className="main-scroll">
           {error && (
             <div className="banner error" role="alert">
@@ -190,115 +181,101 @@ export default function App() {
               {busy}
             </div>
           )}
-          {mode === 'lecture' ? (
-            <section className="lecture-launch">
-              <button
-                className="lecture-upload glass"
-                disabled={!!busy}
-                onClick={() => void importPdf()}
-              >
-                <Upload size={30} />
-                <strong>
-                  {data.documents.find((d) => d.id === lectureId)?.originalName ??
-                    'Upload your lecture'}
-                </strong>
-                <span>
-                  {lectureId ? 'Click to replace · PDF' : 'Choose a PDF of your lecture slides'}
-                </span>
-              </button>
-              <button
-                className="button primary lecture-run"
-                disabled={
-                  !lectureId ||
-                  !!busy ||
-                  !r?.config.voice ||
-                  !r?.config.vision ||
-                  r?.status === 'connecting'
-                }
-                onClick={() =>
-                  void act({
-                    type: 'start',
-                    topicId: null,
-                    documentId: lectureId,
-                    page: data.sessions.filter((s) => s.documentId === lectureId).at(-1)?.page ?? 1,
-                    mode: 'voice',
-                  })
-                }
-              >
-                {r?.status === 'connecting' ? 'Opening lecture…' : 'Run me through the lecture'}
-              </button>
-              {r?.error && (
-                <p role="alert" className="error-message">
-                  {r.error}
-                </p>
-              )}
-            </section>
+          {mode === 'lectures' ? (
+            <Lectures
+              data={data}
+              lectureId={lectureId}
+              busy={busy}
+              onUpload={() => void importPdf()}
+            />
           ) : (
-            <TutorWorkspace data={data} onOpenPdf={(id, page) => setViewer({ id, page })} />
+            <Chats data={data} />
           )}
         </div>
       </main>
       {settings && (
-        <Modal title="Make yourself at home." onClose={() => setSettings(false)}>
-          <h3>Hold to talk</h3>
-          <label className="talk-key-setting">
-            Global talk key
-            <select
-              aria-label="Global talk key"
-              value={data.settings.talkKey}
-              onChange={(e) =>
-                void unwrap(
-                  api.command({
-                    type: 'settings.update',
-                    talkKey: e.target.value as AppState['settings']['talkKey'],
-                  }),
-                ).then(setData)
-              }
-            >
-              <option value="control">Control</option>
-              <option value="right-control">Right Control</option>
-              <option value="fn">Fn / Globe</option>
-              <option value="right-option">Right Option</option>
-              <option value="f8">F8</option>
-            </select>
-          </label>
-          <p>
-            Hold to listen; release to send. You can also hold Yoyo. Drag Yoyo to choose where it
-            returns after pointing.
-          </p>
-          {r?.hotkeyError && (
-            <p role="alert" className="error-message">
-              {r.hotkeyError}
-            </p>
-          )}
-          <p>
-            Fn may also trigger the macOS Globe action. Choose “Do Nothing” for that key in macOS
-            Keyboard settings if needed.
-          </p>
-          <h3>Appearance</h3>
-          <div className="source-actions">
-            {(['system', 'light', 'dark'] as const).map((theme) => (
-              <button
-                className="button"
-                key={theme}
-                onClick={() =>
-                  void unwrap(api.command({ type: 'settings.update', theme })).then(setData)
-                }
-              >
-                {theme[0].toUpperCase() + theme.slice(1)}
-              </button>
-            ))}
+        <Modal title="Settings" onClose={() => setSettings(false)}>
+          <div className="settings">
+            <section className="settings-group">
+              <h3>Talk to Yoyo</h3>
+              <div className="settings-row">
+                <div>
+                  <label htmlFor="talk-key">Talk key</label>
+                  <p>Hold anywhere to ask; release to send. You can also hold Yoyo.</p>
+                </div>
+                <select
+                  id="talk-key"
+                  aria-label="Global talk key"
+                  value={data.settings.talkKey}
+                  onChange={(e) =>
+                    void unwrap(
+                      api.command({
+                        type: 'settings.update',
+                        talkKey: e.target.value as AppState['settings']['talkKey'],
+                      }),
+                    ).then(setData)
+                  }
+                >
+                  <option value="control">Control</option>
+                  <option value="right-control">Right Control</option>
+                  <option value="fn">Fn / Globe</option>
+                  <option value="right-option">Right Option</option>
+                  <option value="f8">F8</option>
+                </select>
+              </div>
+              {data.settings.talkKey === 'fn' && (
+                <p className="settings-hint">
+                  Fn can also open the macOS emoji picker. Set “Press 🌐 key to” Do Nothing in
+                  Keyboard settings.
+                </p>
+              )}
+              {r?.hotkeyError && (
+                <p role="alert" className="settings-hint error-message">
+                  {r.hotkeyError}
+                </p>
+              )}
+            </section>
+            <section className="settings-group">
+              <h3>Appearance</h3>
+              <div className="settings-row">
+                <div>
+                  <span className="settings-label">Theme</span>
+                  <p>Follows macOS unless you choose.</p>
+                </div>
+                <div className="segmented" role="radiogroup" aria-label="Theme">
+                  {(['system', 'light', 'dark'] as const).map((theme) => (
+                    <button
+                      key={theme}
+                      role="radio"
+                      aria-checked={data.settings.theme === theme}
+                      onClick={() =>
+                        void unwrap(api.command({ type: 'settings.update', theme })).then(setData)
+                      }
+                    >
+                      {theme[0].toUpperCase() + theme.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+            <section className="settings-group">
+              <h3>Privacy</h3>
+              <ul className="settings-facts">
+                <li>
+                  <strong>Your voice</strong> is recorded only while you hold the key, then sent to
+                  ElevenLabs.
+                </li>
+                <li>
+                  <strong>Your screen</strong>: holding the key captures the display under your
+                  pointer for Anthropic to read. Yoteach’s own windows are left out.
+                </li>
+                <li>
+                  <strong>Chats, lectures and saved work</strong> stay on this Mac. Provider
+                  retention follows your account settings.
+                </li>
+              </ul>
+            </section>
           </div>
-          <p>
-            Released voice questions and conversation text go to ElevenLabs. Holding the talk key or
-            Yoyo captures the display under your pointer; that image goes to Anthropic when your
-            question needs it. Lecture slides are analyzed directly. Transcripts and saved
-            explanations stay on this Mac; provider retention follows your account settings.
-          </p>
-          <p>
-            macOS may attribute development permissions to Electron or the terminal that launched
-            it. Internal PDFs do not require Screen Recording.
-          </p>
         </Modal>
       )}
       {saved && (
@@ -360,7 +337,7 @@ export default function App() {
                 key={d.id}
                 onClick={() => {
                   setLectureId(d.id);
-                  setMode('lecture');
+                  setMode('lectures');
                   setViewer({ id: d.id, page: 1 });
                   setSaved(false);
                 }}

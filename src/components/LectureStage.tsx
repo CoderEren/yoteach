@@ -84,11 +84,8 @@ export function LectureStage({ media }: { media: GeneratedMedia[] }) {
           Next slide
         </button>
         <HoldButton />
-        <button className="button small" onClick={() => void act({ type: 'pause' })}>
-          Pause
-        </button>
         <button className="button small" onClick={() => void act({ type: 'end' })}>
-          End lecture
+          Close lecture
         </button>
       </footer>
     </main>

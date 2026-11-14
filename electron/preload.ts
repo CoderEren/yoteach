@@ -30,6 +30,7 @@ const api: DesktopApi = {
     save: (id) => ipcRenderer.invoke('tutor:save', id),
     deleteSession: (id) => ipcRenderer.invoke('tutor:delete-session', id),
     deleteExplanation: (id) => ipcRenderer.invoke('tutor:delete-explanation', id),
+    deleteChat: (id) => ipcRenderer.invoke('tutor:delete-chat', id),
     onChange: (fn) => listen('tutor:changed', fn),
     onIntent: (fn) => {
       const off = listen('tutor:intent', fn);

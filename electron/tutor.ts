@@ -75,6 +75,7 @@ export class TutorService {
     readonly fal = new FalClient({ key: '', imageModel: '', videoModel: '' }),
   ) {
     this.state = {
+      chatId: null,
       activeLessonId: null,
       lessonSurface: 'app',
       drawing: null,
@@ -405,6 +406,20 @@ export class TutorService {
       const signedUrl = await this.providers.signedUrl(ctl.signal);
       if (ctl.signal.aborted) throw new Error('Session start cancelled.');
       const s = this.store.startSession(topicId, mode, documentId, page);
+      // Lectures get their own chat. Otherwise continue the latest chat if it was active in the
+      // last 30 minutes; the topic check decides whether a new question starts a new one.
+      const doc = documentId
+        ? this.store.snapshot().documents.find((d) => d.id === documentId)
+        : undefined;
+      const recent = this.store
+        .snapshot()
+        .chats.filter((c) => c.kind === 'chat')
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+      this.state.chatId = doc
+        ? this.store.createChat('lecture', doc.originalName, s.id, doc.id).id
+        : recent && Date.now() - Date.parse(recent.updatedAt) < 30 * 60_000
+          ? recent.id
+          : null;
       Object.assign(this.state, {
         sessionId: s.id,
         lecturePreparing: !!documentId,
@@ -450,6 +465,7 @@ export class TutorService {
     if (this.state.sessionId) this.store.endSession(this.state.sessionId);
     this.stopSharing(false);
     this.state.drawing = null;
+    // The chat itself continues; the next session within 30 minutes picks it up again.
     Object.assign(this.state, {
       sessionId: null,
       lecture: null,
@@ -466,10 +482,78 @@ export class TutorService {
     Object.assign(this.state, p);
     this.emit();
   }
+  private filing?: Promise<void>;
   transcript(sessionId: string, role: 'user' | 'assistant', text: string, eventId: string) {
     this.require(sessionId);
-    this.store.addMessage(sessionId, role, text, eventId);
+    if (!this.state.chatId) {
+      this.state.chatId = this.store.createChat('chat', 'New chat', sessionId).id;
+    }
+    const message = this.store.addMessage(sessionId, role, text, eventId, {
+      chatId: this.state.chatId,
+      page: this.state.lecture?.page,
+    });
     this.emit();
+    if (role === 'user' && !this.state.lecture)
+      this.filing = this.fileByTopic(sessionId, message.id, text);
+  }
+  /**
+   * Decide which chat a question belongs to. A new subject starts a new, named chat; the
+   * question and anything said after it move there.
+   */
+  private async fileByTopic(sessionId: string, messageId: string, text: string) {
+    const chatId = this.state.chatId;
+    const data = this.store.snapshot(),
+      chat = data.chats.find((c) => c.id === chatId);
+    if (!chat || chat.kind !== 'chat') return;
+    const earlier = data.messages.filter((m) => m.chatId === chat.id && m.id !== messageId);
+    try {
+      const verdict = await this.providers.topic(
+        earlier.length
+          ? {
+              title: chat.title,
+              named: chat.named,
+              recent: earlier.slice(-6).map((m) => `${m.role}: ${m.text.slice(0, 300)}`),
+            }
+          : null,
+        text,
+        AbortSignal.timeout(15000),
+      );
+      if (this.state.sessionId !== sessionId) return;
+      if (!earlier.length || verdict.sameTopic) {
+        if (!chat.named || chat.title !== verdict.title)
+          this.store.renameChat(chat.id, verdict.title);
+      } else {
+        const next = this.store.createChat('chat', verdict.title, sessionId);
+        this.store.renameChat(next.id, verdict.title);
+        const after = this.store
+          .snapshot()
+          .messages.filter((m) => m.chatId === chat.id && m.sessionId === sessionId)
+          .filter(
+            (m) =>
+              m.id === messageId ||
+              m.createdAt > data.messages.find((x) => x.id === messageId)!.createdAt,
+          )
+          .map((m) => m.id);
+        this.store.moveMessages(after, next.id);
+        if (this.state.chatId === chat.id) this.state.chatId = next.id;
+      }
+      this.emit();
+    } catch {
+      // Without the topic model, name the chat after its first question.
+      try {
+        if (!chat.named && !earlier.length) {
+          const words = text.replace(/\s+/g, ' ').trim().split(' ').slice(0, 6).join(' ');
+          if (words) this.store.renameChat(chat.id, words.replace(/[?.!,;:]+$/, ''));
+          this.emit();
+        }
+      } catch {
+        /* The workspace closed meanwhile; the chat keeps its current title. */
+      }
+    }
+  }
+  /** For tests: wait until the latest question has been filed. */
+  async filed() {
+    await this.filing;
   }
   clearDrawing() {
     this.state.drawing = null;
@@ -663,6 +747,12 @@ export class TutorService {
           revision: (this.state.drawing?.revision ?? 0) + 1,
         };
         this.state.drawing = drawing;
+        if (this.state.lecture && this.state.chatId && snapshot.source.kind === 'pdf')
+          this.store.logSlideDrawing(
+            this.state.chatId,
+            snapshot.source.page,
+            drawing.marks.map((m) => ({ shape: m.shape, label: m.label, box: m.box })),
+          );
         const first = tool.marks[0]?.regionId ?? tool.connections[0]?.to;
         this.state.focusRegion = first;
         this.state.focusRevision++;
@@ -828,7 +918,10 @@ export class TutorService {
         return { saved: true, id: e.id };
       }
       case 'record_learning_interaction':
-        this.store.addMessage(sessionId, 'note', tool.note);
+        this.store.addMessage(sessionId, 'note', tool.note, undefined, {
+          chatId: this.state.chatId,
+          page: this.state.lecture?.page,
+        });
         this.emit();
         return { recorded: true };
     }

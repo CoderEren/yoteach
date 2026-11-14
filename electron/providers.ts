@@ -208,6 +208,63 @@ export class Providers {
       ),
     );
   }
+  /**
+   * Is this question still about the current chat's topic? Names the topic in a few words.
+   * The text is study data, never instructions.
+   */
+  async topic(
+    current: { title: string; named: boolean; recent: string[] } | null,
+    question: string,
+    signal: AbortSignal,
+  ): Promise<{ sameTopic: boolean; title: string }> {
+    if (!this.config.visionKey) throw new Error('No topic model is configured.');
+    const response = await this.request('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': this.config.visionKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]),
+      body: JSON.stringify({
+        model: this.config.quickModel || this.config.model,
+        max_tokens: 200,
+        output_config: {
+          effort: 'low',
+          format: {
+            type: 'json_schema',
+            schema: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['sameTopic', 'title'],
+              properties: { sameTopic: { type: 'boolean' }, title: { type: 'string' } },
+            },
+          },
+        },
+        system:
+          'You file a student\'s question into study chats. sameTopic: true if the new question continues the current chat\'s subject (follow-ups, clarifications, related sub-points and small talk count as the same); false only for a clearly different subject (e.g. glycolysis then the TCA cycle, or biology then vector addition). title: a 1–4 word subject name in Title Case for the chat this question belongs to (no quotes, no "Chat about"). If sameTopic is true and the current title is already a good subject name, return it unchanged.',
+        messages: [
+          {
+            role: 'user',
+            content: JSON.stringify({ currentChat: current, newQuestion: question.slice(0, 1500) }),
+          },
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`Topic check failed (${response.status}).`);
+    const payload = (await response.json()) as { content?: { type: string; text?: string }[] };
+    const parsed = z
+      .object({ sameTopic: z.boolean(), title: z.string().trim().min(1).max(80) })
+      .parse(
+        JSON.parse(
+          payload.content
+            ?.filter((c) => c.type === 'text')
+            .map((c) => c.text)
+            .join('') ?? '',
+        ),
+      );
+    return { sameTopic: parsed.sameTopic, title: parsed.title.replace(/^["']|["']$/g, '') };
+  }
   /** Grade one free-text answer against authored criteria. The answer is untrusted data. */
   async grade(q: PracticeQuestion, answer: string, signal: AbortSignal): Promise<GradeAnswer> {
     if (!this.config.visionKey)

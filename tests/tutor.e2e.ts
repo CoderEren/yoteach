@@ -26,7 +26,7 @@ async function launch(dir: string) {
   const app = await electron.launch({ args: ['.'], env });
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
   const page = app.windows().find((w) => w.url().endsWith('#/'))!;
-  await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
   return { app, page };
 }
 async function fixtures(app: ElectronApplication, page: Page) {
@@ -183,8 +183,8 @@ test('full-screen lecture teaches, grounds six tools, accepts questions and pres
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, resolve('public/sample-lecture.pdf'));
-    await page.getByRole('button', { name: 'Lecture walkthrough', exact: true }).click();
-    await page.getByRole('button', { name: /Upload your lecture/ }).click();
+    await page.getByRole('button', { name: 'Lectures', exact: true }).click();
+    await page.getByRole('button', { name: /Upload a lecture PDF/ }).click();
     await expect(
       page.getByRole('button', { name: 'Run me through the lecture', exact: true }),
     ).toBeEnabled();
@@ -253,7 +253,7 @@ test('full-screen lecture teaches, grounds six tools, accepts questions and pres
 
     mkdirSync('.impeccable/review', { recursive: true });
     await page.screenshot({ path: '.impeccable/review/lecture-fullscreen.png' });
-    await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByRole('button', { name: 'Close lecture', exact: true }).click();
     await expect.poll(async () => (await runtime(page)).sessionId).toBeNull();
     expect((await runtime(page)).snapshot).toBeNull();
     await expect
@@ -455,7 +455,9 @@ test('authored visual lesson supports keyboard, manipulation, playback and saved
     let boot = await launch(dir);
     app = boot.app;
     let page = boot.page;
-    await page.getByRole('button', { name: /Why invest ATP in glucose/ }).click();
+    await page.evaluate(() =>
+      window.yoteach.tutor.intent({ type: 'lesson-open', lesson: 'glucose-phosphorylation' }),
+    );
     await expect(page.getByRole('heading', { name: 'Why invest ATP in glucose?' })).toBeVisible();
     await page.keyboard.press('Space');
     await expect(
@@ -491,7 +493,7 @@ test('authored visual lesson supports keyboard, manipulation, playback and saved
       page.getByRole('heading', { name: 'Hexokinase brings the partners together' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Back to tutor', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });
@@ -575,7 +577,7 @@ test('Yoyo teaches on the screen: draws on regions, sketches, and opens lesson a
       layer.getByRole('heading', { name: 'Follow the terminal phosphate' }),
     ).toBeVisible();
     await expect(layer.getByRole('slider', { name: 'Phosphate transfer' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
     await provider.tool('navigate_visual_lesson', { step: 4 });
     await expect(layer.getByRole('heading', { name: 'Meet the products' })).toBeVisible();
     await layer.getByRole('button', { name: 'Explain', exact: true }).click();
@@ -702,7 +704,9 @@ test('fal visual analogy shows progress, saves with the lesson step, explains fa
     app = boot.app;
     let page = boot.page;
     await installFal(app, png);
-    await page.getByRole('button', { name: /Why invest ATP in glucose/ }).click();
+    await page.evaluate(() =>
+      window.yoteach.tutor.intent({ type: 'lesson-open', lesson: 'glucose-phosphorylation' }),
+    );
     await page.getByRole('button', { name: 'Next step', exact: true }).click();
     await page.getByRole('button', { name: 'Next step', exact: true }).click();
     await expect(
@@ -818,8 +822,8 @@ test('Stage 3 demo: lecture → visual lesson → fal media → practice misconc
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, resolve('public/sample-lecture.pdf'));
     // 1. Lecture explanation of energy investment.
-    await page.getByRole('button', { name: 'Lecture walkthrough', exact: true }).click();
-    await page.getByRole('button', { name: /Upload your lecture/ }).click();
+    await page.getByRole('button', { name: 'Lectures', exact: true }).click();
+    await page.getByRole('button', { name: /Upload a lecture PDF/ }).click();
     await page.getByRole('button', { name: 'Run me through the lecture', exact: true }).click();
     await expect(page.locator('.lecture-slide-image img')).toBeVisible();
     await expect
@@ -903,7 +907,7 @@ test('Stage 3 demo: lecture → visual lesson → fal media → practice misconc
     const graded = await app.evaluate(() => (globalThis as any).gradeRequests.length);
     expect(graded).toBe(1);
     await page.getByRole('button', { name: 'Back to lecture', exact: true }).click();
-    await page.getByRole('button', { name: 'End lecture', exact: true }).click();
+    await page.getByRole('button', { name: 'Close lecture', exact: true }).click();
     // 6. Restart: everything is still there.
     await app.close();
     app = undefined;
@@ -925,7 +929,21 @@ test('Stage 3 demo: lecture → visual lesson → fal media → practice misconc
     ).toBeVisible();
     await expect(saved.getByText('Suggested: lesson step 6')).toBeVisible();
     await page.screenshot({ path: '.impeccable/review/saved-after-restart.png' });
-    await saved.getByRole('button', { name: 'Open practice', exact: true }).click();
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    // The walkthrough replays from saved history: slide, what Yoyo said, and its drawings.
+    await page.getByRole('button', { name: 'Lectures', exact: true }).click();
+    const walk = page.locator('.walkthrough', { hasText: 'sample-lecture.pdf' });
+    await expect(walk).toBeVisible();
+    await walk.getByRole('button', { name: /Replay/ }).click();
+    await page.getByRole('button', { name: 'Mute narration' }).click();
+    await expect(page.locator('.replay-slide img')).toBeVisible();
+    await expect(page.locator('.replay-caption')).toContainText('ATP activates glucose');
+    await expect(page.getByText(/Slide \d+ · 1\//)).toBeVisible();
+    await page.screenshot({ path: '.impeccable/review/lecture-replay.png' });
+    await page.getByRole('button', { name: 'Close replay' }).click();
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
+    const again = page.getByRole('dialog');
+    await again.getByRole('button', { name: 'Open practice', exact: true }).click();
     await expect(page.getByRole('heading', { name: /why does a cell “invest” ATP/ })).toBeVisible();
     expect(errors).toEqual([]);
   } finally {

@@ -49,6 +49,13 @@ export function Yoyo({
         opacity=".19"
         filter={`url(#${id}-blur)`}
       />
+      {/* One state ring, centred on the yo-yo: an arc while thinking, ripples while listening. */}
+      <g className="yoyo-ring" aria-hidden="true">
+        <circle className="yoyo-ring-track" cx="122" cy="121" r="104" />
+        <circle className="yoyo-ring-arc" cx="122" cy="121" r="104" pathLength={100} />
+        <circle className="yoyo-ripple" cx="122" cy="121" r="96" />
+        <circle className="yoyo-ripple yoyo-ripple-2" cx="122" cy="121" r="96" />
+      </g>
       <g className="yoyo-float">
         <ellipse
           cx="143"
@@ -138,9 +145,6 @@ export function Yoyo({
           {state === 'error' && (
             <path d="M73 103 L86 108 M125 108 L138 103" stroke="#655b8a" strokeWidth="2.5" />
           )}
-        </g>
-        <g className="yoyo-spark" fill="#9c8bda">
-          <path d="M199 39 l3 9 9 3-9 3-3 9-3-9-9-3 9-3Z" />
         </g>
       </g>
     </svg>

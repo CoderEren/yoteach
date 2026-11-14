@@ -238,11 +238,6 @@ export function VisualLesson({
             <Volume2 size={17} />
             Explain this step
           </button>
-          {r?.sessionId && (
-            <button className="button" onClick={() => void act({ type: 'pause' })}>
-              Stop voice
-            </button>
-          )}
           <button
             className="button"
             aria-pressed={!!r?.practice}

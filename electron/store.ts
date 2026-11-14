@@ -14,6 +14,8 @@ import {
   StudySessionSchema,
   MessageSchema,
   ExplanationSchema,
+  ChatSchema,
+  type Chat,
   type TutorMessage,
   type Explanation,
 } from '../shared/tutor';
@@ -54,17 +56,40 @@ export class Store {
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, 'utf8'));
-        if ([1, 2, 3, 4, 5].includes(raw.version)) {
+        if ([1, 2, 3, 4, 5, 6].includes(raw.version)) {
           // Keep an exact pre-migration snapshot, including legacy notes and associations.
           const backup = this.file + `.v${raw.version}.backup`;
           if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
-          raw.version = 6;
+          raw.version = 7;
           raw.lessons ??= [];
           raw.media ??= [];
           raw.attempts ??= [];
+          raw.slideDrawings ??= [];
           raw.sessions ??= [];
           raw.messages ??= [];
           raw.explanations ??= [];
+        }
+        if (!raw.chats) {
+          // One chat per earlier session, titled by its lecture or its first question.
+          raw.chats = [];
+          for (const s of raw.sessions ?? []) {
+            const messages = (raw.messages ?? []).filter((m: any) => m.sessionId === s.id);
+            if (!messages.length && !s.documentId) continue;
+            const doc = (raw.documents ?? []).find((d: any) => d.id === s.documentId);
+            const first = messages.find((m: any) => m.role === 'user')?.text ?? '';
+            const id = randomUUID();
+            raw.chats.push({
+              id,
+              kind: doc ? 'lecture' : 'chat',
+              title: doc ? doc.originalName.slice(0, 80) : firstWords(first) || 'Earlier chat',
+              named: !!doc,
+              documentId: doc?.id ?? null,
+              sessionId: s.id,
+              createdAt: s.startedAt,
+              updatedAt: messages.at(-1)?.createdAt ?? s.startedAt,
+            });
+            for (const m of messages) m.chatId = id;
+          }
         }
         this.state = StateSchema.parse(raw);
         // A prior process cannot own a live session after relaunch.
@@ -460,7 +485,81 @@ export class Store {
       this.save(n);
     }
   }
-  addMessage(sessionId: string, role: TutorMessage['role'], text: string, eventId?: string) {
+  createChat(
+    kind: Chat['kind'],
+    title: string,
+    sessionId: string | null,
+    documentId: string | null = null,
+  ) {
+    const n = this.snapshot(),
+      now = new Date().toISOString();
+    const chat = ChatSchema.parse({
+      id: randomUUID(),
+      kind,
+      title: title.slice(0, 80) || 'New chat',
+      named: kind === 'lecture',
+      documentId,
+      sessionId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    n.chats.push(chat);
+    this.save(n);
+    return chat;
+  }
+  renameChat(id: string, title: string) {
+    const n = this.snapshot(),
+      chat = n.chats.find((c) => c.id === id);
+    if (!chat) return;
+    chat.title = title.trim().slice(0, 80) || chat.title;
+    chat.named = true;
+    this.save(n);
+  }
+  /** Move messages (a topic change detected after they were saved) into another chat. */
+  moveMessages(ids: string[], chatId: string) {
+    const n = this.snapshot();
+    for (const m of n.messages) if (ids.includes(m.id)) m.chatId = chatId;
+    const touched = n.chats.find((c) => c.id === chatId);
+    if (touched) touched.updatedAt = new Date().toISOString();
+    // A chat left empty by the move disappears.
+    n.chats = n.chats.filter(
+      (c) => c.kind === 'lecture' || n.messages.some((m) => m.chatId === c.id),
+    );
+    this.save(n);
+  }
+  deleteChat(id: string) {
+    const n = this.snapshot();
+    n.chats = n.chats.filter((c) => c.id !== id);
+    n.messages = n.messages.filter((m) => m.chatId !== id);
+    n.slideDrawings = n.slideDrawings.filter((d) => d.chatId !== id);
+    this.save(n);
+  }
+  logSlideDrawing(
+    chatId: string,
+    page: number,
+    marks: {
+      shape: string;
+      label: string | null;
+      box: { x: number; y: number; width: number; height: number };
+    }[],
+  ) {
+    const n = this.snapshot();
+    n.slideDrawings.push({
+      id: randomUUID(),
+      chatId,
+      page,
+      marks: marks.slice(0, 12),
+      createdAt: new Date().toISOString(),
+    });
+    this.save(n);
+  }
+  addMessage(
+    sessionId: string,
+    role: TutorMessage['role'],
+    text: string,
+    eventId?: string,
+    place: { chatId?: string | null; page?: number } = {},
+  ) {
     const n = this.snapshot();
     if (!n.sessions.some((s) => s.id === sessionId && !s.endedAt))
       throw new Error('This study session has ended.');
@@ -474,12 +573,16 @@ export class Store {
     const m = MessageSchema.parse({
       id: randomUUID(),
       sessionId,
+      chatId: place.chatId ?? null,
+      page: place.page,
       role,
       text,
       createdAt: new Date().toISOString(),
       eventId,
     });
     n.messages.push(m);
+    const chat = place.chatId ? n.chats.find((c) => c.id === place.chatId) : undefined;
+    if (chat) chat.updatedAt = m.createdAt;
     this.save(n);
     return m;
   }
@@ -511,6 +614,8 @@ export class Store {
     n.explanations = n.explanations.filter((e) => e.sessionId !== id);
     n.media = n.media.filter((m) => m.sessionId !== id);
     n.attempts = n.attempts.filter((a) => a.sessionId !== id);
+    n.chats = n.chats.filter((c) => n.messages.some((m) => m.chatId === c.id));
+    n.slideDrawings = n.slideDrawings.filter((d) => n.chats.some((c) => c.id === d.chatId));
     this.save(n);
     this.cleanupOrphans();
   }
@@ -544,3 +649,9 @@ export class Store {
   }
 }
 import { readdirSync } from 'node:fs';
+
+/** A readable fallback title: the first few words of the first question. */
+export function firstWords(text: string) {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').slice(0, 6).join(' ');
+  return words.length > 2 ? words.replace(/[?.!,;:]+$/, '') : '';
+}

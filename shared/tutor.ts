@@ -72,9 +72,42 @@ export const StudySessionSchema = z.object({
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable(),
 });
+/** A conversation thread shown to the student, named after what it is about. */
+export const ChatSchema = z.object({
+  id: Uuid,
+  kind: z.enum(['chat', 'lecture']),
+  title: z.string().min(1).max(80),
+  /** False until the topic model (or the first question) has named it. */
+  named: z.boolean().default(false),
+  documentId: Uuid.nullable().default(null),
+  sessionId: Uuid.nullable().default(null),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type Chat = z.infer<typeof ChatSchema>;
+/** What Yoyo drew on a lecture slide, kept for the replay. */
+export const SlideDrawingSchema = z.object({
+  id: Uuid,
+  chatId: Uuid,
+  page: z.number().int().min(1).max(500),
+  marks: z
+    .array(
+      z.object({
+        shape: z.string().max(20),
+        label: z.string().max(60).nullable(),
+        box: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+      }),
+    )
+    .max(12),
+  createdAt: z.string().datetime(),
+});
+export type SlideDrawing = z.infer<typeof SlideDrawingSchema>;
 export const MessageSchema = z.object({
   id: Uuid,
   sessionId: Uuid,
+  chatId: Uuid.nullable().default(null),
+  /** Lecture slide on screen when this was said. */
+  page: z.number().int().min(1).max(500).optional(),
   role: z.enum(['user', 'assistant', 'note']),
   text: z.string().min(1).max(16000),
   createdAt: z.string().datetime(),
@@ -99,6 +132,7 @@ export type TutorRuntime = {
   lessonSurface: 'screen' | 'app';
   drawing: ScreenDrawing | null;
   sessionId: string | null;
+  chatId: string | null;
   lecturePreparing: boolean;
   lecture: { documentId: string; page: number; total: number } | null;
   status: 'idle' | 'connecting' | 'connected' | 'paused' | 'error';
@@ -251,6 +285,7 @@ export interface TutorApi {
   save(messageId: string): Promise<import('./model').Result<void>>;
   deleteSession(id: string): Promise<import('./model').Result<void>>;
   deleteExplanation(id: string): Promise<import('./model').Result<void>>;
+  deleteChat(id: string): Promise<import('./model').Result<void>>;
   onChange(fn: (state: TutorRuntime) => void): () => void;
   onIntent(fn: (action: TutorIntent) => void): () => void;
   onNavigate(fn: (topicId: string) => void): () => void;

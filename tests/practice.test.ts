@@ -300,7 +300,7 @@ test('grading failures save nothing; v5 data migrates to v6 with an exact backup
     const bytes = JSON.stringify(legacy);
     writeFileSync(w.store.file, bytes);
     const migrated = new Store(w.dir).snapshot();
-    assert.equal(migrated.version, 6);
+    assert.equal(migrated.version, 7);
     assert.deepEqual(migrated.attempts, []);
     assert.equal(migrated.lessons.length, 1);
     assert.equal(readFileSync(w.store.file + '.v5.backup', 'utf8'), bytes);
