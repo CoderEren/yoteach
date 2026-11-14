@@ -51,6 +51,8 @@ export class TutorService {
   ) {
     this.state = {
       sessionId: null,
+      lecture: null,
+      lecturePreparing: false,
       status: 'idle',
       mode: 'text',
       activity: 'idle',
@@ -72,43 +74,27 @@ export class TutorService {
   emit() {
     this.changed();
   }
-  context(topicId?: string) {
+  context(topicId?: string | null, documentId?: string, page = 1) {
     const d = this.store.snapshot(),
-      s = d.sessions.find((s) => s.id === this.state.sessionId),
-      topic = d.topics.find((t) => t.id === (topicId ?? s?.topicId));
-    if (!topic) throw new Error('Choose an existing topic first.');
+      s = d.sessions.find((s) => s.id === this.state.sessionId);
+    const topic = d.topics.find((t) => t.id === (topicId ?? s?.topicId));
+    const doc = d.documents.find((d) => d.id === (documentId ?? s?.documentId));
     return JSON.stringify({
-      topicId: topic.id,
-      topic: topic.title,
-      course: d.courses.find((c) => c.id === topic.courseId)?.title,
-      notes: topic.overview.slice(0, 6000),
-      sources: topic.sourceRefs.slice(0, 4).map((r) => ({
-        page: r.page,
-        name: d.documents.find((d) => d.id === r.documentId)?.originalName,
-        text: d.documents
-          .find((d) => d.id === r.documentId)
-          ?.pages[r.page - 1]?.text.slice(0, 4000),
-      })),
-      savedExplanations: d.explanations
-        .filter((e) => e.topicId === topic.id)
-        .slice(-3)
-        .map((e) => e.text.slice(0, 1600)),
+      mode: doc ? 'lecture' : 'tutor',
+      lecture: doc ? { name: doc.originalName, page: s?.page ?? page, total: doc.pageCount } : null,
+      legacyNotes: topic?.overview.slice(0, 6000),
       recentConversation: d.messages
         .filter((m) => m.sessionId === s?.id)
         .slice(-8)
         .map((m) => ({ role: m.role, text: m.text.slice(0, 1600) })),
-      availableTopics: d.topics
-        .filter((t) => t.courseId === topic.courseId)
-        .slice(0, 100)
-        .map((t) => ({ id: t.id, title: t.title })),
       screenSharing: this.state.sharing,
       source: this.state.sourceName,
     });
   }
-  async start(topicId: string, mode: 'voice' | 'text') {
+  async start(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
     if (this.state.sessionId || this.connecting)
       throw new Error('End the current session before starting another.');
-    const context = this.context(topicId),
+    const context = this.context(topicId, documentId, page),
       ctl = new AbortController();
     this.connecting = ctl;
     this.state.status = 'connecting';
@@ -117,9 +103,17 @@ export class TutorService {
     try {
       const signedUrl = await this.providers.signedUrl(ctl.signal);
       if (ctl.signal.aborted) throw new Error('Session start cancelled.');
-      const s = this.store.startSession(topicId, mode);
+      const s = this.store.startSession(topicId, mode, documentId, page);
       Object.assign(this.state, {
         sessionId: s.id,
+        lecturePreparing: !!documentId,
+        lecture: documentId
+          ? {
+              documentId,
+              page,
+              total: this.store.snapshot().documents.find((d) => d.id === documentId)!.pageCount,
+            }
+          : null,
         mode,
         status: 'connecting',
         activity: 'idle',
@@ -152,7 +146,13 @@ export class TutorService {
     if (id && id !== this.state.sessionId) return;
     if (this.state.sessionId) this.store.endSession(this.state.sessionId);
     this.stopSharing(false);
-    Object.assign(this.state, { sessionId: null, status: 'idle', mic: false, activity: 'idle' });
+    Object.assign(this.state, {
+      sessionId: null,
+      lecture: null,
+      status: 'idle',
+      mic: false,
+      activity: 'idle',
+    });
     this.emit();
   }
   update(raw: unknown) {
@@ -174,6 +174,7 @@ export class TutorService {
     Object.assign(this.state, {
       sharing: 'off',
       sourceName: '',
+      lecturePreparing: false,
       snapshot: null,
       annotations: [],
       analysis: '',
@@ -201,11 +202,21 @@ export class TutorService {
       const source = s.source,
         document = data.documents.find((d) => d.id === source.documentId),
         session = data.sessions.find((x) => x.id === this.state.sessionId);
-      if (!document || source.page > document.pageCount || document.courseId !== session?.courseId)
-        throw new Error('Share a PDF from the current session’s course.');
+      if (
+        !document ||
+        source.page > document.pageCount ||
+        (session?.documentId && document.id !== session.documentId)
+      )
+        throw new Error('Choose an existing PDF from this session’s lecture.');
+      const preparing = this.state.lecturePreparing;
       this.stopSharing(false);
+      if (this.state.lecture) {
+        this.store.setSlide(this.state.sessionId!, source.page);
+        this.state.lecture.page = source.page;
+      }
       s.epoch = this.state.epoch;
       this.state.sharing = 'pdf';
+      this.state.lecturePreparing = preparing;
       this.state.sourceName = `${document.originalName} · p. ${source.page}`;
     } else if (this.state.sharing !== 'window') throw new Error('Window sharing is off.');
     this.abort?.abort();
@@ -282,18 +293,21 @@ export class TutorService {
         this.emit();
         return { shown: region.label };
       }
-      case 'open_topic': {
-        const d = this.store.snapshot(),
-          current = d.sessions.find((s) => s.id === sessionId),
-          topic = d.topics.find((t) => t.id === tool.topicId);
-        if (!topic || topic.courseId !== current?.courseId)
-          throw new Error('Choose a topic from the current course.');
-        this.store.command({ type: 'topic.open', id: topic.id });
-        this.navigate(topic.id);
+      case 'navigate_slide': {
+        const lecture = this.state.lecture;
+        if (!lecture || this.state.sharing === 'off')
+          throw new Error('Start or resume a lecture with sharing consent first.');
+        if (this.state.lecturePreparing)
+          throw new Error('The current slide is still being prepared.');
+        this.store.setSlide(sessionId, tool.page);
+        this.stopSharing(false);
+        lecture.page = tool.page;
+        this.state.lecturePreparing = true;
         this.emit();
         return {
-          opened: topic.title,
-          note: 'Session memory stays attached to the topic selected at session start.',
+          page: tool.page,
+          total: lecture.total,
+          note: 'Wait for the current slide analysis before teaching.',
         };
       }
       case 'save_explanation': {

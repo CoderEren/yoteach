@@ -4,9 +4,12 @@ await build({
   outfile: 'dist-electron/main.js',
   bundle: true,
   platform: 'node',
+  banner: {
+    js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+  },
   format: 'esm',
   target: 'node22',
-  external: ['electron', 'dotenv'],
+  external: ['electron'],
 });
 await build({
   entryPoints: ['electron/preload.ts'],

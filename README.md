@@ -1,97 +1,75 @@
 # yoteach
 
-A local learning workspace with Yoyo, a floating, conversational desktop tutor. **Stage 2:** courses, PDF roadmaps, voice and text conversations, explicitly shared study pages, grounded visual annotations and saved explanations. Stage 1's approved visual design is preserved.
+A macOS Electron app with two modes: **AI tutor** for ordinary conversational questions, and **Lecture walkthrough** for teaching the actual content of PDF slides. A lavender and icy-blue yo-yo companion stays beside the workspace.
 
-## Run on macOS
+## Run locally
 
-Use Node.js **22.12 or newer** and npm:
+Node 22.12 or newer is required.
 
 ```sh
-git clone --branch stage-2-voice-and-screen https://github.com/CoderEren/yoteach.git
-cd yoteach
-npm install
+cd ~/Desktop/YoTeach
+git switch stage-2-lecture-workflow
+npm install --cache ./work/npm-cache
+# On a new clone only: cp .env.example .env
 npm run dev
 ```
 
-The course workspace, PDF reader and mascot work without credentials. For tutoring, follow [Stage 2 setup and real-conversation checklist](docs/STAGE-2-SETUP.md): copy `.env.example` to `.env`, configure ElevenLabs credentials and its six client tools, add an OpenAI key, then restart. Microphone permission is requested only for a voice session. Internal PDF sharing needs no screen-recording permission. External window sharing requires screen-recording permission and the native helper built with Xcode Command Line Tools or Xcode.
+Keep your existing local `.env`. Set `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ANTHROPIC_API_KEY` and optionally `VISION_MODEL` (defaults to `claude-sonnet-4-6`). Never commit keys. The hosted ElevenLabs agent's Claude selection and this app's Anthropic vision key are separate configurations. No OpenAI key is used.
 
-For a production build:
-
-```sh
-npm run build
-npm start
-```
-
-The development server binds only to `127.0.0.1:5173`. React changes hot reload; main-process changes need a restart. Quit with **⌘Q**. Closing the workspace leaves Yoyo available; use its Pause or End controls to stop an active session. Hide/show the companion with **⌘⇧Y**, the menu bar or **Show Yoyo**. The companion cannot enter native full screen and restores its bounded transparent surface when shown.
+For a production build: `npm run build`, then `npm start`. Restart after changing main-process code or `.env`.
 
 ## Use it
 
-1. Create a course, or explore the explicitly labelled sample course.
-2. Add a lecture PDF (up to 50 MB / 500 pages). The original is untouched. PDF bookmarks or heading detection create an editable topic roadmap.
-3. Rename, nest, reorder and edit topics; add notes. Open a source PDF to read or extract text.
-4. Open **Study with Yoyo**, select a topic and consent to sharing its context. Start voice or text. Session state, microphone and sharing controls are explicit.
-5. Open a course PDF and **Share this page**, or choose a supported document window. Ask about its visible contents. The agent analyzes that image through the vision tool and marks grounded regions in the source panel.
-6. Ask a follow-up or request a circle, arrow, highlight, point or label. Save a useful assistant answer. Revisit it under the topic's **Explanations** tab or the session's local transcript.
-7. **Stop sharing** clears the image and annotations. **Pause/End** disconnect voice and stop sharing. Starting again creates a new session. Saved conversations survive restart.
+- **AI tutor:** consent, then start voice or text. No course, topic or upload is required. You can share a saved PDF page or explicitly choose an eligible document-app window.
+- **Lecture walkthrough:** upload a PDF, select it, consent, then click **Run me through the lecture.** The app renders and analyzes the slide, shows Yoyo and asks the real agent to begin teaching. Interrupt with speech or text. Use Previous/Next or ask Yoyo to navigate; every new slide is rendered and analyzed before teaching. Progression pauses for a question/confirmation rather than advancing on a timer. Text is also available.
+- **Pause/End:** disconnects the conversation and stops audio tracks, capture and pending analysis. Lecture position is saved. Start the walkthrough again to reconnect at the last slide. This creates a new transcript; it does not restore the previous provider session.
+- **Saved material:** imported PDFs, saved explanations and preserved notes. Conversation history is below the tutor. No generated roadmaps, heading extraction, course navigation or future-feature tabs.
 
-## Scope and limits
+PDF is the supported lecture format (up to 50 MB / 500 pages). Export PowerPoint or Keynote files to PDF first. Scanned pages can be analyzed visually; uncertain regions are labelled approximate.
 
-ElevenLabs handles live conversational voice, turn-taking and interruptions through its official SDK. OpenAI provides structured visual context through agent tools. Credentials and the configured agent are required for real answers. Automated fixture responses are confined to tests; the product contains no simulated tutor mode.
-
-PDF text annotations use unique matching text runs and actual PDF geometry. External and scanned-page annotations are labelled approximate. They appear over a still image inside the app, not over arbitrary third-party applications. External sharing is restricted to identifiable document apps; browsers and private-labelled windows are excluded. No whole-display or background analysis is offered.
-
-Roadmap extraction is heuristic and editable. Scanned PDFs can be viewed but lack automatic extracted text. Password-protected PDFs are unsupported; import an unlocked copy. The PDF reader does not run embedded scripts or provide editing, forms or hyperlinks. No fal integration, generated interactive lessons, practice engine, universal computer control, proactive assistance or mastery analytics are implemented. Those remain Stage 3 or later.
-
-This is a local macOS development build, not a signed installer. The desktop UI supports windows from 980 × 680; Windows/Linux and mobile are not validated. See [setup and known limitations](docs/STAGE-2-SETUP.md) for provider configuration, retention, latency and external-capture requirements.
-
-## Data and security
-
-Data defaults to `~/Library/Application Support/yoteach/`:
-
-- `workspace.json`: version 2 courses, topics, extracted source text, settings, activity, sessions, transcripts and saved explanations. Stage 1 data migrates automatically. Interrupted sessions are closed on next launch.
-- `documents/`: app-owned PDF copies with generated IDs.
-
-The main process validates IPC sender windows, frames and schemas. Renderers receive no filesystem access or API keys; only an ephemeral ElevenLabs signed URL. Context isolation, sandboxing, restricted navigation, a local `yoteach://app` protocol and a restrictive CSP remain enabled. Media permissions are granted only to the session owner for authorized audio or selected-window capture. Audio worklets and their resampler are served locally.
-
-Sharing is explicit. Selected topic data goes to ElevenLabs; images go to OpenAI only for analysis. Screenshots and annotation coordinates remain in memory, never in the local database. Pending results are rejected after stop/source change. OpenAI requests set `store: false`; provider account policies still govern retention. Local deletion does not delete provider-side records. Locking/sleeping or hiding the application ends active media. No camera access is granted.
-
-Atomic snapshots use file sync and rename. Corrupt data is preserved with an error rather than silently reset. Back up the data directory normally; there is no cloud sync. Deleting a course or topic cascades to its local sessions and explanations. Deleting a session removes its transcript and saved explanations. Removing a PDF leaves topic notes and clears source references. Original imported files are never deleted.
-
-For isolated data:
+## Normal macOS application
 
 ```sh
-YOTEACH_DATA_DIR="$PWD/work/test-data" npm run dev
+npm run package:mac
+open release/Yoteach.app
 ```
 
-Never commit `.env` or put secrets in `VITE_*` variables.
+The local build creates `release/Yoteach.app` for this Mac and applies an ad-hoc signature. No Apple Developer account is required; this is not a notarized distribution build. Move an existing build aside before rebuilding. The bundle contains no credentials.
 
-## Verification
+A packaged app reads `.env` from its data directory, normally `~/Library/Application Support/yoteach/.env`. Copy your local `.env` there yourself if using the packaged app. Development uses the repository `.env`. `YOTEACH_DATA_DIR` can be passed as an environment variable **before launch** for an isolated workspace; it is not loaded early enough from `.env` to change the data directory.
+
+## Permissions and launch identity
+
+Development runs the Electron executable, launched by Node/npm and the terminal or IDE. macOS may attribute a request to the responsible launching app. Use the identity actually shown in the macOS prompt and Privacy & Security; do not assume an entry must be called Electron. A Finder-launched bundle is named Yoteach and has bundle ID `com.codereren.yoteach`.
+
+Voice asks for Microphone access. External selected-window capture needs Screen Recording access. Internal PDF rendering/sharing needs neither screen permission nor the native window-owner helper. Grant only permissions you choose; no privacy databases are reset. After changing permissions, restart the app. Browser/private-labelled windows are excluded. External window ownership uses a small Swift helper built with Xcode Command Line Tools.
+
+Closing the workspace leaves the floating conversation usable. Pause, End, app Hide, lock, sleep, reload or Quit stops media. The companion remains transparent, compact (200×220) or expanded (350×540), and cannot maximize/fullscreen. Show restores its bounds and transparent background.
+
+## Providers, persistence and privacy
+
+The Electron main process holds keys and obtains short-lived ElevenLabs signed WebSocket URLs. Only the main workspace renderer owns the actual ElevenLabs SDK/audio connection; the companion sends controls to it. Narrow validated IPC, renderer sandboxing, context isolation and the local protocol remain enabled.
+
+Conversation/audio goes to ElevenLabs. Explicitly shared images go to Anthropic's Messages API with structured JSON output, then pass runtime validation and grounding. During a consented walkthrough each requested slide is sent for analysis. The app does not continuously capture windows. Stop/revoke cancels analysis and rejects late results. Screenshots and annotation coordinates are runtime-only. Provider retention follows your accounts' policies.
+
+Unique PDF text evidence maps to actual rotated text geometry. Unmatched/duplicate evidence is omitted. Scanned/window estimates are approximate. Annotations appear over the shared image **inside Yoteach**, not across third-party desktop apps.
+
+Data lives in `~/Library/Application Support/yoteach/`. Schema 3 migrates versions 1/2, retains legacy courses/topics/notes/PDFs/sessions/explanations, and makes a pre-migration `workspace.json.v1.backup` or `.v2.backup`. Imported PDFs are retained. New sessions have optional legacy IDs and a lecture document/page association where applicable. Legacy structures are storage compatibility, not product navigation.
+
+## Agent configuration and verification
+
+See [setup](docs/STAGE-2-SETUP.md), the [complete replacement prompt](docs/YOYO-AGENT-PROMPT.md), and the six [tool definitions](docs/agent-tools). `navigate_slide` replaces `open_topic`; the other five tools retain their names. Only text-only conversation override is needed. Prompt/voice/model/first-message overrides remain disabled.
 
 ```sh
 npm run check
 npm test
-npm run test:e2e
 npm run format:check
-npm audit
+npm run build
+# Build the optional packaged-app smoke-test target:
+# npm run package:mac
+npx playwright test
 ```
 
-Electron tests use temporary data and a real fixture PDF. The SDK journey replaces HTTP/WebSocket transports inside the test harness and exercises the real SDK, IPC, PDF rendering, visual geometry, tools, follow-ups, saving and restart. A separate voice test uses a silent synthetic stream to exercise audio worklets, interruptions, mute and stream shutdown. These tests make no paid provider calls and request no real microphone or screen capture. Screenshots go to ignored `.impeccable/review/`. Unit tests cover migration, storage, provider requests, signed URL validation, grounding and revocation races. Actual voice quality, audio devices and selected external capture require the [manual checklist](docs/STAGE-2-SETUP.md).
+Electron UI tests need an ordinary logged-in macOS GUI session. They use isolated temporary workspaces and HTTP/WebSocket fixtures with the real ElevenLabs client. The synthetic voice test does not prove physical-microphone or live-provider quality. See `docs/REVISION-VERIFICATION.md` for this revision's actual results.
 
-## Code map
-
-- `electron/main.ts`: window lifecycle, app protocol, file picker and IPC validation.
-- `electron/tutor-ipc.ts`: session ownership, permissions, source selection and privacy lifecycle.
-- `electron/tutor.ts`: tools, grounding, session state and cancellation.
-- `electron/providers.ts`: signed ElevenLabs connections and structured OpenAI vision requests.
-- `electron/store.ts`: atomic persistence and migration.
-- `electron/window-sources.ts`, `native/window-owners.swift`: eligible window-owner metadata.
-- `shared/model.ts`, `shared/tutor.ts`: typed bridge and validation schemas.
-- `src/tutor.tsx`: SDK lifecycle, audio stream cancellation and selected-window frames.
-- `src/components/TutorWorkspace.tsx`: study conversation and shared-source annotations.
-- `src/pdf.ts`, `src/components/PdfViewer.tsx`: extraction, reading and explicit page sharing.
-- `src/components/Yoyo.tsx`, `src/components/Companion.tsx`: visual mascot and actual session controls.
-- `docs/agent-tools/`, `docs/YOYO-AGENT-PROMPT.md`: deployable agent tool definitions and prompt.
-
-## Review checkpoint
-
-Stage 1 was approved and Stage 2 was explicitly authorized. Stage 2 implementation is ready for configured live-provider review; live acceptance remains unverified without user credentials. **Do not begin Stage 3 or merge into the default branch without explicit approval.** Historical Stage 1 notes remain in [its review record](docs/STAGE_1_REVIEW.md).
+Stage 3 visual lessons, generated media and practice engines remain outside this revision.

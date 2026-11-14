@@ -2745,3 +2745,90 @@ html:has(.companion-body),
   z-index: 5;
   background: var(--bg);
 }
+
+/* Two-mode workspace and the reference yo-yo. */
+.lecture-library {
+  margin: 28px 32px 0;
+  padding: 28px;
+  border-radius: 20px;
+}
+.lecture-library h1 {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+.lecture-library p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+.lecture-library label {
+  display: grid;
+  gap: 10px;
+  margin: 20px 0 10px;
+}
+.lecture-library select {
+  max-width: 620px;
+}
+.saved-material {
+  display: grid;
+  gap: 18px;
+  max-height: 65vh;
+  overflow: auto;
+}
+.saved-material article p {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+.session-bar {
+  flex-wrap: wrap;
+}
+.yoyo-eyes {
+  transform-origin: 108px 122px;
+}
+.yoyo--speaking .yoyo-mouth {
+  transform-origin: 107px 150px;
+}
+.yoyo--error .yoyo-smile {
+  transform: none;
+}
+.yoyo--listening .yoyo-float {
+  transform-origin: 108px 122px;
+  animation: yoyo-listen 2.8s ease-in-out infinite;
+}
+.yoyo--thinking .yoyo-string {
+  stroke-dasharray: 7 5;
+  animation: string-think 2s linear infinite;
+}
+.yoyo--pointing .yoyo-string {
+  animation: string-point 1.5s ease-in-out infinite;
+}
+.yoyo--success .yoyo-spark {
+  display: block;
+}
+.yoyo--error .yoyo-float {
+  animation: none;
+  transform: rotate(-5deg);
+}
+@keyframes yoyo-listen {
+  50% {
+    transform: rotate(-7deg) translateY(-3px);
+  }
+}
+@keyframes string-think {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes string-point {
+  50% {
+    stroke: #8772c8;
+    stroke-width: 6;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

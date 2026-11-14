@@ -1,3 +1,5 @@
+> Stage 2 lecture revision (14 November 2026): the approved color, typography, glass and accessibility tokens below remain authoritative. Historical course/roadmap/tab and pear-shaped mascot descriptions are superseded: exactly AI tutor and Lecture walkthrough, with saved material/settings/history; twin-disc yo-yo and expressive string from the supplied reference. See `.impeccable/lecture-revision.md`.
+
 ---
 name: "yoteach"
 description: "A calm local learning workspace with a living glass companion."

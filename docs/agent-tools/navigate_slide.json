@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "navigate_slide",
+  "description": "Navigate to an absolute slide number in the active consented PDF lecture and return grounded analysis. Wait for this result before teaching.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "description": "One-based slide number in the active lecture."
+      }
+    },
+    "required": [
+      "page"
+    ]
+  }
+}

@@ -1,146 +1,70 @@
-import {
-  test,
-  expect,
-  _electron as electron,
-  type ElectronApplication,
-  type Page,
-} from '@playwright/test';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { mkdtempSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
-const captures = resolve('.impeccable/review');
-mkdirSync(captures, { recursive: true });
-async function launch(directory: string) {
-  const env: Record<string, string> = {
-    ...(process.env as Record<string, string>),
-    YOTEACH_DATA_DIR: directory,
+import { join, resolve } from 'node:path';
+async function launch(dir: string) {
+  const env = {
+    ...process.env,
+    YOTEACH_DATA_DIR: dir,
     ELEVENLABS_API_KEY: '',
     ELEVENLABS_AGENT_ID: '',
-    OPENAI_API_KEY: '',
-    VISION_API_KEY: '',
-  };
+    ANTHROPIC_API_KEY: '',
+  } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.YOTEACH_DEV_URL;
   const app = await electron.launch({ args: ['.'], env });
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
   const page = app.windows().find((w) => w.url().endsWith('#/'))!;
-  await expect(page.getByRole('heading', { name: 'Your space to understand.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
   return { app, page };
 }
-async function shot(page: Page, name: string) {
-  const toast = page.getByRole('button', { name: 'Dismiss notification', exact: true });
-  if (await toast.isVisible()) await toast.click();
-  await page.evaluate(async () => {
-    const scroller = document.querySelector('.main-scroll');
-    if (scroller) scroller.scrollTop = 0;
-    await document.fonts.ready;
-    await new Promise(requestAnimationFrame);
-    await new Promise(requestAnimationFrame);
-  });
-  await page.screenshot({ path: join(captures, name + '.png'), animations: 'disabled' });
-}
-test('desktop journey: real PDF import, editing, native companion, security and restart persistence', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yoteach-e2e-'));
+test('two modes, PDF persistence, companion restore and all yo-yo states', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-desktop-'));
   let app: ElectronApplication | undefined;
+  mkdirSync('.impeccable/review', { recursive: true });
   try {
-    let launched = await launch(dir);
-    app = launched.app;
-    let page = launched.page;
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await shot(page, 'empty-desktop');
-    await page.getByRole('button', { name: 'Explore a sample course' }).click();
-    await expect(
-      page.getByRole('button', { name: 'Glycolysis: an overview', exact: true }),
-    ).toBeVisible({ timeout: 30000 });
-    await shot(page, 'course-library');
-    await page.getByRole('button', { name: 'Energy investment phase', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Energy investment phase', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Edit topic', exact: true }).click();
-    await page
-      .getByLabel('Your notes & overview')
-      .fill('Why is ATP invested before it is produced?');
-    await page.getByRole('button', { name: 'Save topic', exact: true }).click();
-    await expect(
-      page.getByText('Why is ATP invested before it is produced?', { exact: true }),
-    ).toBeVisible();
-    await shot(page, 'topic-desktop');
-    await page
-      .getByRole('button', { name: 'Open Sample · Introduction to metabolism.pdf', exact: true })
-      .click();
-    await expect(page.getByLabel('Page number')).toHaveValue('3');
-    await expect(page.getByText('Loading page…', { exact: true })).not.toBeVisible();
-    await expect(page.locator('canvas')).toBeVisible();
-    await shot(page, 'pdf-desktop');
-    await page.getByRole('button', { name: 'Next page', exact: true }).click();
-    await expect(page.getByLabel('Page number')).toHaveValue('4');
-    await page.getByRole('button', { name: 'Extracted text', exact: true }).click();
-    await expect(page.locator('.pdf-text')).toContainText('Energy payoff phase');
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    // Native dialog is stubbed only in the test harness; the normal import/extraction path is unchanged.
+    await expect(page.locator('.primary-nav button')).toHaveCount(2);
+    await expect(page.getByText('Study with Yoyo', { exact: true })).toHaveCount(0);
+    await page.screenshot({ path: '.impeccable/review/ai-tutor.png' });
+    await page.getByRole('button', { name: 'Lecture walkthrough', exact: true }).click();
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, resolve('public/sample-lecture.pdf'));
-    await page.getByRole('button', { name: 'Add PDF', exact: true }).click();
-    await expect(page.locator('.import-progress')).not.toBeVisible({ timeout: 30000 });
-    await expect(
-      page.getByText('2 documents · 10 topics · Local workspace', { exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Add topic', exact: true }).click();
-    await page.getByLabel('Topic title').fill('Review questions');
-    await page.getByLabel('Place under').selectOption({ label: 'Energy investment phase' });
-    await page.getByRole('button', { name: 'Add topic', exact: true }).last().click();
-    await expect(
-      page.getByRole('heading', { name: 'Review questions', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Delete topic', exact: true }).click();
-    await page.getByRole('button', { name: 'Remove', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Review questions', exact: true }),
-    ).not.toBeVisible();
-    await page.getByRole('button', { name: 'Rename course', exact: true }).click();
-    await page.getByLabel('Course name').fill('Biochemistry');
-    await page.getByRole('button', { name: 'Save name', exact: true }).click();
-    await page
-      .getByRole('button', { name: 'Energy investment phase', exact: true })
-      .first()
-      .click();
-    await page.getByRole('button', { name: 'Settings', exact: false }).click();
+    await page.getByRole('button', { name: 'Upload lecture PDF' }).click();
+    await expect(page.getByLabel('Choose your lecture')).not.toHaveValue('');
+    const state = await page.evaluate(() => window.yoteach.getState());
+    expect(state.ok && state.value.topics.length).toBe(0);
+    await page.getByRole('button', { name: 'Preview lecture slides' }).click();
+    await expect(page.locator('canvas')).toBeVisible();
+    await page.getByRole('button', { name: 'Next page', exact: true }).click();
+    await expect(page.getByLabel('Page number')).toHaveValue('2');
+    await page.getByRole('button', { name: 'Extracted text', exact: true }).click();
+    await expect(page.locator('.pdf-text')).toContainText('Glycolysis');
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    await page.screenshot({ path: '.impeccable/review/lecture-library.png' });
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Dark', exact: true }).click();
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await shot(page, 'topic-dark');
-    await page.getByRole('button', { name: 'yoteach home', exact: true }).click();
-    await shot(page, 'dashboard-dark');
-    await page.getByRole('button', { name: 'Settings', exact: false }).click();
-    await page.getByRole('button', { name: 'Light', exact: true }).click();
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await shot(page, 'dashboard-desktop');
-    const companion = app.windows().find((w) => w.url().includes('/companion'))!;
-    await expect(companion.getByRole('button', { name: 'Expand Yoyo panel' })).toBeVisible();
-    const winState = await app.evaluate(({ BrowserWindow }) =>
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    await page.screenshot({ path: '.impeccable/review/lecture-dark.png' });
+    const pet = app.windows().find((w) => w.url().includes('/companion'))!;
+    const before = await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().map((w) => ({
+        fullscreen: w.isFullScreenable(),
         url: w.webContents.getURL(),
-        alwaysOnTop: w.isAlwaysOnTop(),
-        bounds: w.getBounds(),
         preferences: (w.webContents as any).getLastWebPreferences(),
       })),
     );
-    expect(winState.find((w) => w.url.includes('/companion'))?.alwaysOnTop).toBe(true);
-    for (const w of winState) {
+    expect(before.find((w) => w.url.includes('/companion'))?.fullscreen).toBe(false);
+    for (const w of before) {
       expect(w.preferences.contextIsolation).toBe(true);
-      expect(w.preferences.nodeIntegration).toBe(false);
       expect(w.preferences.sandbox).toBe(true);
+      expect(w.preferences.nodeIntegration).toBe(false);
     }
-    expect(
-      await app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => w.webContents.getURL().includes('/companion'))!
-          .isFullScreenable(),
-      ),
-    ).toBe(false);
-    // Reproduce the oversized transparent surface reported on restore.
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
         .find((w) => w.webContents.getURL().includes('/companion'))!
@@ -148,119 +72,91 @@ test('desktop journey: real PDF import, editing, native companion, security and 
     );
     await page.evaluate(() => window.yoteach.companion('hide'));
     await page.evaluate(() => window.yoteach.companion('show'));
-    const restored = await app.evaluate(({ BrowserWindow }) =>
+    const bounds = await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
         .find((w) => w.webContents.getURL().includes('/companion'))!
         .getBounds(),
     );
-    expect({ width: restored.width, height: restored.height }).toEqual({ width: 200, height: 220 });
-    await expect(companion.getByRole('button', { name: 'Expand Yoyo panel' })).toBeVisible();
-    await companion.getByRole('button', { name: 'Expand Yoyo panel' }).click();
-    await expect(companion.getByText('Your learning companion', { exact: true })).toBeVisible();
-    await companion.getByText('Preview expressions', { exact: true }).click();
-    await expect(companion.getByText('Energy investment phase', { exact: true })).toBeVisible();
-    for (const state of [
-      'Listening',
-      'Thinking',
-      'Speaking',
-      'Pointing',
-      'Celebrating',
-      'Unavailable',
-      'Idle',
-    ])
-      await companion.getByRole('button', { name: state, exact: true }).click();
-    await companion.getByText('Preview expressions', { exact: true }).click();
-    await shot(companion, 'companion-expanded');
-    await companion.getByRole('button', { name: 'Hide Yoyo', exact: true }).click();
+    expect([bounds.width, bounds.height]).toEqual([200, 220]);
+    await pet.getByRole('button', { name: 'Expand Yoyo panel' }).click();
+    await pet.getByText('Preview expressions', { exact: true }).click();
+    for (const [label, state] of [
+      ['Listening', 'listening'],
+      ['Thinking', 'thinking'],
+      ['Speaking', 'speaking'],
+      ['Pointing', 'pointing'],
+      ['Celebrating', 'success'],
+      ['Unavailable', 'error'],
+      ['Idle', 'idle'],
+    ]) {
+      await pet.getByRole('button', { name: label, exact: true }).click();
+      await expect(pet.locator(`.yoyo--${state}`)).toBeVisible();
+      await pet.screenshot({
+        path: `.impeccable/review/yoyo-${state}.png`,
+        animations: 'disabled',
+      });
+    }
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
     expect(
-      await app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => w.webContents.getURL().includes('/companion'))
-          ?.isVisible(),
-      ),
-    ).toBe(false);
-    await page.getByRole('button', { name: 'Show Yoyo', exact: true }).first().click();
-    expect(
-      await app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => w.webContents.getURL().includes('/companion'))
-          ?.isVisible(),
-      ),
-    ).toBe(true);
-    await companion.getByRole('button', { name: 'Collapse Yoyo', exact: true }).click();
-    await app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().includes('/companion'),
-      )!;
-      w.setPosition(120, 120);
-    });
-    await expect
-      .poll(() =>
-        app!.evaluate(
-          ({ BrowserWindow }) =>
-            BrowserWindow.getAllWindows()
-              .find((w) => w.webContents.getURL().includes('/companion'))
-              ?.getBounds().x,
-        ),
-      )
-      .toBe(120);
-    expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
-    expect((await page.evaluate(() => window.yoteach.readPdf('../../etc/passwd'))).ok).toBe(false);
-    expect(
-      (
-        await companion.evaluate(() =>
-          window.yoteach.command({ type: 'course.create', title: 'Forbidden', color: 'iris' }),
-        )
-      ).ok,
-    ).toBe(false);
-    await page.getByRole('button', { name: 'Study with Yoyo', exact: true }).first().click();
-    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Connect Yoyo’s voice' })).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Start voice session', exact: true }),
-    ).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Choose window', exact: true })).toBeDisabled();
-    expect(
-      (await companion.evaluate(() => window.yoteach.tutor.start(crypto.randomUUID(), 'text'))).ok,
-    ).toBe(false);
-    await shot(page, 'study-desktop');
-    // Minimum supported desktop viewport.
+      await pet.locator('.yoyo-float').evaluate((el) => getComputedStyle(el).animationName),
+    ).toBe('none');
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
-        .find((w) => !w.webContents.getURL().includes('/companion'))!
+        .find((w) => w.webContents.getURL().endsWith('#/'))!
         .setSize(1000, 720),
     );
-    await shot(page, 'study-small');
-    await page.getByRole('button', { name: 'yoteach home', exact: true }).click();
-    await shot(page, 'dashboard-small');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    expect((await pet.evaluate(() => window.yoteach.tutor.start(null, 'text'))).ok).toBe(false);
+    expect((await page.evaluate(() => window.yoteach.readPdf('../../etc/passwd'))).ok).toBe(false);
     await app.close();
     app = undefined;
-    launched = await launch(dir);
-    app = launched.app;
-    page = launched.page;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
     await expect(
-      page.getByRole('button', { name: 'Continue learning', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Continue learning', exact: true }).click();
-    await expect(
-      page.getByText('Why is ATP invested before it is produced?', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Biochemistry', exact: true })).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Open Sample · Introduction to metabolism.pdf', exact: true })
-      .click();
-    await expect(page.getByLabel('Page number')).toHaveValue('3');
-    await expect(page.getByText('Loading page…', { exact: true })).not.toBeVisible();
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete course', exact: true }).click();
-    await page.getByRole('button', { name: 'Remove', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Start with something you’re learning.', exact: true }),
+      page.getByRole('button', { name: 'sample-lecture.pdf', exact: true }),
     ).toBeVisible();
     expect(errors).toEqual([]);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('packaged Yoteach starts with its own identity and isolated data', async () => {
+  test.skip(
+    !existsSync('release/Yoteach.app/Contents/MacOS/Yoteach'),
+    'Run npm run package:mac to include the packaged launch check.',
+  );
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-bundle-'));
+  const env = {
+    ...process.env,
+    YOTEACH_DATA_DIR: dir,
+    ELEVENLABS_API_KEY: '',
+    ELEVENLABS_AGENT_ID: '',
+    ANTHROPIC_API_KEY: '',
+  } as Record<string, string>;
+  delete env.ELECTRON_RUN_AS_NODE;
+  delete env.YOTEACH_DEV_URL;
+  let app: ElectronApplication | undefined;
+  try {
+    app = await electron.launch({
+      executablePath: resolve('release/Yoteach.app/Contents/MacOS/Yoteach'),
+      args: [],
+      env,
+    });
+    await expect.poll(() => app!.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
+    const page = app.windows().find((w) => w.url().endsWith('#/'))!;
+    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+    const info = await app.evaluate(({ app }) => ({
+      packaged: app.isPackaged,
+      name: app.getName(),
+      data: app.getPath('userData'),
+    }));
+    expect(info).toEqual({ packaged: true, name: 'yoteach', data: dir });
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

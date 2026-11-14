@@ -1,4 +1,11 @@
-import { BrowserWindow, desktopCapturer, powerMonitor, session, systemPreferences } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  powerMonitor,
+  session,
+  systemPreferences,
+} from 'electron';
 import { z } from 'zod';
 import { config as loadEnv } from 'dotenv';
 import { join } from 'node:path';
@@ -18,12 +25,15 @@ export function installTutor(
   open: () => void,
   root: string,
 ) {
-  loadEnv({ path: join(root, '.env'), quiet: true });
+  loadEnv({
+    path: app.isPackaged ? join(app.getPath('userData'), '.env') : join(root, '.env'),
+    quiet: true,
+  });
   const providers = new Providers({
     elevenKey: process.env.ELEVENLABS_API_KEY ?? '',
     agentId: process.env.ELEVENLABS_AGENT_ID ?? '',
-    visionKey: process.env.OPENAI_API_KEY ?? process.env.VISION_API_KEY ?? '',
-    model: process.env.VISION_MODEL ?? 'gpt-4.1-mini',
+    visionKey: process.env.ANTHROPIC_API_KEY ?? '',
+    model: process.env.VISION_MODEL ?? 'claude-sonnet-4-6',
   });
   const emit = () => {
     changed();
@@ -147,8 +157,13 @@ export function installTutor(
   handle(
     'tutor:start',
     async (input) => {
-      const { topicId, mode } = z
-        .object({ topicId: Id, mode: z.enum(['voice', 'text']) })
+      const { topicId, mode, documentId, page } = z
+        .object({
+          topicId: Id.nullable(),
+          mode: z.enum(['voice', 'text']),
+          documentId: Id.optional(),
+          page: z.number().int().min(1).max(500).optional(),
+        })
         .parse(input);
       if (
         mode === 'voice' &&
@@ -156,9 +171,9 @@ export function installTutor(
         !(await systemPreferences.askForMediaAccess('microphone'))
       )
         throw new Error(
-          'Microphone access is off. Enable it for Electron in macOS Privacy & Security, or use text.',
+          'Microphone access is off. Enable it for the app named in the macOS permission prompt, or use text.',
         );
-      return service.start(topicId, mode);
+      return service.start(topicId, mode, documentId, page);
     },
     true,
   );
@@ -204,7 +219,7 @@ export function installTutor(
         return (await sources()).map((s) => ({ id: s.id, name: s.name.slice(0, 240) }));
       } catch {
         throw new Error(
-          'Window access is unavailable. Enable Screen Recording for Electron in macOS Privacy & Security and restart, or share an internal PDF page.',
+          'Window access is unavailable. Enable Screen Recording for the app named by macOS (Yoteach, Electron or your terminal) and restart, or share an internal PDF page.',
         );
       }
     },
@@ -250,7 +265,6 @@ export function installTutor(
       service.acceptSnapshot(input, true);
       selected = null;
       displayGrant = false;
-      main()?.webContents.send('tutor:stop-stream');
     },
     true,
   );

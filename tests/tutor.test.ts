@@ -12,7 +12,7 @@ const config = {
   elevenKey: 'test-secret',
   agentId: 'test-agent',
   visionKey: 'test-vision-secret',
-  model: 'gpt-4.1-mini',
+  model: 'claude-sonnet-4-6',
 };
 const answer: VisionAnswer = {
   explanation: 'ATP activates the substrate.',
@@ -49,6 +49,12 @@ function setup(
     'Lecture.pdf',
     new Uint8Array(Buffer.from('%PDF-1.7')),
   );
+  store.command({
+    type: 'topic.create',
+    courseId: course.id,
+    title: 'Legacy notes',
+    parentId: null,
+  });
   const topic = store.snapshot().topics[0],
     doc = store.snapshot().documents[0];
   let navigated = '';
@@ -82,7 +88,7 @@ function setup(
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
-test('Stage 1 migration preserves notes and persists version 2 safely', () => {
+test('Stage 1 migration preserves notes and persists version 3 safely', () => {
   const f = setup();
   try {
     const old = { ...f.store.snapshot(), version: 1 };
@@ -91,7 +97,7 @@ test('Stage 1 migration preserves notes and persists version 2 safely', () => {
     delete (old as any).explanations;
     writeFileSync(f.store.file, JSON.stringify(old));
     const next = new Store(f.dir).snapshot();
-    assert.equal(next.version, 2);
+    assert.equal(next.version, 3);
     assert.equal(next.documents[0].id, f.doc.id);
     assert.deepEqual(next.sessions, []);
   } finally {
@@ -154,7 +160,7 @@ test('pause/revoke discards in-flight vision, clears screenshots and rejects sta
     resolveAnalysis(
       new Response(
         JSON.stringify({
-          output: [{ content: [{ type: 'output_text', text: JSON.stringify(answer) }] }],
+          content: [{ type: 'text', text: JSON.stringify(answer) }],
         }),
       ),
     );
@@ -188,8 +194,7 @@ test('tools navigate, save actual explanations, record notes; history survives r
       name: 'record_learning_interaction',
       note: 'Student asked about activation.',
     });
-    await f.service.tool(start.id, { name: 'open_topic', topicId: f.topic.id });
-    assert.equal(f.navigated(), f.topic.id);
+
     const next = new Store(f.dir).snapshot();
     assert.equal(next.explanations[0].text, 'ATP activates the substrate.');
     assert.equal(next.messages.length, 3);
@@ -204,14 +209,14 @@ test('tools navigate, save actual explanations, record notes; history survives r
     f.cleanup();
   }
 });
-test('vision request stays server-side, structured and non-storing; configuration excludes secrets', async () => {
+test('vision request stays server-side, structured and validated; configuration excludes secrets', async () => {
   let request: RequestInit | undefined;
   const p = new Providers(config, async (url, init) => {
-    assert.equal(url, 'https://api.openai.com/v1/responses');
+    assert.equal(url, 'https://api.anthropic.com/v1/messages');
     request = init;
     return new Response(
       JSON.stringify({
-        output: [{ content: [{ type: 'output_text', text: JSON.stringify(answer) }] }],
+        content: [{ type: 'text', text: JSON.stringify(answer) }],
       }),
     );
   });
@@ -219,10 +224,10 @@ test('vision request stays server-side, structured and non-storing; configuratio
   try {
     await p.analyze(f.snapshot(), 'Why?', 'context', new AbortController().signal);
     const body = JSON.parse(String(request?.body));
-    assert.equal(body.store, false);
-    assert.equal(body.text.format.type, 'json_schema');
-    assert.equal(body.text.format.strict, true);
-    assert.equal(body.input[0].content[1].type, 'input_image');
+    assert.equal(body.output_config.format.type, 'json_schema');
+    assert.equal(body.messages[0].content[1].type, 'image');
+    assert.equal(body.messages[0].content[1].source.media_type, 'image/jpeg');
+    assert.equal((request?.headers as Record<string, string>)['anthropic-version'], '2023-06-01');
     assert.ok(!JSON.stringify(p.status()).includes('secret'));
     assert.ok(!String(request?.body).includes('test-vision-secret'));
   } finally {
@@ -242,7 +247,7 @@ test('signed URL host, missing configuration, foreign PDF and ended session are 
     const start = await f.service.start(f.topic.id, 'text');
     const invalid = f.snapshot();
     if (invalid.source.kind === 'pdf') invalid.source.documentId = randomUUID();
-    assert.throws(() => f.service.acceptSnapshot(invalid, true), /current session/);
+    assert.throws(() => f.service.acceptSnapshot(invalid, true), /existing PDF/);
     f.service.end();
     assert.throws(() => f.service.transcript(start.id, 'user', 'late', 'late'), /ended/);
   } finally {
@@ -286,4 +291,82 @@ test('rotated PDF text uses its visible vertical footprint instead of an unrelat
   assert.ok(Math.abs(rotated.width - 0.02) < 1e-9);
   assert.ok(Math.abs(rotated.height - 0.1) < 1e-9);
   assert.equal(textRunBox([20, 0, 0, -20, -200, 200], 100, 1000, 1000), null);
+});
+
+test('topic-free tutoring and lecture progress survive settings updates and restart', async () => {
+  const f = setup();
+  try {
+    const free = await f.service.start(null, 'text');
+    f.service.transcript(free.id, 'assistant', 'A general explanation.', 'a');
+    f.store.command({ type: 'settings.update', theme: 'dark' });
+    assert.equal(f.store.snapshot().sessions.at(-1)?.topicId, null);
+    f.service.end();
+    const lecture = await f.service.start(null, 'voice', f.doc.id);
+    f.service.acceptSnapshot(f.snapshot(), true);
+    f.service.update({ sessionId: lecture.id, lecturePreparing: false });
+    await f.service.tool(lecture.id, { name: 'navigate_slide', page: 1 });
+    assert.equal(f.service.state.snapshot, null);
+    assert.equal(f.service.state.lecture?.page, 1);
+    await assert.rejects(f.service.tool(lecture.id, { name: 'navigate_slide', page: 2 }));
+    f.service.end();
+    const reloaded = new Store(f.dir).snapshot();
+    assert.equal(reloaded.sessions.at(-1)?.documentId, f.doc.id);
+    assert.equal(reloaded.messages[0].text, 'A general explanation.');
+  } finally {
+    f.cleanup();
+  }
+});
+test('Anthropic errors, refusal, truncation and invalid structured data are rejected', async () => {
+  const f = setup();
+  try {
+    for (const payload of [
+      { stop_reason: 'refusal' },
+      { stop_reason: 'max_tokens' },
+      { content: [{ type: 'text', text: 'not json' }] },
+    ]) {
+      const p = new Providers(config, async () => new Response(JSON.stringify(payload)));
+      await assert.rejects(p.analyze(f.snapshot(), 'Explain', '', new AbortController().signal));
+    }
+    for (const status of [401, 403, 429, 500]) {
+      const p = new Providers(config, async () => new Response('{}', { status }));
+      await assert.rejects(
+        p.analyze(f.snapshot(), 'Explain', '', new AbortController().signal),
+        new RegExp(String(status)),
+      );
+    }
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('version 2 migration preserves every legacy record and backs up exact original bytes', async () => {
+  const f = setup();
+  try {
+    const session = await f.service.start(f.topic.id, 'text');
+    f.service.transcript(session.id, 'assistant', 'Keep this explanation.', 'saved');
+    await f.service.tool(session.id, { name: 'save_explanation', title: 'Preserved' });
+    f.store.command({
+      type: 'topic.update',
+      id: f.topic.id,
+      title: f.topic.title,
+      parentId: null,
+      overview: 'Keep these notes.',
+    });
+    const legacy: any = { ...f.store.snapshot(), version: 2 };
+    legacy.sessions.forEach((s: any) => {
+      delete s.documentId;
+      delete s.page;
+    });
+    const bytes = JSON.stringify(legacy);
+    writeFileSync(f.store.file, bytes);
+    const migrated = new Store(f.dir).snapshot();
+    assert.equal(readFileSync(f.store.file + '.v2.backup', 'utf8'), bytes);
+    assert.equal(migrated.topics[0].overview, 'Keep these notes.');
+    assert.equal(migrated.documents[0].id, f.doc.id);
+    assert.equal(migrated.sessions[0].topicId, f.topic.id);
+    assert.equal(migrated.explanations[0].text, 'Keep this explanation.');
+    assert.equal(migrated.messages[0].text, 'Keep this explanation.');
+  } finally {
+    f.cleanup();
+  }
 });

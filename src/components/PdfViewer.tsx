@@ -133,7 +133,7 @@ export function PdfViewer({
       <div className="pdf-share-bar">
         <p>
           {tutor?.sessionId
-            ? 'Share a still image of this page. Yoyo can send it to OpenAI when you ask about it.'
+            ? 'Share a still image of this page. Yoyo can send it to Anthropic when you ask about it.'
             : 'Start a study session to share a page with Yoyo.'}
         </p>
         <button

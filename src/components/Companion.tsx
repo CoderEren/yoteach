@@ -68,8 +68,12 @@ export function Companion({ data }: { data: AppState }) {
             </button>
           </header>
           <div className="companion-context">
-            <span>{course?.title ?? 'Your learning workspace'}</span>
-            <strong>{topic?.title ?? 'Choose a topic to get started'}</strong>
+            <span>{r?.lecture ? 'Lecture walkthrough' : 'AI tutor'}</span>
+            <strong>
+              {r?.lecture
+                ? `Slide ${r.lecture.page} of ${r.lecture.total}`
+                : 'What would you like to understand?'}
+            </strong>
           </div>
           <p className="companion-copy">
             {r?.activity === 'thinking'
@@ -111,7 +115,7 @@ export function Companion({ data }: { data: AppState }) {
             </p>
           )}
           <button className="button companion-open" onClick={() => void act({ type: 'open' })}>
-            Study with Yoyo
+            Open workspace
             <ArrowUpRight size={16} />
           </button>
           {!r?.sessionId && (

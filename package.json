@@ -15,7 +15,8 @@
     "predev": "node scripts/assets.mjs",
     "prebuild": "node scripts/assets.mjs",
     "format": "prettier --write src electron shared scripts tests *.ts",
-    "format:check": "prettier --check src electron shared scripts tests *.ts"
+    "format:check": "prettier --check src electron shared scripts tests *.ts",
+    "package:mac": "npm run build && node scripts/package-mac.mjs"
   },
   "dependencies": {
     "@alexanderolsen/libsamplerate-js": "^2.1.2",

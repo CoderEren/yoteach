@@ -74,16 +74,15 @@ export function AnnotationLayer({ annotations }: { annotations: Annotation[] }) 
 }
 export function TutorWorkspace({
   data,
-  onOpenTopic,
+  lectureId,
   onOpenPdf,
 }: {
   data: AppState;
-  onOpenTopic: (id: string) => void;
+  lectureId?: string;
   onOpenPdf: (id: string, page: number) => void;
 }) {
   const { runtime: r, act } = useTutor();
-  const [topicId, setTopicId] = useState(data.settings.lastTopicId ?? data.topics[0]?.id ?? ''),
-    [consent, setConsent] = useState(false),
+  const [consent, setConsent] = useState(false),
     [text, setText] = useState(''),
     [error, setError] = useState(''),
     [windows, setWindows] = useState<WindowSource[] | null>(null),
@@ -95,10 +94,6 @@ export function TutorWorkspace({
     window.addEventListener('tutor-error', fn);
     return () => window.removeEventListener('tutor-error', fn);
   }, []);
-  useEffect(() => {
-    if (!data.topics.some((t) => t.id === topicId))
-      setTopicId(data.settings.lastTopicId ?? data.topics[0]?.id ?? '');
-  }, [data.topics, topicId]);
   async function run(fn: () => Promise<unknown>) {
     setError('');
     setBusy(true);
@@ -112,7 +107,7 @@ export function TutorWorkspace({
   }
   if (!r) return <p role="status">Opening Yoyo…</p>;
   const active = data.sessions.find((s) => s.id === r.sessionId),
-    chosen = data.topics.find((t) => t.id === (active?.topicId ?? topicId)),
+    chosen = data.documents.find((d) => d.id === (active?.documentId ?? lectureId)),
     viewId = r.sessionId ?? historyId,
     messages = data.messages.filter((m) => m.sessionId === viewId),
     snapshot = r.snapshot;
@@ -122,7 +117,7 @@ export function TutorWorkspace({
     <section className="tutor-workspace page-enter">
       <header className="tutor-heading">
         <div>
-          <h1>Let’s work through it.</h1>
+          <h1>{lectureId ? 'Let’s bring this lecture to life.' : 'Let’s work through it.'}</h1>
           <p>A question, a conversation, a little more clarity.</p>
         </div>
         <div className="tutor-presence">
@@ -157,15 +152,6 @@ export function TutorWorkspace({
       {!ready && (
         <section className="session-start glass">
           <div>
-            <label htmlFor="study-topic">What are we studying?</label>
-            <select id="study-topic" value={topicId} onChange={(e) => setTopicId(e.target.value)}>
-              {!data.topics.length && <option value="">Add a course and topic first</option>}
-              {data.topics.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {data.courses.find((c) => c.id === t.courseId)?.title} / {t.title}
-                </option>
-              ))}
-            </select>
             <label className="consent-check">
               <input
                 type="checkbox"
@@ -173,32 +159,55 @@ export function TutorWorkspace({
                 onChange={(e) => setConsent(e.target.checked)}
               />
               <span>
-                Share this topic’s notes, linked source text and saved explanations with ElevenLabs.
-                Keep a transcript on this Mac.
+                Send conversation text to ElevenLabs. For a lecture walkthrough, also send each
+                slide image to Anthropic and its explanation to ElevenLabs. Keep a transcript on
+                this Mac.
               </span>
             </label>
             <p className="privacy-caption">
-              Voice also sends microphone audio. A shared page or window image goes to OpenAI only
-              when Yoyo analyzes it. Provider retention follows your account settings.
+              Voice also sends microphone audio. A shared page or window image goes to Anthropic
+              only when Yoyo analyzes it. Provider retention follows your account settings.
             </p>
           </div>
           <div className="session-start-actions">
             <button
               className="button primary"
               disabled={
-                !consent || !topicId || !r.config.voice || r.status === 'connecting' || busy
+                !consent ||
+                (!!lectureId && !r.config.vision) ||
+                !r.config.voice ||
+                r.status === 'connecting' ||
+                busy
               }
-              onClick={() => void run(() => act({ type: 'start', topicId, mode: 'voice' }))}
+              onClick={() =>
+                void run(() =>
+                  act({
+                    type: 'start',
+                    topicId: null,
+                    documentId: lectureId,
+                    page: data.sessions.filter((s) => s.documentId === lectureId).at(-1)?.page ?? 1,
+                    mode: 'voice',
+                  }),
+                )
+              }
             >
               <Mic size={17} />
-              Start voice session
+              {lectureId ? 'Run me through the lecture.' : 'Start voice session'}
             </button>
             <button
               className="button"
               disabled={
-                !consent || !topicId || !r.config.voice || r.status === 'connecting' || busy
+                !consent ||
+                (!!lectureId && !r.config.vision) ||
+                !r.config.voice ||
+                r.status === 'connecting' ||
+                busy
               }
-              onClick={() => void run(() => act({ type: 'start', topicId, mode: 'text' }))}
+              onClick={() =>
+                void run(() =>
+                  act({ type: 'start', topicId: null, documentId: lectureId, mode: 'text' }),
+                )
+              }
             >
               <MessageSquare size={17} />
               Start with text
@@ -221,17 +230,38 @@ export function TutorWorkspace({
           </p>
           <span>
             <Check size={15} />
-            Your courses and PDFs are ready to use now.
+            Your saved PDFs are ready to use now.
           </span>
         </div>
       )}
       {ready && (
         <div className="session-bar">
-          <button className="session-topic" onClick={() => onOpenTopic(active!.topicId)}>
-            <BookOpen size={17} />
-            <strong>{chosen?.title}</strong>
-            <ArrowUpRight size={15} />
-          </button>
+          <strong className="session-topic">{chosen?.originalName ?? 'AI tutor'}</strong>
+          {r.lecture && (
+            <div className="toolbar-group">
+              <button
+                className="button small"
+                disabled={r.lecture.page <= 1 || r.lecturePreparing}
+                onClick={() =>
+                  void run(() => act({ type: 'lecture-page', page: r.lecture!.page - 1 }))
+                }
+              >
+                Previous slide
+              </button>
+              <span>
+                Slide {r.lecture.page} / {r.lecture.total}
+              </span>
+              <button
+                className="button small"
+                disabled={r.lecture.page >= r.lecture.total || r.lecturePreparing}
+                onClick={() =>
+                  void run(() => act({ type: 'lecture-page', page: r.lecture!.page + 1 }))
+                }
+              >
+                Next slide
+              </button>
+            </div>
+          )}
           <span className={r.mic ? 'permission-on' : 'permission-off'}>
             {r.mic ? <Mic size={14} /> : <MicOff size={14} />}Mic {r.mic ? 'on' : 'off'}
           </span>
@@ -298,7 +328,7 @@ export function TutorWorkspace({
                       {data.explanations.some(
                         (e) => e.sessionId === m.sessionId && e.text === m.text,
                       )
-                        ? 'Saved to topic'
+                        ? 'Saved'
                         : 'Save explanation'}
                     </button>
                   )}
@@ -412,20 +442,14 @@ export function TutorWorkspace({
               <p>
                 {r.sharing === 'window'
                   ? `Yoyo will capture ${r.sourceName} when you ask about it. No image has been analyzed yet.`
-                  : 'Open a course PDF and choose “Share this page”, or select a study window. Yoyo only analyzes images when you ask.'}
+                  : 'Open a saved PDF and choose “Share this page”, or select a study window. Yoyo only analyzes images when you ask.'}
               </p>
             </div>
           )}
           <div className="source-actions">
-            {chosen?.sourceRefs[0] && (
-              <button
-                className="button"
-                onClick={() =>
-                  onOpenPdf(chosen.sourceRefs[0].documentId, chosen.sourceRefs[0].page)
-                }
-              >
-                <BookOpen size={16} />
-                Open source PDF
+            {chosen && (
+              <button className="button" onClick={() => onOpenPdf(chosen.id, r.lecture?.page ?? 1)}>
+                Open lecture PDF
               </button>
             )}
             <button
@@ -439,7 +463,7 @@ export function TutorWorkspace({
           </div>
           {!r.config.vision && (
             <p className="privacy-caption source-note">
-              Add <code>OPENAI_API_KEY</code> to enable visual explanations.
+              Add <code>ANTHROPIC_API_KEY</code> to enable visual explanations.
             </p>
           )}
         </section>
@@ -463,7 +487,9 @@ export function TutorWorkspace({
                   <MessageSquare size={18} />
                   <span>
                     <strong>
-                      {data.topics.find((t) => t.id === s.topicId)?.title ?? 'Study session'}
+                      {data.documents.find((d) => d.id === s.documentId)?.originalName ??
+                        data.topics.find((t) => t.id === s.topicId)?.title ??
+                        'AI tutor'}
                     </strong>
                     <small>
                       {new Date(s.startedAt).toLocaleDateString()} ·{' '}
@@ -489,8 +515,8 @@ export function TutorWorkspace({
       {windows && (
         <Modal title="Share a study window" onClose={() => setWindows(null)}>
           <p className="share-consent">
-            Yoyo can capture this window while sharing is on. Images are sent to OpenAI only on an
-            analysis request. Browser and private-labelled windows are excluded; use the internal
+            Yoyo can capture this window while sharing is on. Images are sent to Anthropic only on
+            an analysis request. Browser and private-labelled windows are excluded; use the internal
             PDF viewer for browser documents.
           </p>
           <div className="window-choices">
@@ -513,7 +539,8 @@ export function TutorWorkspace({
             ) : (
               <p>
                 No eligible windows found. Open a study document in Preview or share a PDF inside
-                yoteach. If needed, enable Electron under macOS Screen Recording and restart.
+                yoteach. If needed, enable the app named by macOS under Screen Recording and
+                restart.
               </p>
             )}
           </div>

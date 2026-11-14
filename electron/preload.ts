@@ -11,7 +11,8 @@ const api: DesktopApi = {
   tutor: {
     get: () => ipcRenderer.invoke('tutor:get'),
     intent: (action) => ipcRenderer.invoke('tutor:intent', action),
-    start: (topicId, mode) => ipcRenderer.invoke('tutor:start', { topicId, mode }),
+    start: (topicId, mode, documentId, page) =>
+      ipcRenderer.invoke('tutor:start', { topicId, mode, documentId, page }),
     end: (id) => ipcRenderer.invoke('tutor:end', id),
     update: (patch) => ipcRenderer.invoke('tutor:update', patch),
     transcript: (sessionId, role, text, eventId) =>

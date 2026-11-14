@@ -43,8 +43,10 @@ export const AnnotationSchema = z.object({
 export type Annotation = z.infer<typeof AnnotationSchema>;
 export const StudySessionSchema = z.object({
   id: Uuid,
-  courseId: Uuid,
-  topicId: Uuid,
+  courseId: Uuid.nullable(),
+  topicId: Uuid.nullable(),
+  documentId: Uuid.nullable().default(null),
+  page: z.number().int().min(1).max(500).default(1),
   mode: z.enum(['voice', 'text']),
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable(),
@@ -60,8 +62,8 @@ export const MessageSchema = z.object({
 export const ExplanationSchema = z.object({
   id: Uuid,
   sessionId: Uuid,
-  courseId: Uuid,
-  topicId: Uuid,
+  courseId: Uuid.nullable(),
+  topicId: Uuid.nullable(),
   title: z.string().min(1).max(120),
   text: z.string().min(1).max(16000),
   source: z.object({ documentId: Uuid, page: z.number().int().positive() }).nullable(),
@@ -72,6 +74,8 @@ export type TutorMessage = z.infer<typeof MessageSchema>;
 export type Explanation = z.infer<typeof ExplanationSchema>;
 export type TutorRuntime = {
   sessionId: string | null;
+  lecturePreparing: boolean;
+  lecture: { documentId: string; page: number; total: number } | null;
   status: 'idle' | 'connecting' | 'connected' | 'paused' | 'error';
   mode: 'voice' | 'text';
   activity: 'idle' | 'listening' | 'thinking' | 'speaking' | 'pointing' | 'success' | 'error';
@@ -94,7 +98,7 @@ export const ToolSchema = z.discriminatedUnion('name', [
   }),
   z.object({ name: z.literal('highlight_screen_region'), snapshotId: Uuid, regionId: Uuid }),
   z.object({ name: z.literal('draw_annotation'), snapshotId: Uuid, regionId: Uuid, shape: Shape }),
-  z.object({ name: z.literal('open_topic'), topicId: Uuid }),
+  z.object({ name: z.literal('navigate_slide'), page: z.number().int().min(1).max(500) }),
   z.object({ name: z.literal('save_explanation'), title: z.string().trim().min(1).max(120) }),
   z.object({
     name: z.literal('record_learning_interaction'),
@@ -103,7 +107,14 @@ export const ToolSchema = z.discriminatedUnion('name', [
 ]);
 export type TutorTool = z.infer<typeof ToolSchema>;
 export const IntentSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('start'), topicId: Uuid, mode: z.enum(['voice', 'text']) }),
+  z.object({
+    type: z.literal('start'),
+    topicId: Uuid.nullable().default(null),
+    documentId: Uuid.optional(),
+    page: z.number().int().min(1).max(500).optional(),
+    mode: z.enum(['voice', 'text']),
+  }),
+  z.object({ type: z.literal('lecture-page'), page: z.number().int().min(1).max(500) }),
   z.object({ type: z.literal('text'), text: z.string().trim().min(1).max(2000) }),
   z.object({ type: z.literal('end') }),
   z.object({ type: z.literal('pause') }),
@@ -115,6 +126,7 @@ export const IntentSchema = z.discriminatedUnion('type', [
 export type TutorIntent = z.infer<typeof IntentSchema>;
 export const RuntimeUpdateSchema = z.object({
   sessionId: Uuid,
+  lecturePreparing: z.boolean().optional(),
   status: z.enum(['connecting', 'connected', 'paused', 'error']).optional(),
   activity: z
     .enum(['idle', 'listening', 'thinking', 'speaking', 'pointing', 'success', 'error'])
@@ -127,8 +139,10 @@ export interface TutorApi {
   get(): Promise<import('./model').Result<TutorRuntime>>;
   intent(action: TutorIntent): Promise<import('./model').Result<void>>;
   start(
-    topicId: string,
+    topicId: string | null,
     mode: 'voice' | 'text',
+    documentId?: string,
+    page?: number,
   ): Promise<import('./model').Result<{ id: string; signedUrl: string; context: string }>>;
   end(id: string): Promise<import('./model').Result<void>>;
   update(patch: RuntimeUpdate): Promise<import('./model').Result<void>>;

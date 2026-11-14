@@ -41,7 +41,7 @@ let workspace: BrowserWindow | null = null,
 let moveTimer: ReturnType<typeof setTimeout> | undefined;
 const pending = new Map<
   string,
-  { bytes: Uint8Array; name: string; courseId: string; created: number }
+  { bytes: Uint8Array; name: string; courseId: string | null; created: number }
 >();
 const base = dev ?? 'yoteach://app';
 function sendState() {
@@ -284,8 +284,10 @@ function registerHandlers() {
   handle(
     'pdf:pick',
     async (input) => {
-      const { courseId, sample } = z.object({ courseId: Id, sample: z.boolean() }).parse(input);
-      if (!store.snapshot().courses.some((c) => c.id === courseId))
+      const { courseId, sample } = z
+        .object({ courseId: Id.nullable(), sample: z.boolean() })
+        .parse(input);
+      if (courseId && !store.snapshot().courses.some((c) => c.id === courseId))
         throw new Error('Choose an existing course first.');
       for (const [key, value] of pending)
         if (Date.now() - value.created > 15 * 60 * 1000) pending.delete(key);

@@ -1,763 +1,312 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import {
-  ArrowLeft,
-  ArrowRight,
   BookOpen,
-  Check,
-  ChevronRight,
-  FolderOpen,
-  Home,
-  LoaderCircle,
-  Monitor,
-  Moon,
-  Plus,
-  Search,
+  MessageSquare,
   Settings,
   ShieldCheck,
-  Sun,
-  X,
+  Upload,
+  FileText,
+  ArrowRight,
 } from 'lucide-react';
-import type { AppState, Command, Course, SourceDocument, Topic } from '../shared/model';
+import type { AppState } from '../shared/model';
 import { api, unwrap } from './api';
-import type { loadPdf as LoadPdf } from './pdf';
-import { Dashboard } from './components/Dashboard';
-import { CourseWorkspace } from './components/CourseWorkspace';
+import { Companion } from './components/Companion';
+import { TutorWorkspace } from './components/TutorWorkspace';
 import { Modal } from './components/Modal';
+import { Yoyo } from './components/Yoyo';
+import { useTutor } from './tutor';
 const PdfViewer = lazy(() =>
   import('./components/PdfViewer').then((m) => ({ default: m.PdfViewer })),
 );
-import { Yoyo } from './components/Yoyo';
-import { Companion } from './components/Companion';
-import { TutorWorkspace } from './components/TutorWorkspace';
-import { useTutor } from './tutor';
-type EditModal =
-  | { kind: 'course'; course?: Course }
-  | { kind: 'topic'; topic?: Topic }
-  | { kind: 'delete'; entity: 'course' | 'topic' | 'document'; id: string; title: string }
-  | { kind: 'settings' };
 export default function App() {
-  const [study, setStudy] = useState(false);
-  const { runtime: tutor } = useTutor();
   const [data, setData] = useState<AppState | null>(null),
-    [fatal, setFatal] = useState(''),
+    [mode, setMode] = useState<'tutor' | 'lecture'>('tutor');
+  const [lectureId, setLectureId] = useState(''),
     [error, setError] = useState(''),
-    [notice, setNotice] = useState(''),
-    [courseId, setCourseId] = useState<string | null>(null),
-    [topicId, setTopicId] = useState<string | null>(null),
-    [query, setQuery] = useState(''),
-    [modal, setModal] = useState<EditModal | null>(null),
-    [viewer, setViewer] = useState<{ id: string; page: number } | null>(null),
-    [busy, setBusy] = useState(''),
-    [title, setTitle] = useState(''),
-    [color, setColor] = useState<Course['color']>('iris'),
-    [overview, setOverview] = useState(''),
-    [parentId, setParentId] = useState(''),
-    [formError, setFormError] = useState(''),
-    [saving, setSaving] = useState(false);
+    [busy, setBusy] = useState('');
+  const [settings, setSettings] = useState(false),
+    [saved, setSaved] = useState(false);
+  const [viewer, setViewer] = useState<{ id: string; page: number } | null>(null);
+  const { runtime: r } = useTutor();
   const companion = location.hash === '#/companion';
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-        e.preventDefault();
-        setModal({ kind: 'settings' });
-      }
-    };
-    addEventListener('keydown', handler);
-    return () => removeEventListener('keydown', handler);
-  }, []);
-  useEffect(() => {
     if (!api) {
-      setFatal('Open yoteach through npm run dev or npm start to connect the desktop workspace.');
+      setError('Launch the desktop app with npm run dev.');
       return;
     }
-    unwrap(api.getState())
+    void unwrap(api.getState())
       .then(setData)
-      .catch((e) => setFatal(e.message));
+      .catch((e) => setError(e.message));
     return api.onState(setData);
   }, []);
   useEffect(() => {
-    if (!data) return;
+    document.body.classList.toggle('companion-body', companion);
     const media = matchMedia('(prefers-color-scheme: dark)');
-    const apply = () => {
-      document.documentElement.dataset.theme =
-        data.settings.theme === 'system' ? (media.matches ? 'dark' : 'light') : data.settings.theme;
-    };
+    const apply = () =>
+      (document.documentElement.dataset.theme =
+        data?.settings.theme === 'system'
+          ? media.matches
+            ? 'dark'
+            : 'light'
+          : (data?.settings.theme ?? 'light'));
     apply();
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
   }, [data?.settings.theme]);
   useEffect(() => {
-    document.body.classList.toggle('companion-body', companion);
-  }, [companion]);
-  useEffect(() => {
-    if (!notice) return;
-    const t = setTimeout(() => setNotice(''), 5000);
-    return () => clearTimeout(t);
-  }, [notice]);
-  async function command(cmd: Command) {
-    const result = await unwrap(api.command(cmd));
-    setData(result);
-    return result;
-  }
-  function report(e: unknown) {
-    setError(e instanceof Error ? e.message : String(e));
-  }
-  function openCourse(id: string) {
-    setStudy(false);
-    setCourseId(id);
-    setTopicId(null);
-    setQuery('');
-  }
-  function openTopic(id: string) {
-    setStudy(false);
-    if (!id) {
-      setTopicId(null);
-      return;
-    }
-    const t = data?.topics.find((t) => t.id === id);
-    if (!t) return;
-    setCourseId(t.courseId);
-    setTopicId(id);
-    setQuery('');
-    void command({ type: 'topic.open', id }).catch(report);
-  }
-  useEffect(() => {
     if (!api || companion) return;
-    const off = api.tutor.onIntent((a) => {
+    return api.tutor.onIntent((a) => {
       if (a.type === 'open') {
-        setStudy(true);
-        setQuery('');
+        setMode(r?.lecture ? 'lecture' : 'tutor');
+        if (r?.lecture) setLectureId(r.lecture.documentId);
       }
     });
-    const nav = api.tutor.onNavigate((id) => openTopic(id));
-    return () => {
-      off();
-      nav();
-    };
-  }, [data, companion]);
-  function edit(next: EditModal) {
-    setFormError('');
-    setModal(next);
-    setTitle(
-      next.kind === 'course'
-        ? (next.course?.title ?? '')
-        : next.kind === 'topic'
-          ? (next.topic?.title ?? '')
-          : '',
-    );
-    setColor(next.kind === 'course' ? (next.course?.color ?? 'iris') : 'iris');
-    setOverview(next.kind === 'topic' ? (next.topic?.overview ?? '') : '');
-    setParentId(next.kind === 'topic' ? (next.topic?.parentId ?? '') : '');
-  }
-  async function saveForm(e: React.FormEvent) {
-    e.preventDefault();
-    if (!modal || saving) return;
-    setSaving(true);
-    setFormError('');
-    try {
-      if (modal.kind === 'course') {
-        const next = await command(
-          modal.course
-            ? { type: 'course.rename', id: modal.course.id, title }
-            : { type: 'course.create', title, color },
-        );
-        if (!modal.course) openCourse(next.courses.at(-1)!.id);
-        setNotice(
-          modal.course ? 'Course renamed.' : 'Your course is ready. Add a lecture PDF to begin.',
-        );
-      }
-      if (modal.kind === 'topic' && courseId) {
-        const next = await command(
-          modal.topic
-            ? {
-                type: 'topic.update',
-                id: modal.topic.id,
-                title,
-                overview,
-                parentId: parentId || null,
-              }
-            : { type: 'topic.create', courseId, title, parentId: parentId || null },
-        );
-        if (!modal.topic) {
-          const created = next.topics.at(-1)!;
-          setTopicId(created.id);
-          await command({ type: 'topic.open', id: created.id });
-        }
-        setNotice(modal.topic ? 'Topic saved.' : 'Topic added.');
-      }
-      if (modal.kind === 'delete') {
-        await command({ type: `${modal.entity}.delete` as 'course.delete', id: modal.id });
-        if (modal.entity === 'course') {
-          setCourseId(null);
-          setTopicId(null);
-        }
-        if (modal.entity === 'topic') setTopicId(null);
-        setNotice(
-          `${modal.entity === 'document' ? 'PDF' : modal.entity === 'topic' ? 'Topic' : 'Course'} removed.`,
-        );
-      }
-      setModal(null);
-    } catch (e) {
-      setFormError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-  async function importPdf(id: string, sample = false) {
-    if (busy) return;
+  }, [r?.lecture]);
+  async function importPdf(sample = false) {
     setBusy('Choose a lecture PDF…');
     setError('');
     let token: string | undefined;
-    let task: ReturnType<typeof LoadPdf> | undefined;
+    let task: ReturnType<(typeof import('./pdf'))['loadPdf']> | undefined;
     try {
-      const selected = await unwrap(api.pickPdf(id, sample));
+      const selected = await unwrap(api.pickPdf(null, sample));
       if (!selected) return;
       token = selected.token;
-      setBusy('Reading your PDF…');
       const { loadPdf, extractPdf } = await import('./pdf');
       task = loadPdf(selected.bytes);
-      const pdf = await task.promise;
-      const result = await extractPdf(pdf, (p, total) => setBusy(`Reading page ${p} of ${total}…`));
-      if (!result.headings.length)
-        result.headings.push({
-          title: selected.name.replace(/\.pdf$/i, '').slice(0, 120) || 'Lecture notes',
-          page: 1,
-          level: 1,
-        });
-      const next = await unwrap(api.finishImport({ token, courseId: id, ...result }));
-      setData(next);
-      setNotice(
-        result.organization === 'fallback'
-          ? 'PDF added. No headings found; edit the starter topic to organize it.'
-          : `PDF added. Roadmap created from ${result.organization === 'outline' ? 'bookmarks' : 'detected headings'}—review and edit as needed.`,
+      const result = await extractPdf(await task.promise, (p, total) =>
+        setBusy(`Reading page ${p} of ${total}…`),
       );
+      const next = await unwrap(api.finishImport({ token, courseId: null, ...result }));
+      setData(next);
+      setLectureId(next.documents.at(-1)!.id);
     } catch (e) {
-      report(e);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       if (token) await api.cancelImport(token);
       await task?.destroy();
       setBusy('');
     }
   }
-  async function addSample() {
-    if (busy) return;
-    try {
-      const existing = data?.courses.find((c) => c.title === 'Biochemistry · Sample');
-      const next = existing
-        ? data!
-        : await command({ type: 'course.create', title: 'Biochemistry · Sample', color: 'iris' });
-      const id = existing?.id ?? next.courses.at(-1)!.id;
-      openCourse(id);
-      await importPdf(id, true);
-    } catch (e) {
-      report(e);
-    }
-  }
-  if (fatal)
-    return (
-      <div className="launch-message">
-        <Yoyo />
-        <h1>Let’s open your workspace.</h1>
-        <p role="alert">{fatal}</p>
-      </div>
-    );
   if (!data)
     return (
       <div className="launch-message">
-        <LoaderCircle className="spin" />
-        <p>Opening your workspace…</p>
+        <Yoyo />
+        <p role="status">{error || 'Opening your workspace…'}</p>
       </div>
     );
   if (companion) return <Companion data={data} />;
-  const course = data.courses.find((c) => c.id === courseId),
-    topic = data.topics.find((t) => t.id === topicId),
-    viewDoc = data.documents.find((d) => d.id === viewer?.id),
-    matchingCourses = data.courses.filter((c) =>
-      c.title.toLowerCase().includes(query.toLowerCase()),
-    ),
-    matchingTopics = data.topics.filter((t) => t.title.toLowerCase().includes(query.toLowerCase()));
+  const doc = data.documents.find((d) => d.id === viewer?.id);
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="titlebar-space" />
-        <button
-          className="brand"
-          onClick={() => {
-            setStudy(false);
-            setCourseId(null);
-            setTopicId(null);
-            setQuery('');
-          }}
-          aria-label="yoteach home"
-        >
-          <span className="brand-symbol">
-            <span />
-            <span />
-          </span>
+        <button className="brand" aria-label="yoteach home" onClick={() => setMode('tutor')}>
           yoteach<span className="brand-period">.</span>
         </button>
         <nav className="primary-nav" aria-label="Main navigation">
           <button
-            className={!study && !courseId && !query ? 'active' : ''}
-            onClick={() => {
-              setStudy(false);
-              setCourseId(null);
-              setTopicId(null);
-              setQuery('');
-            }}
+            className={mode === 'tutor' ? 'active' : ''}
+            disabled={!!r?.sessionId && !!r.lecture}
+            onClick={() => setMode('tutor')}
           >
-            <Home size={18} />
-            Workspace
+            <MessageSquare size={18} />
+            AI tutor
           </button>
           <button
-            className={study ? 'active' : ''}
-            onClick={() => {
-              setStudy(true);
-              setQuery('');
-            }}
+            className={mode === 'lecture' ? 'active' : ''}
+            disabled={!!r?.sessionId && !r.lecture}
+            onClick={() => setMode('lecture')}
           >
             <BookOpen size={18} />
-            Study with Yoyo
+            Lecture walkthrough
           </button>
         </nav>
-        <div className="sidebar-section-title">
-          <span>Your courses</span>
-          <button
-            className="icon-button"
-            onClick={() => edit({ kind: 'course' })}
-            aria-label="Create course"
-          >
-            <Plus size={16} />
-          </button>
+        <div className="sidebar-empty">
+          A question or a whole lecture.
+          <br />A little more clarity.
         </div>
-        <nav className="course-nav" aria-label="Courses">
-          {data.courses.map((c) => (
-            <button
-              key={c.id}
-              className={!study && courseId === c.id ? 'active' : ''}
-              onClick={() => openCourse(c.id)}
-            >
-              <span className={`sidebar-course-dot course-${c.color}`} />
-              <span>{c.title}</span>
-              {courseId === c.id && <ChevronRight size={14} />}
-            </button>
-          ))}
-          {!data.courses.length && (
-            <p className="sidebar-empty">
-              Room for everything
-              <br />
-              you want to learn.
-            </p>
-          )}
-        </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-companion">
             <div className="mini-yoyo">
               <Yoyo />
             </div>
-            <div>
-              <strong>Yoyo is here.</strong>
-              <span>Your desktop companion</span>
-            </div>
+            <strong>Yoyo is here.</strong>
             <button
               className="icon-button"
               aria-label="Show Yoyo"
-              onClick={() => void unwrap(api.companion('show')).catch(report)}
+              onClick={() => void api.companion('show')}
             >
               <ArrowRight size={16} />
             </button>
           </div>
-          <button className="sidebar-setting" onClick={() => edit({ kind: 'settings' })}>
+          <button className="sidebar-setting" onClick={() => setSaved(true)}>
+            <FileText size={17} />
+            Saved material
+          </button>
+          <button className="sidebar-setting" onClick={() => setSettings(true)}>
             <Settings size={17} />
-            Settings<span>⌘ ,</span>
+            Settings
           </button>
           <div className="sidebar-local">
             <ShieldCheck size={13} />
-            On this Mac · Stage 2
+            Saved on this Mac
           </div>
         </div>
       </aside>
       <main className="main-shell">
         <header className="topbar">
-          <div className="breadcrumbs">
-            {study ? (
-              <>
-                <BookOpen size={16} />
-                <span>Study with Yoyo</span>
-              </>
-            ) : course ? (
-              <>
-                <button
-                  onClick={() => {
-                    setCourseId(null);
-                    setTopicId(null);
-                  }}
-                  aria-label="Back to workspace"
-                >
-                  <ArrowLeft size={17} />
-                </button>
-                <span>Workspace</span>
-                <ChevronRight size={14} />
-                <strong>{course.title}</strong>
-              </>
-            ) : (
-              <>
-                <FolderOpen size={16} />
-                <span>Learning workspace</span>
-              </>
-            )}
-          </div>
-          <div className="search-field">
-            <Search size={16} />
-            <input
-              aria-label="Search courses and topics"
-              placeholder="Find a course or topic"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {query && (
-              <button aria-label="Clear search" onClick={() => setQuery('')}>
-                <X size={15} />
-              </button>
-            )}
-          </div>
-          <button
-            className="topbar-yoyo"
-            onClick={() => void unwrap(api.companion('show')).catch(report)}
-          >
-            <span className="status-dot" />
+          <div className="breadcrumbs">{mode === 'tutor' ? 'AI tutor' : 'Lecture walkthrough'}</div>
+          <button className="topbar-yoyo" onClick={() => void api.companion('show')}>
             Show Yoyo
           </button>
         </header>
         <div className="main-scroll">
           {error && (
             <div className="banner error" role="alert">
-              <span>{error}</span>
-              <button
-                className="icon-button"
-                onClick={() => setError('')}
-                aria-label="Dismiss error"
-              >
-                <X size={16} />
-              </button>
+              {error}
+              <button onClick={() => setError('')}>Dismiss</button>
             </div>
           )}
           {busy && (
             <div className="banner import-progress" role="status">
-              <LoaderCircle className="spin" size={18} />
-              <span>{busy}</span>
-              <small>Keep yoteach open until import finishes.</small>
+              {busy}
             </div>
           )}
-          {query ? (
-            <section className="search-results page-enter">
-              <h1>Search your workspace</h1>
-              <p>Results for “{query}”</p>
-              {matchingCourses.length + matchingTopics.length === 0 ? (
-                <div className="quiet-empty">
-                  <Search size={30} />
-                  <h2>No matches yet.</h2>
-                  <p>Try a different course or topic name.</p>
-                </div>
-              ) : (
-                <>
-                  {matchingCourses.map((c) => (
-                    <button className="search-result" key={c.id} onClick={() => openCourse(c.id)}>
-                      <BookOpen size={20} />
-                      <span>
-                        <strong>{c.title}</strong>
-                        <small>Course</small>
-                      </span>
-                      <ChevronRight size={18} />
-                    </button>
-                  ))}
-                  {matchingTopics.map((t) => (
-                    <button className="search-result" key={t.id} onClick={() => openTopic(t.id)}>
-                      <FolderOpen size={20} />
-                      <span>
-                        <strong>{t.title}</strong>
-                        <small>
-                          {data.courses.find((c) => c.id === t.courseId)?.title} · Topic
-                        </small>
-                      </span>
-                      <ChevronRight size={18} />
-                    </button>
-                  ))}
-                </>
+          {mode === 'lecture' && !r?.sessionId && (
+            <section className="lecture-library glass">
+              <div>
+                <h1>Your lecture, explained.</h1>
+                <p>
+                  Upload your slides as a PDF. Yoyo teaches each slide and makes room for your
+                  questions.
+                </p>
+                <p className="privacy-caption">
+                  PDF only · Export PowerPoint or Keynote slides to PDF first.
+                </p>
+              </div>
+              <div className="source-actions">
+                <button
+                  className="button primary"
+                  disabled={!!busy}
+                  onClick={() => void importPdf()}
+                >
+                  <Upload size={17} />
+                  Upload lecture PDF
+                </button>
+                <button
+                  className="text-button"
+                  disabled={!!busy}
+                  onClick={() => void importPdf(true)}
+                >
+                  Try a sample lecture
+                </button>
+              </div>
+              {!!data.documents.length && (
+                <label>
+                  Choose your lecture
+                  <select
+                    aria-label="Choose your lecture"
+                    value={lectureId}
+                    onChange={(e) => setLectureId(e.target.value)}
+                  >
+                    <option value="">Select a PDF</option>
+                    {data.documents.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.originalName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {lectureId && (
+                <button
+                  className="text-button"
+                  onClick={() => setViewer({ id: lectureId, page: 1 })}
+                >
+                  Preview lecture slides
+                </button>
               )}
             </section>
-          ) : study ? (
+          )}
+          {(mode === 'tutor' || lectureId) && (
             <TutorWorkspace
+              key={mode}
               data={data}
-              onOpenTopic={openTopic}
+              lectureId={mode === 'lecture' ? lectureId : undefined}
               onOpenPdf={(id, page) => setViewer({ id, page })}
             />
-          ) : course ? (
-            <CourseWorkspace
-              data={data}
-              onStudy={() => {
-                setStudy(true);
-                setQuery('');
-              }}
-              course={course}
-              topicId={topicId}
-              onTopic={openTopic}
-              onAddTopic={() => edit({ kind: 'topic' })}
-              onEditTopic={(topic) => edit({ kind: 'topic', topic })}
-              onDeleteTopic={(t) =>
-                edit({ kind: 'delete', entity: 'topic', id: t.id, title: t.title })
-              }
-              onMoveTopic={(t, direction) =>
-                void command({ type: 'topic.move', id: t.id, direction }).catch(report)
-              }
-              onRenameCourse={() => edit({ kind: 'course', course })}
-              onDeleteCourse={() =>
-                edit({ kind: 'delete', entity: 'course', id: course.id, title: course.title })
-              }
-              onImport={() => void importPdf(course.id)}
-              onOpenPdf={(d, p = 1) => setViewer({ id: d.id, page: p })}
-              onDeletePdf={(d) =>
-                edit({ kind: 'delete', entity: 'document', id: d.id, title: d.originalName })
-              }
-              busy={!!busy}
-            />
-          ) : (
-            <Dashboard
-              data={data}
-              onCreate={() => edit({ kind: 'course' })}
-              onCourse={openCourse}
-              onTopic={openTopic}
-              onSample={() => void addSample()}
-              busy={!!busy}
-            />
           )}
-          <footer className="workspace-footer">
-            <span>A little clearer, every day.</span>
-            <span>yoteach · A little more clarity</span>
-          </footer>
         </div>
       </main>
-      {notice && (
-        <div className="toast" role="status">
-          <Check size={17} />
-          {notice}
-          <button
-            className="icon-button"
-            onClick={() => setNotice('')}
-            aria-label="Dismiss notification"
-          >
-            <X size={15} />
-          </button>
-        </div>
-      )}
-      {modal && (
-        <Modal
-          title={
-            modal.kind === 'course'
-              ? modal.course
-                ? 'Rename course'
-                : 'Make room for a new subject.'
-              : modal.kind === 'topic'
-                ? modal.topic
-                  ? 'Edit topic'
-                  : 'Add a topic'
-                : modal.kind === 'delete'
-                  ? `Remove ${modal.entity === 'document' ? 'PDF' : modal.entity}?`
-                  : 'Make yourself at home.'
-          }
-          onClose={() => {
-            if (!saving) setModal(null);
-          }}
-        >
-          {modal.kind === 'settings' ? (
-            <div className="settings-content">
-              <h3>Appearance</h3>
-              <p>Choose the light that works for you.</p>
-              <div className="theme-options">
-                {(
-                  [
-                    { id: 'light', label: 'Light', icon: Sun },
-                    { id: 'dark', label: 'Dark', icon: Moon },
-                    { id: 'system', label: 'System', icon: Monitor },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.id}
-                    className={data.settings.theme === t.id ? 'selected' : ''}
-                    aria-pressed={data.settings.theme === t.id}
-                    onClick={() =>
-                      void command({ type: 'settings.update', theme: t.id }).catch(report)
-                    }
-                  >
-                    <t.icon size={22} />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <h3>Tutoring connections</h3>
-              <p>
-                ElevenLabs: {tutor?.config.voice ? 'Configured' : 'Needs API key and agent ID'} ·
-                Vision: {tutor?.config.vision ? 'Configured' : 'Needs OpenAI key'}. Keys are loaded
-                from the app’s .env file at launch.
-              </p>
-              <h3>Desktop companion</h3>
-              <p>Drag Yoyo with the grip above its head. Click Yoyo to open session controls.</p>
+      {settings && (
+        <Modal title="Make yourself at home." onClose={() => setSettings(false)}>
+          <h3>Appearance</h3>
+          <div className="source-actions">
+            {(['system', 'light', 'dark'] as const).map((theme) => (
               <button
                 className="button"
+                key={theme}
                 onClick={() =>
-                  void unwrap(api.companion(data.settings.mascotVisible ? 'hide' : 'show')).catch(
-                    report,
-                  )
+                  void unwrap(api.command({ type: 'settings.update', theme })).then(setData)
                 }
               >
-                {data.settings.mascotVisible ? 'Hide Yoyo' : 'Show Yoyo'}
+                {theme[0].toUpperCase() + theme.slice(1)}
               </button>
-              <p className="settings-shortcut">Restore from the menu bar or press ⌘ ⇧ Y.</p>
-              <div className="settings-privacy">
-                <ShieldCheck size={22} />
-                <div>
-                  <strong>You choose what Yoyo sees.</strong>
-                  <p>
-                    Courses, PDFs, notes and transcripts are saved on this Mac. Study sessions send
-                    selected topic context to ElevenLabs. Explicitly shared images go to OpenAI on
-                    request. Pause or end a session to stop audio and sharing.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={saveForm} className="editor-form">
-              {modal.kind === 'delete' ? (
-                <>
-                  <p>
-                    Remove <strong>“{modal.title}”</strong>?
-                  </p>
-                  <p className="secondary">
-                    {modal.entity === 'course'
-                      ? 'This removes its topics, notes, study sessions, saved explanations and imported PDF copies from yoteach. Your original files stay where they are.'
-                      : modal.entity === 'topic'
-                        ? 'This removes the topic, its notes, study sessions and saved explanations. Subtopics move up one level. Source PDFs stay in your course.'
-                        : 'This removes the imported copy and its source links. Topics and your notes remain. Your original file stays where it is.'}
-                  </p>
-                  <p className="delete-warning">This action cannot be undone.</p>
-                </>
-              ) : (
-                <>
-                  <label>
-                    {modal.kind === 'course' ? 'Course name' : 'Topic title'}
-                    <input
-                      autoFocus
-                      required
-                      maxLength={120}
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder={
-                        modal.kind === 'course'
-                          ? 'e.g. Biochemistry'
-                          : 'e.g. Energy investment phase'
-                      }
-                    />
-                  </label>
-                  {modal.kind === 'course' && !modal.course && (
-                    <fieldset className="color-picker">
-                      <legend>Course colour</legend>
-                      {(['iris', 'cyan', 'rose', 'sage'] as const).map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          className={`color-option course-${c} ${color === c ? 'selected' : ''}`}
-                          aria-label={c}
-                          aria-pressed={color === c}
-                          onClick={() => setColor(c)}
-                        >
-                          {color === c && <Check size={17} />}
-                        </button>
-                      ))}
-                    </fieldset>
-                  )}
-                  {modal.kind === 'topic' && (
-                    <>
-                      <label>
-                        Place under
-                        <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
-                          <option value="">Course root</option>
-                          {data.topics
-                            .filter((t) => t.courseId === courseId && t.id !== modal.topic?.id)
-                            .map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.title}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                      {modal.topic && (
-                        <label>
-                          Your notes & overview
-                          <textarea
-                            rows={6}
-                            maxLength={20000}
-                            value={overview}
-                            onChange={(e) => setOverview(e.target.value)}
-                            placeholder="What should you remember? What do you want to ask?"
-                          />
-                        </label>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-              {formError && (
-                <p className="error-message" role="alert">
-                  {formError}
-                </p>
-              )}
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="button"
-                  disabled={saving}
-                  onClick={() => setModal(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`button ${modal.kind === 'delete' ? 'destructive' : 'primary'}`}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <>
-                      <LoaderCircle className="spin" size={16} />
-                      Saving…
-                    </>
-                  ) : modal.kind === 'delete' ? (
-                    'Remove'
-                  ) : modal.kind === 'course' ? (
-                    modal.course ? (
-                      'Save name'
-                    ) : (
-                      'Create course'
-                    )
-                  ) : modal.topic ? (
-                    'Save topic'
-                  ) : (
-                    'Add topic'
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
+            ))}
+          </div>
+          <p>
+            Microphone audio and conversation text go to ElevenLabs. Explicitly shared slide or
+            window images go to Anthropic for analysis. Transcripts and saved explanations stay on
+            this Mac; provider retention follows your account settings.
+          </p>
+          <p>
+            macOS may attribute development permissions to Electron or the terminal that launched
+            it. Internal PDFs do not require Screen Recording.
+          </p>
         </Modal>
       )}
-      {viewer && viewDoc && (
-        <Suspense
-          fallback={
-            <div className="toast" role="status">
-              Opening PDF…
-            </div>
-          }
-        >
-          <PdfViewer document={viewDoc} initialPage={viewer.page} onClose={() => setViewer(null)} />
+      {saved && (
+        <Modal title="Saved material" onClose={() => setSaved(false)}>
+          <div className="saved-material">
+            {data.documents.map((d) => (
+              <button
+                className="button"
+                key={d.id}
+                onClick={() => {
+                  setViewer({ id: d.id, page: 1 });
+                  setSaved(false);
+                }}
+              >
+                <FileText size={16} />
+                {d.originalName}
+              </button>
+            ))}
+            {data.explanations.map((e) => (
+              <article key={e.id}>
+                <h3>{e.title}</h3>
+                <p>{e.text}</p>
+              </article>
+            ))}
+            {data.topics
+              .filter((t) => t.overview)
+              .map((t) => (
+                <article key={t.id}>
+                  <h3>{t.title}</h3>
+                  <p>{t.overview}</p>
+                  <small>Preserved note from your previous workspace</small>
+                </article>
+              ))}
+            {!data.documents.length &&
+              !data.explanations.length &&
+              !data.topics.some((t) => t.overview) && (
+                <p>Your PDFs, saved explanations and preserved notes will appear here.</p>
+              )}
+          </div>
+        </Modal>
+      )}
+      {viewer && doc && (
+        <Suspense fallback={<p>Opening PDF…</p>}>
+          <PdfViewer document={doc} initialPage={viewer.page} onClose={() => setViewer(null)} />
         </Suspense>
       )}
     </div>

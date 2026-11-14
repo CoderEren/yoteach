@@ -1,12 +1,9 @@
-# User configuration for Stage 2
+# Local setup
 
-The local workspace and companion need no keys. Real tutoring needs:
+1. Use Node >=22.12. Run `npm install --cache ./work/npm-cache`.
+2. Keep the ignored `.env` local. Set `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ANTHROPIC_API_KEY`, and `VISION_MODEL=claude-sonnet-4-6`.
+3. Configure the existing hosted agent using `docs/STAGE-2-SETUP.md`. The system prompt and navigation tool changed.
+4. Run `npm run dev`, consent, and choose AI tutor or Lecture walkthrough.
+5. For a Finder-launched local app, run `npm run package:mac`. Its `.env` lives in the user-data directory; secrets are not included in the bundle.
 
-- `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` in the project-root `.env`.
-- An authenticated ElevenLabs agent with the six client tool definitions and supplied prompt.
-- `OPENAI_API_KEY` for visual analysis; optional `VISION_MODEL` (default `gpt-4.1-mini`).
-- Microphone access for voice; screen-recording access for external window sharing. Internal PDF sharing needs neither screen-recording permission nor the native helper.
-
-Read [the full setup and real-conversation checklist](docs/STAGE-2-SETUP.md). Keys were not present during development. Add them locally; do not paste secrets into chat or commit them.
-
-Xcode/Command Line Tools builds the optional macOS metadata helper for external document windows. This machine has Xcode. No Apple Developer account or signing setup is needed for this development build. No fal configuration is needed until Stage 3 is explicitly approved.
+Internal PDF sharing needs no Screen Recording permission. Development permissions may belong to Electron or its responsible terminal/IDE. Use the actual macOS prompt identity. See README for complete instructions and verification limits.

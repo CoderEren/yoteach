@@ -42,11 +42,16 @@ export class Store {
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, 'utf8'));
-        this.state = StateSchema.parse(
-          raw.version === 1
-            ? { ...raw, version: 2, sessions: [], messages: [], explanations: [] }
-            : raw,
-        );
+        if (raw.version === 1 || raw.version === 2) {
+          // Keep an exact pre-migration snapshot, including legacy notes and associations.
+          const backup = this.file + `.v${raw.version}.backup`;
+          if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
+          raw.version = 3;
+          raw.sessions ??= [];
+          raw.messages ??= [];
+          raw.explanations ??= [];
+        }
+        this.state = StateSchema.parse(raw);
         // A prior process cannot own a live session after relaunch.
         this.state.sessions.forEach((s) => {
           if (!s.endedAt) s.endedAt = new Date().toISOString();
@@ -79,7 +84,12 @@ export class Store {
     renameSync(temporary, this.file);
     this.state = valid;
   }
-  private activity(next: AppState, courseId: string, text: string, topicId: string | null = null) {
+  private activity(
+    next: AppState,
+    courseId: string | null,
+    text: string,
+    topicId: string | null = null,
+  ) {
     next.activities.unshift({
       id: randomUUID(),
       courseId,
@@ -210,9 +220,11 @@ export class Store {
         break;
     }
     if (!n.topics.some((t) => t.id === n.settings.lastTopicId)) n.settings.lastTopicId = null;
-    n.sessions = n.sessions.filter((s) => n.topics.some((t) => t.id === s.topicId));
+    n.sessions = n.sessions.filter((s) => !s.topicId || n.topics.some((t) => t.id === s.topicId));
     n.messages = n.messages.filter((m) => n.sessions.some((s) => s.id === m.sessionId));
-    n.explanations = n.explanations.filter((e) => n.topics.some((t) => t.id === e.topicId));
+    n.explanations = n.explanations.filter(
+      (e) => !e.topicId || n.topics.some((t) => t.id === e.topicId),
+    );
     n.explanations.forEach((e) => {
       if (e.source && !n.documents.some((d) => d.id === e.source!.documentId)) e.source = null;
     });
@@ -223,7 +235,7 @@ export class Store {
   importPdf(input: ImportPayload, originalName: string, bytes: Uint8Array) {
     const payload = ImportSchema.parse(input),
       n = this.snapshot();
-    this.course(n, payload.courseId);
+    if (payload.courseId) this.course(n, payload.courseId);
     if (
       payload.pages.some((p, i) => p.page !== i + 1) ||
       payload.headings.some((h) => h.page > payload.pages.length)
@@ -243,22 +255,6 @@ export class Store {
       organization: payload.organization,
       createdAt,
     });
-    let parents: { level: number; id: string }[] = [];
-    for (const h of payload.headings) {
-      while (parents.length && parents[parents.length - 1].level >= h.level) parents.pop();
-      const topicId = randomUUID();
-      n.topics.push({
-        id: topicId,
-        courseId: payload.courseId,
-        parentId: parents.at(-1)?.id ?? null,
-        title: h.title,
-        overview: '',
-        order: n.topics.length,
-        sourceRefs: [{ documentId: id, page: h.page }],
-        createdAt,
-      });
-      parents.push({ level: h.level, id: topicId });
-    }
     this.activity(n, payload.courseId, `Added ${originalName.slice(0, 220)}`);
     try {
       this.save(n);
@@ -283,13 +279,18 @@ export class Store {
     this.save(n);
     return this.snapshot();
   }
-  startSession(topicId: string, mode: 'voice' | 'text') {
-    const n = this.snapshot(),
-      t = this.topic(n, topicId);
+  startSession(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
+    const n = this.snapshot();
+    const t = topicId ? this.topic(n, topicId) : null;
+    const doc = documentId ? n.documents.find((d) => d.id === documentId) : null;
+    if (documentId && (!doc || page > doc.pageCount))
+      throw new Error('Choose an existing lecture and slide.');
     const session = StudySessionSchema.parse({
       id: randomUUID(),
-      courseId: t.courseId,
+      courseId: t?.courseId ?? doc?.courseId ?? null,
       topicId,
+      documentId: documentId ?? null,
+      page,
       mode,
       startedAt: new Date().toISOString(),
       endedAt: null,
@@ -297,6 +298,14 @@ export class Store {
     n.sessions.push(session);
     this.save(n);
     return session;
+  }
+  setSlide(id: string, page: number) {
+    const n = this.snapshot(),
+      s = n.sessions.find((s) => s.id === id && !s.endedAt);
+    const d = n.documents.find((d) => d.id === s?.documentId);
+    if (!s || !d || page < 1 || page > d.pageCount) throw new Error('That slide is unavailable.');
+    s.page = page;
+    this.save(n);
   }
   endSession(id: string) {
     const n = this.snapshot(),

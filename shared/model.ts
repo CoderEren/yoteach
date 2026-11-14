@@ -35,7 +35,7 @@ export const HeadingSchema = z.object({
 });
 export const DocumentSchema = z.object({
   id: Id,
-  courseId: Id,
+  courseId: Id.nullable(),
   originalName: z.string().max(240),
   filename: z.string().regex(/^[a-f0-9-]{36}\.pdf$/),
   pageCount: z.number().int().min(1).max(500),
@@ -51,13 +51,13 @@ export const SettingsSchema = z.object({
 });
 export const ActivitySchema = z.object({
   id: Id,
-  courseId: Id,
+  courseId: Id.nullable(),
   topicId: Id.nullable(),
   text: z.string().max(300),
   createdAt: Stamp,
 });
 export const StateSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   sessions: z.array(StudySessionSchema),
   messages: z.array(MessageSchema),
   explanations: z.array(ExplanationSchema),
@@ -101,10 +101,10 @@ export const CommandSchema = z.discriminatedUnion('type', [
 export type Command = z.infer<typeof CommandSchema>;
 export const ImportSchema = z.object({
   token: Id,
-  courseId: Id,
+  courseId: Id.nullable(),
   pages: z.array(PageSchema).min(1).max(500),
-  headings: z.array(HeadingSchema).max(100),
-  organization: DocumentSchema.shape.organization,
+  headings: z.array(HeadingSchema).max(100).default([]),
+  organization: DocumentSchema.shape.organization.default('fallback'),
 });
 export type ImportPayload = z.infer<typeof ImportSchema>;
 export type PendingImport = { token: string; name: string; bytes: Uint8Array };
@@ -113,7 +113,7 @@ export interface DesktopApi {
   tutor: TutorApi;
   getState(): Promise<Result<AppState>>;
   command(command: Command): Promise<Result<AppState>>;
-  pickPdf(courseId: string, sample?: boolean): Promise<Result<PendingImport | null>>;
+  pickPdf(courseId: string | null, sample?: boolean): Promise<Result<PendingImport | null>>;
   finishImport(payload: ImportPayload): Promise<Result<AppState>>;
   cancelImport(token: string): Promise<Result<void>>;
   readPdf(id: string): Promise<Result<Uint8Array>>;
@@ -121,7 +121,7 @@ export interface DesktopApi {
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
-  version: 2,
+  version: 3,
   sessions: [],
   messages: [],
   explanations: [],
