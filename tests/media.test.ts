@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { Store } from '../electron/store';
 import { Providers } from '../electron/providers';
 import { TutorService } from '../electron/tutor';
-import { FalClient } from '../electron/fal';
+import { FalClient, videoInput } from '../electron/fal';
 import { illustrationPrompt, isFalMediaUrl, sniffMedia } from '../shared/media';
 import { ToolSchema } from '../shared/tutor';
 
@@ -326,4 +326,16 @@ test('failed or cancelled generation saves nothing; v4 data migrates with an exa
   } finally {
     rmSync(w.dir, { recursive: true, force: true });
   }
+});
+
+test('video requests are bounded and silent for LTX 2.3; unknown models get only the prompt', () => {
+  assert.deepEqual(videoInput('fal-ai/ltx-2.3/text-to-video/fast', 'p'), {
+    prompt: 'p',
+    duration: 6,
+    resolution: '1080p',
+    aspect_ratio: '16:9',
+    generate_audio: false,
+    enable_safety_checker: true,
+  });
+  assert.deepEqual(videoInput('fal-ai/some/other-video', 'p'), { prompt: 'p' });
 });

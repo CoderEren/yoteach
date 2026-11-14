@@ -62,6 +62,22 @@ const wait = (ms: number, signal: AbortSignal) =>
     );
   });
 export class FalError extends Error {}
+/**
+ * Known video models get short, silent, bounded clips. Others receive only the prompt, the
+ * one field every fal text-to-video endpoint accepts.
+ */
+export function videoInput(model: string, prompt: string) {
+  if (model.startsWith('fal-ai/ltx-2.3/'))
+    return {
+      prompt,
+      duration: 6,
+      resolution: '1080p',
+      aspect_ratio: '16:9',
+      generate_audio: false,
+      enable_safety_checker: true,
+    };
+  return { prompt };
+}
 
 /** Main-process fal queue client. The key never leaves this process. */
 export class FalClient {
@@ -131,8 +147,22 @@ export class FalClient {
       throw new FalError(
         'fal could not find the configured model or request. Check FAL_IMAGE_MODEL and FAL_VIDEO_MODEL.',
       );
-    if (response.status === 422)
-      throw new FalError('fal could not accept this request. Try a simpler description.');
+    if (response.status === 422) {
+      // fal reports input validation here; name the field without echoing provider text.
+      let field = '';
+      try {
+        const body = (await response.json()) as { detail?: { loc?: unknown[] }[] };
+        const loc = body.detail?.[0]?.loc;
+        field = Array.isArray(loc) ? String(loc.at(-1) ?? '') : '';
+      } catch {
+        /* no structured detail */
+      }
+      throw new FalError(
+        !field || field === 'prompt'
+          ? 'fal could not accept this description. Try rewording it.'
+          : `fal rejected the “${field.replace(/[^\w-]/g, '').slice(0, 40)}” setting for this model. Check FAL_IMAGE_MODEL and FAL_VIDEO_MODEL.`,
+      );
+    }
     if (response.status === 429)
       throw new FalError('fal is rate limiting requests. Wait a moment and retry.');
     if (!response.ok)
@@ -222,7 +252,7 @@ export class FalClient {
     const input =
       kind === 'image'
         ? { prompt, image_size: 'landscape_4_3', num_images: 1, enable_safety_checker: true }
-        : { prompt };
+        : videoInput(model, prompt);
     const submitted = Submitted.safeParse(
       await this.call(
         `${QUEUE}/${model}`,
