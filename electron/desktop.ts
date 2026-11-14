@@ -48,9 +48,60 @@ export function installDesktop(options: {
       if (progress === 1) clearInterval(flight);
     }, 16);
   }
+  let stage: Electron.Rectangle | null = null;
+  /** The overlay is Yoyo's drawing surface on the user's screen; lectures draw in the app. */
+  function needsOverlay(r: TutorRuntime) {
+    if (r.lecture) return false;
+    const onScreen = r.snapshot?.source.kind === 'screen';
+    const marks =
+      onScreen && !!(r.focusRegion || r.drawing?.marks.length || r.drawing?.connections.length);
+    const lesson = !!r.activeLessonId && r.lessonSurface === 'screen';
+    const appLesson = !!r.activeLessonId && r.lessonSurface === 'app';
+    const media = !!r.generation && r.generation.origin === 'tutor' && !appLesson;
+    return marks || lesson || media || !!r.drawing?.diagram;
+  }
+  function syncOverlay(r: TutorRuntime) {
+    const layer = overlay();
+    if (!layer || layer.isDestroyed()) return;
+    layer.webContents.send('tutor:changed', r);
+    if (!needsOverlay(r)) {
+      stage = null;
+      if (layer.isVisible()) {
+        layer.setIgnoreMouseEvents(true, { forward: true });
+        layer.hide();
+      }
+      return;
+    }
+    const source = r.snapshot?.source;
+    // Grounded drawings must cover the captured display exactly; otherwise stay where we are.
+    const want =
+      source?.kind === 'screen' &&
+      screen
+        .getAllDisplays()
+        .some(
+          (d) =>
+            String(d.id) === source.id &&
+            d.bounds.x === source.bounds.x &&
+            d.bounds.y === source.bounds.y &&
+            d.bounds.width === source.bounds.width &&
+            d.bounds.height === source.bounds.height,
+        )
+        ? source.bounds
+        : (stage ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds);
+    if (
+      !stage ||
+      stage.x !== want.x ||
+      stage.y !== want.y ||
+      stage.width !== want.width ||
+      stage.height !== want.height
+    ) {
+      stage = want;
+      layer.setBounds(want);
+    }
+    if (!layer.isVisible()) layer.showInactive();
+  }
   function returnHome() {
     clearTimeout(returnTimer);
-    overlay()?.hide();
     pet()?.webContents.send('companion:pose', { direction: null });
     if (!dragging && pointed && home) {
       const area = screen.getDisplayNearestPoint(home).workArea;
@@ -112,10 +163,10 @@ export function installDesktop(options: {
   }
   function update(r: TutorRuntime) {
     keySettings();
+    syncOverlay(r);
     if (r.input === 'arming' || r.input === 'listening') {
       clearInterval(flight);
       clearTimeout(returnTimer);
-      overlay()?.hide();
       pet()?.webContents.send('companion:pose', { direction: null });
       focusKey = '';
       return;
@@ -151,10 +202,6 @@ export function installDesktop(options: {
           )
       )
         return;
-      const layer = overlay();
-      layer?.setBounds(area);
-      layer?.webContents.send('tutor:changed', r);
-      layer?.showInactive();
     } else if (snapshot.source.kind === 'pdf' && main()?.isFullScreen()) {
       const bounds = main()!.getContentBounds();
       area = fitImage(snapshot, { ...bounds, height: bounds.height - 76 });
@@ -175,7 +222,6 @@ export function installDesktop(options: {
       dragging = true;
       clearInterval(flight);
       clearTimeout(returnTimer);
-      overlay()?.hide();
       pet()?.webContents.send('companion:pose', { direction: null });
       pointed = false;
       const b = win.getBounds();

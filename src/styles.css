@@ -3550,3 +3550,241 @@ html:has(.companion-body),
     padding-left: 0;
   }
 }
+/* Yoyo drawing on the screen or slide: strokes draw in one after another. */
+.drawing-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.drawing-layer svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.drawing-layer .draw,
+.diagram-sketch .draw {
+  fill: none;
+  stroke: #6b5cdb;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  /* A pale halo keeps the ink readable on dark and busy backgrounds. */
+  paint-order: stroke;
+  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 3px rgba(255, 255, 255, 0.6));
+  animation: draw-in 0.55s ease-out forwards;
+}
+.drawing-layer .draw.fill {
+  fill: rgba(107, 92, 219, 0.16);
+  stroke-width: 2.5;
+}
+.drawing-layer .draw.dot {
+  fill: #6b5cdb;
+}
+.mark-label {
+  font:
+    650 17px/1 -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    sans-serif;
+  fill: #3f32a6;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: label-in 0.35s ease-out forwards;
+}
+.mark-label.small {
+  font-size: 12px;
+}
+@keyframes draw-in {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes label-in {
+  to {
+    opacity: 1;
+  }
+}
+.desktop-overlay {
+  overflow: hidden;
+}
+.screen-card {
+  position: absolute;
+  top: 72px;
+  width: min(440px, 34vw);
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  padding: 20px 22px;
+  pointer-events: auto;
+  display: grid;
+  gap: 12px;
+}
+.screen-card .practice-panel {
+  grid-template-columns: 1fr;
+  grid-template-areas: 'header' 'body' 'review';
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.screen-card .practice-review {
+  border-left: 0;
+  padding-left: 0;
+}
+.screen-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.screen-card-header h2 {
+  margin: 4px 0 0;
+  font-size: 19px;
+  line-height: 1.3;
+}
+.screen-card p {
+  margin: 0;
+  line-height: 1.55;
+  font-size: 14px;
+}
+.screen-card blockquote {
+  margin: 0;
+  border-left: 3px solid var(--iris);
+  padding-left: 12px;
+  color: var(--iris);
+  font-weight: 600;
+  font-size: 14px;
+}
+.screen-card-scene {
+  position: relative;
+  border-radius: 14px;
+  background: var(--iris-soft);
+  padding: 22px 10px 10px;
+}
+.screen-card-scene svg {
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+}
+.screen-card-scene input {
+  width: 100%;
+  accent-color: var(--iris);
+}
+.screen-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.screen-card .generation-panel {
+  margin-top: 0;
+}
+.screen-card .generated-media-frame,
+.screen-card .generated-media-frame img {
+  max-height: 200px;
+}
+.practice-voice {
+  margin-top: 12px !important;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--iris-soft);
+  color: var(--iris);
+}
+.screen-sketch {
+  position: absolute;
+  top: 90px;
+  max-width: 46vw;
+  pointer-events: auto;
+}
+.screen-card.right {
+  right: 28px;
+}
+.screen-card.left {
+  left: 28px;
+}
+.screen-sketch.low {
+  top: auto;
+  bottom: 90px;
+}
+.diagram-sketch svg {
+  max-width: 100%;
+  height: auto;
+}
+.screen-sketch.left {
+  left: 32px;
+}
+.screen-sketch.right {
+  right: 32px;
+}
+.diagram-sketch {
+  margin: 0;
+  padding: 14px 16px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(107, 92, 219, 0.25);
+  color: #1d2235;
+}
+.diagram-sketch figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-weight: 650;
+  font-size: 15px;
+  color: #3f32a6;
+  margin-bottom: 6px;
+}
+.diagram-sketch svg {
+  display: block;
+  max-height: 60vh;
+}
+.diagram-sketch .diagram-node .draw {
+  fill: rgba(237, 234, 253, 0.85);
+  stroke-width: 2.5;
+}
+.diagram-sketch .diagram-edge .draw {
+  stroke-width: 2.5;
+}
+.diagram-text {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font:
+    600 13px/1.25 -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    sans-serif;
+  color: #1d2235;
+  opacity: 0;
+  animation: label-in 0.35s ease-out forwards;
+}
+.screen-clear {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  pointer-events: auto;
+}
+.lecture-sketch {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  max-width: 44%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawing-layer .draw,
+  .diagram-sketch .draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .mark-label,
+  .diagram-text {
+    animation: none;
+    opacity: 1;
+  }
+}

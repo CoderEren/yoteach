@@ -55,10 +55,28 @@ Evidence:
 - New Electron demo journey "Stage 3 demo: lecture → visual lesson → fal media → practice misconception → saved restart" (fixture providers, real UI). Screenshots in ignored `.impeccable/review/`.
 - **Live Claude grading passed:** `claude-sonnet-4-6`, 4.9 s. The answer "…glycolysis nets four ATP overall" was graded partial, with `gross-as-net` grounded on the exact quote. Files `work/live-grade.ts` and `work/live-grade-result.json`.
 
+## Chunk 5 — Yoyo teaches on the user's screen
+
+Requested by the user on 14 Nov: drawing on the screen is the primary way to communicate. Outside the lecture, Yoyo should not bring the app window forward.
+
+Implemented:
+- The overlay window is now Yoyo's drawing surface over the display the question came from, or the display under the pointer. It is transparent and click-through (`setIgnoreMouseEvents(true, {forward:true})`); cards turn clicks on only while the pointer is over them (`overlay:interactive`). The overlay may use only a narrow channel list in `main.ts`. Capture already excludes every Yoteach window, so drawings never reach vision analysis.
+- `draw_on_screen(marks, connections, clear)`: circle, underline, box, arrow, highlight or point on grounded regionIds from the latest `analyze_current_screen`, with short labels and labelled arrows between regions. Strokes animate in sequence as if hand-drawn, with a halo for contrast. Invented regionIds are rejected. Yoyo flies beside the first mark. In a lecture the same marks draw on the slide.
+- `sketch_diagram(diagram)`: 2–7 nodes as a flow or cycle with labelled edges. `shared/drawing.ts` lays it out deterministically, so the model supplies no coordinates. It appears in free space and survives a new capture; grounded marks do not. `clear_screen()` clears both.
+- Lessons, practice and tutor-started images open as cards on the screen (`lessonSurface: 'screen'`). They have Prev/Next, Explain, Practice, the phosphate slider, option answers and visual-analogy generation. Written answers are spoken. Cards take the side of the screen without marks; the sketch takes the other side. Lectures, and lessons opened from the app, keep the in-app views (`lessonSurface: 'app'`). Practice results from a card reach the conversation through a main-process `inform` intent.
+- Held questions with a screen card open still capture the screen, and also send the card's lesson and practice context.
+- Prompt and tools: AI tutor mode now says to teach on the screen and draw first. The hosted agent is **synced**: 14 tools, all checks true, backup `work/agent-visual-1794688923826`.
+
+Evidence:
+- 36 unit tests (`tests/drawing.test.ts`: layout bounds and determinism, grounded-only marks, add/replace/clear, sketch surviving a new capture, screen vs app surfaces, no app focus).
+- Electron journey "Yoyo teaches on the screen…" replaces the old in-app agent-lesson test: capture → analyze → circle and label on the overlay → sketch → lesson card → Explain → Next → practice card with misconception → second capture with card context. The app window never gains focus. All 8 Electron journeys pass; packaged launch is skipped because no bundle exists on this Mac.
+- **Live hosted-agent check passed** (text session, no microphone or capture). Asked to "draw a quick diagram on my screen", Yoyo called `sketch_diagram` (Glucose → Cleavage & Oxidation → 2 Pyruvate, labelled −2 ATP / +4 ATP). Asked for the phosphate transfer step, it opened the lesson card on the screen at step 3; the app window stayed on the tutor page. Files `work/live-screen.mjs`, `work/live-screen-result.json`, `work/live-screen-*.png`.
+- Not verified live: drawing on a real captured screen (needs Screen Recording for this build and a spoken question), and real OS clicks on cards through the click-through layer. Playwright clicks bypass macOS hit-testing.
+
 ## Remaining
 
-- Live voice practice through the hosted agent (after syncing tools).
-- The user's next request (14 Nov): Yoyo should teach mainly by drawing on the user's screen rather than opening the app window. Only the lecture stays in the app's PDF view.
+- Live spoken practice through the hosted agent (the tools are synced; not exercised with a microphone).
+- A manual pass on a real Mac: hold the talk key over another app, ask about something visible, and confirm the drawing lands on it and the cards are clickable.
 
 Do not claim Stage 3 complete until the user reviews it. Keep the lecture launch page at two controls and preserve the two-mode workspace. No wake phrase was implemented; always-listening support remains deferred.
 

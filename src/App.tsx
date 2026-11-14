@@ -105,10 +105,10 @@ export default function App() {
       </div>
     );
   if (companion) return <Companion data={data} />;
-  if (overlay) return <DesktopOverlay />;
+  if (overlay) return <DesktopOverlay data={data} />;
   const lesson = data.lessons.find((l) => l.id === r?.activeLessonId);
   const media = data.media.find((m) => m.id === mediaId);
-  if (lesson)
+  if (lesson && r?.lessonSurface !== 'screen')
     return (
       <VisualLesson key={lesson.id} saved={lesson} media={data.media} attempts={data.attempts} />
     );

@@ -151,11 +151,17 @@ export function installTutor(
     const action = IntentSchema.parse(input);
     if (action.type === 'open') open();
     if (action.type === 'lesson-open') {
-      service.openLesson(action.savedId);
-      open();
+      const surface = action.surface ?? 'app';
+      service.openLesson(action.savedId, surface);
+      if (surface === 'app') open();
     }
+    if (action.type === 'screen-clear') service.clearDrawing();
     if (action.type === 'lesson-step') service.stepLesson(action.id, action.step);
-    if (action.type === 'practice-open') service.openPractice(action.question);
+    if (action.type === 'practice-open')
+      service.openPractice(
+        action.question,
+        service.state.activeLessonId ? service.state.lessonSurface : 'app',
+      );
     if (action.type === 'practice-close') service.closePractice();
     if (action.type === 'lesson-close') {
       if (service.state.practice) service.closePractice();
@@ -210,7 +216,11 @@ export function installTutor(
         !['arming', 'listening', 'sending'].includes(service.state.input)
       )
         throw new Error('Hold the talk key or Yoyo to capture your screen.');
-      if (service.state.lecture || service.state.activeLessonId) return;
+      if (
+        service.state.lecture ||
+        (service.state.activeLessonId && service.state.lessonSurface === 'app')
+      )
+        return;
       const id = service.state.sessionId,
         display = captureDisplay ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       service.stopSharing();

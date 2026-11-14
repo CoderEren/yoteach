@@ -498,8 +498,8 @@ test('authored visual lesson supports keyboard, manipulation, playback and saved
   }
 });
 
-test('agent opens and navigates a visual lesson while narration and held questions remain available', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yoteach-visual-voice-'));
+test('Yoyo teaches on the screen: draws on regions, sketches, and opens lesson and practice cards there', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-screen-'));
   let app: ElectronApplication | undefined;
   try {
     const boot = await launch(dir);
@@ -510,15 +510,75 @@ test('agent opens and navigates a visual lesson while narration and held questio
       window.yoteach.tutor.intent({ type: 'start', topicId: null, mode: 'voice' }),
     );
     await expect.poll(async () => (await runtime(page)).status).toBe('connected');
+    const layer = app.windows().find((w) => w.url().includes('/overlay'))!;
+    const overlayVisible = () =>
+      app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().includes('/overlay'))!
+          .isVisible(),
+      );
+    const workspaceFocused = () =>
+      app!.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().endsWith('#/'))!
+          .isFocused(),
+      );
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().endsWith('#/'))!
+        .blur(),
+    );
+    // A held question captures the screen; Yoyo analyzes it and draws on it.
+    const hold = page.getByRole('button', { name: 'Hold to speak', exact: true });
+    await hold.hover();
+    await page.mouse.down();
+    await expect.poll(async () => (await runtime(page)).input).toBe('listening');
+    await page.waitForTimeout(250);
+    await page.mouse.up();
+    await expect.poll(async () => (await runtime(page)).snapshot?.source.kind).toBe('screen');
+    const analysis = await provider.tool('analyze_current_screen', {
+      question: 'Where is the investment?',
+    });
+    const region = analysis.regions[0].regionId;
+    await provider.tool('draw_on_screen', {
+      marks: [{ regionId: region, shape: 'circle', label: 'ATP is spent here' }],
+      connections: [],
+      clear: true,
+    });
+    await expect.poll(overlayVisible).toBe(true);
+    await expect(layer.locator('.mark-circle ellipse')).toHaveCount(1);
+    await expect(layer.locator('.mark-label', { hasText: 'ATP is spent here' })).toBeVisible();
+    await provider.tool('sketch_diagram', {
+      diagram: {
+        title: 'Investment then payoff',
+        layout: 'flow',
+        nodes: [
+          { id: 'glucose', label: 'Glucose' },
+          { id: 'invest', label: '2 ATP invested' },
+          { id: 'payoff', label: '4 ATP made' },
+        ],
+        edges: [
+          { from: 'glucose', to: 'invest' },
+          { from: 'invest', to: 'payoff', label: 'net +2' },
+        ],
+      },
+    });
+    await expect(layer.getByRole('img', { name: 'Investment then payoff' })).toBeVisible();
+    await expect(layer.locator('.diagram-node')).toHaveCount(3);
+    // The lesson opens as a card on the screen, not in the app.
     const opened = await provider.tool('open_visual_lesson', {
       lesson: 'glucose-phosphorylation',
       step: 3,
     });
     expect(opened.scene).toBe('transfer');
-    await expect(page.getByRole('slider', { name: 'Phosphate transfer' })).toBeVisible();
+    await expect(
+      layer.getByRole('heading', { name: 'Follow the terminal phosphate' }),
+    ).toBeVisible();
+    await expect(layer.getByRole('slider', { name: 'Phosphate transfer' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
     await provider.tool('navigate_visual_lesson', { step: 4 });
-    await expect(page.getByRole('heading', { name: 'Meet the products' })).toBeVisible();
-    await page.getByRole('button', { name: 'Explain this step', exact: true }).click();
+    await expect(layer.getByRole('heading', { name: 'Meet the products' })).toBeVisible();
+    await layer.getByRole('button', { name: 'Explain', exact: true }).click();
     await expect
       .poll(() =>
         provider.messages.some(
@@ -526,42 +586,54 @@ test('agent opens and navigates a visual lesson while narration and held questio
         ),
       )
       .toBe(true);
-    const button = page.getByRole('button', { name: 'Hold to speak', exact: true });
-    await button.hover();
+    await layer.getByRole('button', { name: 'Next step', exact: true }).click();
+    await expect(
+      layer.getByRole('heading', { name: 'Retain and prepare the sugar' }),
+    ).toBeVisible();
+    // Practice on the same card; a written question is answered aloud.
+    await provider.tool('ask_practice_question', { question: 'energy-source' });
+    await expect(
+      layer.getByRole('heading', { name: /Why is phosphorylating glucose/ }),
+    ).toBeVisible();
+    await expect(layer.getByText(/Hold your talk key or Yoyo and say your answer/)).toBeVisible();
+    await layer.getByRole('tab', { name: 'Question 5' }).click();
+    await layer.getByLabel('Four ATP').check();
+    await layer.getByRole('button', { name: 'Check answer', exact: true }).click();
+    await expect(
+      layer.getByText('Possible misconception: Glycolysis nets four ATP per glucose.').first(),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        provider.messages.some(
+          (m) => m.type === 'contextual_update' && String(m.text).includes('practice question'),
+        ),
+      )
+      .toBe(true);
+    mkdirSync('.impeccable/review', { recursive: true });
+    await layer.screenshot({ path: '.impeccable/review/on-screen-teaching.png' });
+    // A held question with the card open captures the screen and includes the card context.
+    const captures = await app.evaluate(() => (globalThis as any).__captures ?? 0);
+    await hold.hover();
     await page.mouse.down();
     await expect.poll(async () => (await runtime(page)).input).toBe('listening');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(250);
     await page.mouse.up();
-    await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
-    await expect.poll(async () => (await runtime(page)).input).toBe('idle');
-    expect(await app.evaluate(() => (globalThis as any).__captures ?? 0)).toBe(0);
-    await page.getByRole('button', { name: 'Stop voice', exact: true }).click();
-    await expect.poll(async () => (await runtime(page)).sessionId).toBeNull();
-    await expect(page.getByRole('heading', { name: 'Meet the products' })).toBeVisible();
-    const narrationRequests = () =>
-      provider.messages.filter(
-        (m) => m.type === 'user_message' && m.text.includes('visual lesson step'),
-      ).length;
-    const before = narrationRequests();
-    await app.evaluate(() => {
-      const original = globalThis.fetch;
-      globalThis.fetch = async (...args) => {
-        if (String(args[0]).includes('get-signed-url'))
-          await new Promise<void>((resolve) => {
-            (globalThis as any).__resumeAuth = resolve;
-          });
-        return original(...args);
-      };
-    });
-    await page.getByRole('button', { name: 'Explain this step', exact: true }).click();
     await expect
-      .poll(() => app!.evaluate(() => typeof (globalThis as any).__resumeAuth))
-      .toBe('function');
-    await page.getByRole('button', { name: 'Back to tutor', exact: true }).click();
-    await app.evaluate(() => (globalThis as any).__resumeAuth());
-    await expect.poll(async () => (await runtime(page)).status).toBe('connected');
-    await page.waitForTimeout(150);
-    expect(narrationRequests()).toBe(before);
+      .poll(() => app!.evaluate(() => (globalThis as any).__captures ?? 0))
+      .toBe(captures + 1);
+    await expect
+      .poll(() =>
+        provider.messages.some(
+          (m) =>
+            m.type === 'contextual_update' && String(m.text).includes('lesson card is also open'),
+        ),
+      )
+      .toBe(true);
+    expect(await workspaceFocused()).toBe(false);
+    await layer.getByRole('button', { name: 'Back to lesson' }).first().click();
+    await layer.getByRole('button', { name: 'Close lesson', exact: true }).click();
+    await provider.tool('clear_screen');
+    await expect.poll(overlayVisible).toBe(false);
     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'end' }));
   } finally {
     await app?.close();

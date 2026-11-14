@@ -13,6 +13,7 @@ import { Store } from './store';
 import { Providers, type VisionAnswer } from './providers';
 import { FalClient } from './fal';
 import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
+import type { ScreenDrawing } from '../shared/drawing';
 import {
   AnswerSchema,
   QuestionId,
@@ -69,6 +70,8 @@ export class TutorService {
   ) {
     this.state = {
       activeLessonId: null,
+      lessonSurface: 'app',
+      drawing: null,
       sessionId: null,
       lecture: null,
       lecturePreparing: false,
@@ -138,8 +141,8 @@ export class TutorService {
       note: 'Review items come only from the latest answer to each question, never from time spent.',
     };
   }
-  openPractice(id?: string) {
-    if (!this.state.activeLessonId) this.openLesson();
+  openPractice(id?: string, surface: 'screen' | 'app' = 'app') {
+    if (!this.state.activeLessonId) this.openLesson(undefined, surface);
     // Questions whose latest answer needs review come first, then unanswered ones.
     const attempts = this.store.snapshot().attempts;
     const latest = (q: string) => attempts.filter((a) => a.questionId === q).at(-1);
@@ -166,7 +169,8 @@ export class TutorService {
     let answer = AnswerSchema.parse(raw);
     if (this.state.practice?.checking)
       throw new Error('The previous answer is still being checked.');
-    if (!this.state.activeLessonId) this.openLesson();
+    if (!this.state.activeLessonId)
+      this.openLesson(undefined, origin === 'tutor' ? this.surface() : 'app');
     const lessonId = this.state.activeLessonId;
     // A spoken or typed option counts as choosing it.
     if (answer.kind === 'text' && q.choices) {
@@ -227,10 +231,16 @@ export class TutorService {
     const lesson = this.store.snapshot().lessons.find((l) => l.id === this.state.activeLessonId);
     return lesson ? lessonContext(lesson) : null;
   }
-  openLesson(savedId?: string) {
+  /** Lectures stay in the app; everything else is taught on the user's screen. */
+  surface(): 'screen' | 'app' {
+    return this.state.lecture ? 'app' : 'screen';
+  }
+  openLesson(savedId?: string, surface: 'screen' | 'app' = 'app') {
     const lesson = this.store.openLesson('glucose-phosphorylation', this.state.sessionId, savedId);
-    this.stopSharing(false);
+    // Screen lessons keep the current screen grounding; the authored card does not replace it.
+    if (surface === 'app') this.stopSharing(false);
     this.state.activeLessonId = lesson.id;
+    this.state.lessonSurface = surface;
     this.emit();
     return this.lessonContext();
   }
@@ -385,6 +395,7 @@ export class TutorService {
     if (id && id !== this.state.sessionId) return;
     if (this.state.sessionId) this.store.endSession(this.state.sessionId);
     this.stopSharing(false);
+    this.state.drawing = null;
     Object.assign(this.state, {
       sessionId: null,
       lecture: null,
@@ -406,9 +417,19 @@ export class TutorService {
     this.store.addMessage(sessionId, role, text, eventId);
     this.emit();
   }
+  clearDrawing() {
+    this.state.drawing = null;
+    this.state.focusRegion = null;
+    this.emit();
+  }
   stopSharing(emit = true) {
     this.abort?.abort();
     this.abort = undefined;
+    // Grounded marks die with their snapshot; a concept diagram does not depend on one.
+    const d = this.state.drawing;
+    this.state.drawing = d?.diagram
+      ? { ...d, snapshotId: null, marks: [], connections: [], revision: d.revision + 1 }
+      : null;
     if (['thinking', 'pointing'].includes(this.state.activity))
       this.state.activity = this.state.mic ? 'listening' : 'idle';
     Object.assign(this.state, {
@@ -476,8 +497,9 @@ export class TutorService {
     const tool = ToolSchema.parse(input);
     switch (tool.name) {
       case 'open_visual_lesson': {
-        this.openLesson();
-        this.openWorkspace();
+        const surface = this.surface();
+        this.openLesson(undefined, surface);
+        if (surface === 'app') this.openWorkspace();
         return this.stepLesson(this.state.activeLessonId!, tool.step);
       }
       case 'navigate_visual_lesson': {
@@ -495,14 +517,22 @@ export class TutorService {
         };
       }
       case 'ask_practice_question': {
-        this.openWorkspace();
+        const shown = this.openPractice(
+          tool.question,
+          this.state.activeLessonId ? this.state.lessonSurface : this.surface(),
+        );
+        if (this.state.lessonSurface === 'app') this.openWorkspace();
         return {
-          ...this.openPractice(tool.question),
+          ...shown,
           note: 'The question is now shown. Ask it in your own short words, wait for the student, then call record_practice_attempt with their answer verbatim. Do not reveal the answer first.',
         };
       }
       case 'record_practice_attempt': {
-        if (this.state.practice?.questionId !== tool.question) this.openPractice(tool.question);
+        if (this.state.practice?.questionId !== tool.question)
+          this.openPractice(
+            tool.question,
+            this.state.activeLessonId ? this.state.lessonSurface : this.surface(),
+          );
         const a = await this.answerPractice(
           tool.question,
           { kind: 'text', text: tool.answer },
@@ -524,6 +554,82 @@ export class TutorService {
               : 'Saved locally. Explain kindly using the feedback and correction; call any misconception possible, cite their words, and suggest the review step. Never call it mastery.',
         };
       }
+      case 'draw_on_screen': {
+        const snapshot = this.state.snapshot;
+        if (!snapshot || this.state.sharing === 'off')
+          throw new Error(
+            'Nothing on screen is grounded yet. Call analyze_current_screen with the question first, then draw on its regions.',
+          );
+        if (!tool.marks.length && !tool.connections.length)
+          throw new Error('Give at least one mark or connection.');
+        const region = (id: string) => {
+          const found = this.state.annotations.find((a) => a.id === id);
+          if (!found)
+            throw new Error(
+              'Use regionIds returned by the latest analyze_current_screen. Never invent regions.',
+            );
+          return found;
+        };
+        const previous =
+          !tool.clear && this.state.drawing?.snapshotId === snapshot.id ? this.state.drawing : null;
+        const drawing: ScreenDrawing = {
+          id: randomUUID(),
+          snapshotId: snapshot.id,
+          marks: [
+            ...(previous?.marks ?? []),
+            ...tool.marks.map((m) => ({
+              id: randomUUID(),
+              regionId: m.regionId,
+              shape: m.shape,
+              label: m.label ?? null,
+              box: region(m.regionId).box,
+            })),
+          ],
+          connections: [
+            ...(previous?.connections ?? []),
+            ...tool.connections.map((c) => ({
+              id: randomUUID(),
+              from: region(c.from).box,
+              to: region(c.to).box,
+              label: c.label ?? null,
+            })),
+          ],
+          diagram: this.state.drawing?.diagram ?? null,
+          revision: (this.state.drawing?.revision ?? 0) + 1,
+        };
+        this.state.drawing = drawing;
+        const first = tool.marks[0]?.regionId ?? tool.connections[0]?.to;
+        this.state.focusRegion = first;
+        this.state.focusRevision++;
+        this.state.activity = 'pointing';
+        this.emit();
+        return {
+          drawn: drawing.marks.length + drawing.connections.length,
+          where:
+            snapshot.source.kind === 'pdf' ? 'on the lecture slide' : 'on the student’s screen',
+          note: 'Drawn with a short animation. Refer to it naturally while you explain.',
+        };
+      }
+      case 'sketch_diagram': {
+        const current = this.state.drawing;
+        this.state.drawing = {
+          id: randomUUID(),
+          snapshotId: current?.snapshotId ?? null,
+          marks: current?.marks ?? [],
+          connections: current?.connections ?? [],
+          diagram: tool.diagram,
+          revision: (current?.revision ?? 0) + 1,
+        };
+        this.emit();
+        return {
+          shown: true,
+          where: this.state.lecture ? 'over the lecture slide' : 'on the student’s screen',
+          note: 'The app laid it out and is drawing it now. Walk through it node by node.',
+        };
+      }
+      case 'clear_screen':
+        this.clearDrawing();
+        return { cleared: true };
       case 'analyze_current_screen': {
         const snapshot = this.state.snapshot;
         if (!snapshot || this.state.sharing === 'off')
@@ -566,7 +672,7 @@ export class TutorService {
               evidence: a.evidence,
               precision: a.precision,
             })),
-            note: 'Call highlight_screen_region or draw_annotation to point out a grounded region on the screen. Vision-estimated regions are approximate.',
+            note: 'Teach by drawing: call draw_on_screen with these regionIds (circle, underline, box, arrow, highlight, point, short labels, connections between regions) while you explain. Vision-estimated regions are approximate.',
           };
         } catch (e) {
           if (!ctl.signal.aborted && epoch === this.state.epoch) {

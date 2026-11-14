@@ -3,6 +3,7 @@ import { useTutor } from '../tutor';
 import { AnnotationLayer } from './TutorWorkspace';
 import { HoldButton } from './HoldButton';
 import { GenerationPanel } from './GeneratedMedia';
+import { DiagramSketch, DrawingLayer } from './DesktopOverlay';
 import type { GeneratedMedia } from '../../shared/media';
 export function LectureStage({ media }: { media: GeneratedMedia[] }) {
   const { runtime: r, act } = useTutor();
@@ -27,10 +28,23 @@ export function LectureStage({ media }: { media: GeneratedMedia[] }) {
             }}
           >
             <img src={snapshot.image} alt={`Lecture slide ${r.lecture.page}`} />
-            <AnnotationLayer annotations={r.annotations.filter((a) => a.id === r.focusRegion)} />
+            <AnnotationLayer
+              annotations={r.annotations.filter(
+                (a) => a.id === r.focusRegion && !r.drawing?.marks.some((m) => m.regionId === a.id),
+              )}
+            />
+            <DrawingLayer drawing={r.drawing?.snapshotId === snapshot.id ? r.drawing : null} />
           </div>
         ) : (
           <p role="status">Preparing slide {r.lecture.page}…</p>
+        )}
+        {r.drawing?.diagram && (
+          <aside className="lecture-sketch">
+            <DiagramSketch
+              diagram={r.drawing.diagram}
+              onClose={() => void act({ type: 'screen-clear' })}
+            />
+          </aside>
         )}
         {r.generation && (
           <aside className="lecture-generation glass">

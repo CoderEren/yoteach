@@ -1,0 +1,79 @@
+{
+  "type": "client",
+  "name": "draw_on_screen",
+  "description": "Draw on the student's screen (or the lecture slide) over regions returned by the latest analyze_current_screen: circle, underline, box, arrow, highlight or point, with short labels and labelled arrows between regions. Animated like hand drawing. Use it while you explain. Never invent regionIds.",
+  "expects_response": true,
+  "response_timeout_secs": 10,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "marks": {
+        "type": "array",
+        "description": "Up to 8 marks.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "regionId": {
+              "type": "string",
+              "description": "A regionId returned by the latest analyze_current_screen."
+            },
+            "shape": {
+              "type": "string",
+              "enum": [
+                "highlight",
+                "circle",
+                "underline",
+                "box",
+                "arrow",
+                "point"
+              ],
+              "description": "How to mark the region."
+            },
+            "label": {
+              "type": "string",
+              "description": "Optional few-word label, up to 60 characters."
+            }
+          },
+          "required": [
+            "regionId",
+            "shape"
+          ]
+        }
+      },
+      "connections": {
+        "type": "array",
+        "description": "Up to 6 labelled arrows between two regions.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "description": "A regionId returned by the latest analyze_current_screen."
+            },
+            "to": {
+              "type": "string",
+              "description": "A regionId returned by the latest analyze_current_screen."
+            },
+            "label": {
+              "type": "string",
+              "description": "Optional label, up to 40 characters."
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        }
+      },
+      "clear": {
+        "type": "boolean",
+        "description": "true replaces your previous drawing; false adds to it."
+      }
+    },
+    "required": [
+      "marks",
+      "connections",
+      "clear"
+    ]
+  }
+}

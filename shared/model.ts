@@ -132,6 +132,8 @@ export interface PracticeApi {
   remove(id: string): Promise<Result<void>>;
 }
 export interface DesktopApi {
+  /** Only the on-screen layer uses this: make the area under the pointer clickable. */
+  overlay: { interactive(on: boolean): Promise<Result<void>> };
   tutor: TutorApi;
   media: MediaApi;
   practice: PracticeApi;

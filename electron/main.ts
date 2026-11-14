@@ -201,6 +201,18 @@ function updateTray() {
     ]),
   );
 }
+// The on-screen layer may read state, change the lesson/practice it shows, and toggle clicks.
+const overlayChannels = new Set([
+  'workspace:get',
+  'tutor:get',
+  'tutor:intent',
+  'overlay:interactive',
+  'practice:answer',
+  'media:generate',
+  'media:cancel',
+  'media:dismiss',
+  'media:read',
+]);
 function registerHandlers() {
   function handle(channel: string, fn: (input: any) => unknown, workspaceOnly = false) {
     ipcMain.handle(channel, async (event, input) => {
@@ -212,8 +224,8 @@ function registerHandlers() {
           !frame ||
           frame !== event.sender.mainFrame ||
           ![workspace, companion, overlay].includes(owner) ||
-          (owner === overlay && !['workspace:get', 'tutor:get'].includes(channel)) ||
-          (workspaceOnly && owner !== workspace)
+          (owner === overlay && !overlayChannels.has(channel)) ||
+          (workspaceOnly && owner !== workspace && owner !== overlay)
         )
           throw new Error('This action is not available in this window.');
         const url = new URL(frame.url);
@@ -246,6 +258,10 @@ function registerHandlers() {
     resolve(here, '..'),
   );
   handle('workspace:get', () => store.snapshot());
+  handle('overlay:interactive', (input) => {
+    // Click-through everywhere except over a card the pointer is on.
+    overlay?.setIgnoreMouseEvents(!z.boolean().parse(input), { forward: true });
+  });
   handle(
     'workspace:command',
     (input) => {
@@ -444,7 +460,7 @@ else {
     overlay.on('closed', () => {
       overlay = null;
     });
-    overlay.setIgnoreMouseEvents(true);
+    overlay.setIgnoreMouseEvents(true, { forward: true });
     overlay.setAlwaysOnTop(true, 'floating');
     overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     load(overlay, '/overlay');

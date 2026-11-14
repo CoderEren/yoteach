@@ -169,6 +169,10 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   }
   async function handle(action: TutorIntent) {
     if (action.type === 'open') return;
+    if (action.type === 'inform') {
+      voice.current?.sendContextualUpdate(action.text);
+      return;
+    }
     if (
       action.type === 'lesson-open' ||
       action.type === 'lesson-step' ||
@@ -242,7 +246,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
           mic: turn.held,
           activity: turn.held ? 'listening' : 'thinking',
         });
-        if (live.current?.activeLessonId) {
+        if (live.current?.activeLessonId && live.current.lessonSurface === 'app') {
           const saved = (await unwrap(api.getState())).lessons.find(
             (l) => l.id === live.current?.activeLessonId,
           );
@@ -256,8 +260,21 @@ export function TutorProvider({ children }: { children: ReactNode }) {
             await unwrap(api.tutor.captureScreen());
             if (turn.cancelled) return;
             voice.current?.sendContextualUpdate(
-              'A fresh still of the current screen was captured for this held question. Discard previous screen regions. Use analyze_current_screen with the question before explaining or pointing at visible content.',
+              'A fresh still of the current screen was captured for this held question. Discard previous screen regions. Use analyze_current_screen with the question before explaining or pointing at visible content, then draw_on_screen on its regions.',
             );
+            const onScreen = live.current?.activeLessonId
+              ? (await unwrap(api.getState())).lessons.find(
+                  (l) => l.id === live.current?.activeLessonId,
+                )
+              : undefined;
+            if (onScreen && !turn.cancelled)
+              voice.current?.sendContextualUpdate(
+                'The authored lesson card is also open on the screen: ' +
+                  JSON.stringify(lessonContext(onScreen)) +
+                  (live.current?.practice
+                    ? ` A practice question is showing: ${live.current.practice.questionId}. If this is the student's answer, record it with record_practice_attempt.`
+                    : ''),
+              );
           } catch {
             if (turn.cancelled) return;
             voice.current?.sendContextualUpdate(
@@ -357,6 +374,9 @@ export function TutorProvider({ children }: { children: ReactNode }) {
             [
               'open_visual_lesson',
               'navigate_visual_lesson',
+              'draw_on_screen',
+              'sketch_diagram',
+              'clear_screen',
               'generate_illustration',
               'ask_practice_question',
               'record_practice_attempt',

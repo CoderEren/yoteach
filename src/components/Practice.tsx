@@ -50,11 +50,14 @@ export function ReviewList({
 export function PracticePanel({
   attempts,
   onReview,
+  voiceOnly = false,
 }: {
   attempts: PracticeAttempt[];
   onReview: (step: number) => void;
+  /** On-screen cards cannot take keyboard focus: written answers are spoken. */
+  voiceOnly?: boolean;
 }) {
-  const { runtime: r, act, inform } = useTutor();
+  const { runtime: r, act } = useTutor();
   const id = r?.practice?.questionId ?? practice[0].id,
     q = find(id),
     checking = !!r?.practice?.checking;
@@ -82,8 +85,10 @@ export function PracticePanel({
       );
       setChoice('');
       setText('');
-      inform(
-        'The student answered a practice question in the app (study data): ' +
+      void act({
+        type: 'inform',
+        text:
+          'The student answered a practice question in the app (study data): ' +
           JSON.stringify({
             question: q.prompt,
             verdict: attempt.verdict,
@@ -94,7 +99,7 @@ export function PracticePanel({
             })),
           }) +
           ' The feedback is already on screen; add at most one short spoken sentence if helpful.',
-      );
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -157,6 +162,10 @@ export function PracticePanel({
                 </label>
               ))}
             </fieldset>
+          ) : voiceOnly ? (
+            <p className="practice-voice">
+              Hold your talk key or Yoyo and say your answer. Yoyo checks and saves it here.
+            </p>
           ) : (
             <>
               <label htmlFor="practice-answer" className="sr-only">
@@ -173,7 +182,7 @@ export function PracticePanel({
               />
             </>
           )}
-          <div className="practice-actions">
+          <div className="practice-actions" hidden={voiceOnly && !q.choices}>
             <button
               className="button primary"
               disabled={checking || (q.choices ? !choice : !text.trim())}

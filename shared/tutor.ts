@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { LessonKey, LessonStep } from './lessons';
 import { MediaKind, Subject, type Generation } from './media';
 import { QuestionId } from './practice';
+import { ConnectionSchema, DiagramSchema, MarkSchema, type ScreenDrawing } from './drawing';
 const Uuid = z.uuid();
 export const Shape = z.enum(['highlight', 'arrow', 'circle', 'point', 'label']);
 export const Box = z
@@ -88,6 +89,9 @@ export type TutorMessage = z.infer<typeof MessageSchema>;
 export type Explanation = z.infer<typeof ExplanationSchema>;
 export type TutorRuntime = {
   activeLessonId: string | null;
+  /** Outside lectures, Yoyo teaches on the user's screen rather than in the app window. */
+  lessonSurface: 'screen' | 'app';
+  drawing: ScreenDrawing | null;
   sessionId: string | null;
   lecturePreparing: boolean;
   lecture: { documentId: string; page: number; total: number } | null;
@@ -129,6 +133,14 @@ export const ToolSchema = z.discriminatedUnion('name', [
     subject: Subject,
     kind: MediaKind.default('image'),
   }),
+  z.object({
+    name: z.literal('draw_on_screen'),
+    marks: z.array(MarkSchema).max(8).default([]),
+    connections: z.array(ConnectionSchema).max(6).default([]),
+    clear: z.boolean().default(true),
+  }),
+  z.object({ name: z.literal('sketch_diagram'), diagram: DiagramSchema }),
+  z.object({ name: z.literal('clear_screen') }),
   z.object({ name: z.literal('ask_practice_question'), question: QuestionId.optional() }),
   z.object({
     name: z.literal('record_practice_attempt'),
@@ -150,12 +162,19 @@ export const ToolSchema = z.discriminatedUnion('name', [
 ]);
 export type TutorTool = z.infer<typeof ToolSchema>;
 export const IntentSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('lesson-open'), lesson: LessonKey, savedId: Uuid.optional() }),
+  z.object({
+    type: z.literal('lesson-open'),
+    lesson: LessonKey,
+    savedId: Uuid.optional(),
+    surface: z.enum(['screen', 'app']).optional(),
+  }),
   z.object({ type: z.literal('lesson-step'), id: Uuid, step: LessonStep }),
   z.object({ type: z.literal('lesson-close') }),
   z.object({ type: z.literal('lesson-narrate') }),
   z.object({ type: z.literal('practice-open'), question: QuestionId.optional() }),
   z.object({ type: z.literal('practice-close') }),
+  z.object({ type: z.literal('screen-clear') }),
+  z.object({ type: z.literal('inform'), text: z.string().min(1).max(6000) }),
   z.object({ type: z.literal('hold-start') }),
   z.object({ type: z.literal('hold-end') }),
   z.object({ type: z.literal('hold-cancel') }),
