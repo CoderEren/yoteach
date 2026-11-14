@@ -6,7 +6,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  external: ['electron'],
+  external: ['electron', 'dotenv'],
 });
 await build({
   entryPoints: ['electron/preload.ts'],
@@ -17,3 +17,5 @@ await build({
   target: 'node22',
   external: ['electron'],
 });
+
+await import('./build-native.mjs');

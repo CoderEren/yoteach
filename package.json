@@ -18,6 +18,9 @@
     "format:check": "prettier --check src electron shared scripts tests *.ts"
   },
   "dependencies": {
+    "@alexanderolsen/libsamplerate-js": "^2.1.2",
+    "@elevenlabs/client": "^1.36.1",
+    "dotenv": "^18.0.10",
     "lucide-react": "^0.468.0",
     "pdfjs-dist": "6.5.438",
     "react": "19.3.1",

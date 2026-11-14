@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "record_learning_interaction",
+  "description": "Record a concise learning note from this conversation. Record actual questions and explicit student statements. Do not infer mastery or confusion from time spent.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "note": {
+        "type": "string",
+        "description": "A grounded learning note, at most 1000 characters."
+      }
+    },
+    "required": [
+      "note"
+    ]
+  }
+}

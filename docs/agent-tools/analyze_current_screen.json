@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "analyze_current_screen",
+  "description": "Analyze the explicitly shared PDF page or selected study window before answering any question about visible content. Returns an explanation, snapshotId and grounded regionIds. Never claim screen access without a successful result.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "question": {
+        "type": "string",
+        "description": "The student\u2019s specific question about the visible material."
+      }
+    },
+    "required": [
+      "question"
+    ]
+  }
+}

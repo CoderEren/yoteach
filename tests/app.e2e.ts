@@ -14,6 +14,10 @@ async function launch(directory: string) {
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     YOTEACH_DATA_DIR: directory,
+    ELEVENLABS_API_KEY: '',
+    ELEVENLABS_AGENT_ID: '',
+    OPENAI_API_KEY: '',
+    VISION_API_KEY: '',
   };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.YOTEACH_DEV_URL;
@@ -24,7 +28,11 @@ async function launch(directory: string) {
   return { app, page };
 }
 async function shot(page: Page, name: string) {
+  const toast = page.getByRole('button', { name: 'Dismiss notification', exact: true });
+  if (await toast.isVisible()) await toast.click();
   await page.evaluate(async () => {
+    const scroller = document.querySelector('.main-scroll');
+    if (scroller) scroller.scrollTop = 0;
     await document.fonts.ready;
     await new Promise(requestAnimationFrame);
     await new Promise(requestAnimationFrame);
@@ -148,7 +156,8 @@ test('desktop journey: real PDF import, editing, native companion, security and 
     expect({ width: restored.width, height: restored.height }).toEqual({ width: 200, height: 220 });
     await expect(companion.getByRole('button', { name: 'Expand Yoyo panel' })).toBeVisible();
     await companion.getByRole('button', { name: 'Expand Yoyo panel' }).click();
-    await expect(companion.getByText('Animation preview', { exact: true })).toBeVisible();
+    await expect(companion.getByText('Your learning companion', { exact: true })).toBeVisible();
+    await companion.getByText('Preview expressions', { exact: true }).click();
     await expect(companion.getByText('Energy investment phase', { exact: true })).toBeVisible();
     for (const state of [
       'Listening',
@@ -160,6 +169,7 @@ test('desktop journey: real PDF import, editing, native companion, security and 
       'Idle',
     ])
       await companion.getByRole('button', { name: state, exact: true }).click();
+    await companion.getByText('Preview expressions', { exact: true }).click();
     await shot(companion, 'companion-expanded');
     await companion.getByRole('button', { name: 'Hide Yoyo', exact: true }).click();
     expect(
@@ -203,12 +213,25 @@ test('desktop journey: real PDF import, editing, native companion, security and 
         )
       ).ok,
     ).toBe(false);
+    await page.getByRole('button', { name: 'Study with Yoyo', exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Let’s work through it.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Connect Yoyo’s voice' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Start voice session', exact: true }),
+    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Choose window', exact: true })).toBeDisabled();
+    expect(
+      (await companion.evaluate(() => window.yoteach.tutor.start(crypto.randomUUID(), 'text'))).ok,
+    ).toBe(false);
+    await shot(page, 'study-desktop');
     // Minimum supported desktop viewport.
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
         .find((w) => !w.webContents.getURL().includes('/companion'))!
         .setSize(1000, 720),
     );
+    await shot(page, 'study-small');
+    await page.getByRole('button', { name: 'yoteach home', exact: true }).click();
     await shot(page, 'dashboard-small');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

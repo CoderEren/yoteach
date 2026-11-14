@@ -1,6 +1,43 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/model';
+function listen<T>(channel: string, fn: (value: T) => void) {
+  const listener = (_event: unknown, value: T) => fn(value);
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
+}
 const api: DesktopApi = {
+  tutor: {
+    get: () => ipcRenderer.invoke('tutor:get'),
+    intent: (action) => ipcRenderer.invoke('tutor:intent', action),
+    start: (topicId, mode) => ipcRenderer.invoke('tutor:start', { topicId, mode }),
+    end: (id) => ipcRenderer.invoke('tutor:end', id),
+    update: (patch) => ipcRenderer.invoke('tutor:update', patch),
+    transcript: (sessionId, role, text, eventId) =>
+      ipcRenderer.invoke('tutor:transcript', { sessionId, role, text, eventId }),
+    tool: (sessionId, tool) => ipcRenderer.invoke('tutor:tool', { sessionId, tool }),
+    windows: () => ipcRenderer.invoke('tutor:windows'),
+    selectWindow: (id) => ipcRenderer.invoke('tutor:select-window', id),
+    validateWindow: (id, epoch) => ipcRenderer.invoke('tutor:validate-window', { id, epoch }),
+    sharePdf: (snapshot) => ipcRenderer.invoke('tutor:share-pdf', snapshot),
+    snapshot: (snapshot) => ipcRenderer.invoke('tutor:snapshot', snapshot),
+    stopSharing: () => ipcRenderer.invoke('tutor:stop-sharing'),
+    save: (id) => ipcRenderer.invoke('tutor:save', id),
+    deleteSession: (id) => ipcRenderer.invoke('tutor:delete-session', id),
+    deleteExplanation: (id) => ipcRenderer.invoke('tutor:delete-explanation', id),
+    onChange: (fn) => listen('tutor:changed', fn),
+    onIntent: (fn) => {
+      const off = listen('tutor:intent', fn);
+      const stream = () => fn({ type: 'stop-sharing' });
+      ipcRenderer.on('tutor:stop-stream', stream);
+      return () => {
+        off();
+        ipcRenderer.removeListener('tutor:stop-stream', stream);
+      };
+    },
+    onNavigate: (fn) => listen('tutor:navigate', fn),
+  },
   getState: () => ipcRenderer.invoke('workspace:get'),
   command: (command) => ipcRenderer.invoke('workspace:command', command),
   pickPdf: (courseId, sample = false) => ipcRenderer.invoke('pdf:pick', { courseId, sample }),

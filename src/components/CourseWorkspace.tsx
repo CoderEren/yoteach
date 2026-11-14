@@ -18,6 +18,8 @@ import {
   Upload,
 } from 'lucide-react';
 import type { AppState, Course, SourceDocument, Topic } from '../../shared/model';
+import { api, unwrap } from '../api';
+import { Modal } from './Modal';
 export type TopicTab =
   'overview' | 'sources' | 'explanations' | 'lessons' | 'practice' | 'progress';
 const tabs: { id: TopicTab; label: string }[] = [
@@ -30,6 +32,7 @@ const tabs: { id: TopicTab; label: string }[] = [
 ];
 export function CourseWorkspace({
   data,
+  onStudy,
   course,
   topicId,
   onTopic,
@@ -45,6 +48,7 @@ export function CourseWorkspace({
   busy,
 }: {
   data: AppState;
+  onStudy: () => void;
   course: Course;
   topicId: string | null;
   onTopic: (id: string) => void;
@@ -63,6 +67,8 @@ export function CourseWorkspace({
     documents = data.documents.filter((d) => d.courseId === course.id),
     topic = topics.find((t) => t.id === topicId);
   const [tab, setTab] = useState<TopicTab>('overview');
+  const [removeExplanation, setRemoveExplanation] = useState<string | null>(null),
+    [saveError, setSaveError] = useState('');
   useEffect(() => setTab('overview'), [topicId, course.id]);
   function branch(parentId: string | null, depth = 0): React.ReactNode {
     return topics
@@ -174,6 +180,27 @@ export function CourseWorkspace({
   };
   return (
     <div className="course-workspace page-enter">
+      {removeExplanation && (
+        <Modal title="Delete saved explanation?" onClose={() => setRemoveExplanation(null)}>
+          <p>The original conversation remains in your session history.</p>
+          {saveError && <p role="alert">{saveError}</p>}
+          <div className="form-actions">
+            <button className="button" onClick={() => setRemoveExplanation(null)}>
+              Keep explanation
+            </button>
+            <button
+              className="button danger"
+              onClick={() => {
+                void unwrap(api.tutor.deleteExplanation(removeExplanation))
+                  .then(() => setRemoveExplanation(null))
+                  .catch((e) => setSaveError(e.message));
+              }}
+            >
+              Delete explanation
+            </button>
+          </div>
+        </Modal>
+      )}
       <header className="course-heading">
         <div className={`course-symbol course-${course.color}`}>
           <BookOpen size={25} />
@@ -324,14 +351,65 @@ export function CourseWorkspace({
                       <div>
                         <strong>A little more clarity, one topic at a time.</strong>
                         <p>
-                          Read your source, make a note, and bring Yoyo along. Live tutoring will
-                          arrive in a later stage.
+                          Read your source, ask a question, and keep the explanations that click.
                         </p>
                       </div>
+                      <button className="text-button" onClick={onStudy}>
+                        Study with Yoyo
+                        <ArrowUpRight size={14} />
+                      </button>
                     </div>
                   </>
                 ) : tab === 'sources' ? (
                   sourceList
+                ) : tab === 'explanations' ? (
+                  <div className="saved-explanations">
+                    {data.explanations.filter((e) => e.topicId === topic.id).length ? (
+                      data.explanations
+                        .filter((e) => e.topicId === topic.id)
+                        .map((e) => (
+                          <article key={e.id}>
+                            <div className="section-heading">
+                              <h3>{e.title}</h3>
+                              <button
+                                className="icon-button danger-subtle"
+                                aria-label={`Delete explanation ${e.title}`}
+                                onClick={() => setRemoveExplanation(e.id)}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                            <p>{e.text}</p>
+                            <small>Saved {new Date(e.createdAt).toLocaleDateString()}</small>
+                            {e.source && (
+                              <button
+                                className="text-button"
+                                onClick={() => {
+                                  const d = data.documents.find(
+                                    (d) => d.id === e.source!.documentId,
+                                  );
+                                  if (d) onOpenPdf(d, e.source!.page);
+                                }}
+                              >
+                                Open source · page {e.source.page}
+                              </button>
+                            )}
+                          </article>
+                        ))
+                    ) : (
+                      <div className="future-state">
+                        <MessageSquare size={32} />
+                        <h3>Keep the explanations that click.</h3>
+                        <p>
+                          Save a useful answer during a conversation. It will be here whenever you
+                          need it.
+                        </p>
+                        <button className="button" onClick={onStudy}>
+                          Study with Yoyo
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   (() => {
                     const item = future[tab];

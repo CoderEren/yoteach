@@ -1,6 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { TutorProvider } from './tutor';
+if (location.hash === '#/companion') document.body.classList.add('companion-body');
 import './styles.css';
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -21,6 +23,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { fai
 }
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
-    <App />
+    <TutorProvider>
+      <App />
+    </TutorProvider>
   </ErrorBoundary>,
 );

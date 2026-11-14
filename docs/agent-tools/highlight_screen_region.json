@@ -1,0 +1,24 @@
+{
+  "type": "client",
+  "name": "highlight_screen_region",
+  "description": "Highlight an existing grounded region from the most recent analyze_current_screen result.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "snapshotId": {
+        "type": "string",
+        "description": "Exact snapshotId returned by analysis."
+      },
+      "regionId": {
+        "type": "string",
+        "description": "Exact regionId returned by analysis."
+      }
+    },
+    "required": [
+      "snapshotId",
+      "regionId"
+    ]
+  }
+}

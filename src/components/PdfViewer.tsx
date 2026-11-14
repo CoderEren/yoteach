@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, AlignLeft, LoaderCircle } from 'lucide-react';
-import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import { Util, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist';
+import { useTutor } from '../tutor';
+import { textRunBox } from '../../shared/pdf-geometry';
+import type { SharedSnapshot } from '../../shared/tutor';
 import type { SourceDocument } from '../../shared/model';
 import { api, unwrap } from '../api';
 import { loadPdf } from '../pdf';
@@ -14,6 +17,8 @@ export function PdfViewer({
   initialPage: number;
   onClose: () => void;
 }) {
+  const { runtime: tutor } = useTutor();
+  const [sharing, setSharing] = useState(false);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null),
     [page, setPage] = useState(initialPage),
     [zoom, setZoom] = useState(1),
@@ -80,8 +85,65 @@ export function PdfViewer({
       render?.cancel();
     };
   }, [pdf, page, zoom, text]);
+  async function sharePage() {
+    if (!pdf || !tutor?.sessionId) return;
+    const epoch = tutor.epoch;
+    setSharing(true);
+    setError('');
+    try {
+      const sheet = await pdf.getPage(page),
+        natural = sheet.getViewport({ scale: 1 }),
+        scale = Math.min(1.8, 1600 / Math.max(natural.width, natural.height)),
+        viewport = sheet.getViewport({ scale });
+      const image = window.document.createElement('canvas');
+      image.width = Math.ceil(viewport.width);
+      image.height = Math.ceil(viewport.height);
+      await sheet.render({ canvas: image, viewport }).promise;
+      const content = await sheet.getTextContent();
+      const textBoxes: SharedSnapshot['textBoxes'] = content.items
+        .flatMap((item) => {
+          if (!('str' in item) || !item.str.trim()) return [];
+          const transform = Util.transform(viewport.transform, item.transform);
+          const box = textRunBox(transform, item.width * scale, image.width, image.height);
+          return box ? [{ text: item.str.slice(0, 2000), box }] : [];
+        })
+        .slice(0, 2000);
+      await unwrap(
+        api.tutor.sharePdf({
+          id: crypto.randomUUID(),
+          epoch,
+          source: { kind: 'pdf', documentId: document.id, page, name: document.originalName },
+          image: image.toDataURL('image/jpeg', 0.88),
+          width: image.width,
+          height: image.height,
+          capturedAt: new Date().toISOString(),
+          textBoxes,
+        }),
+      );
+      await unwrap(api.tutor.intent({ type: 'open' }));
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'This page could not be shared. Try again.');
+    } finally {
+      setSharing(false);
+    }
+  }
   return (
     <Modal title={document.originalName} onClose={onClose} wide>
+      <div className="pdf-share-bar">
+        <p>
+          {tutor?.sessionId
+            ? 'Share a still image of this page. Yoyo can send it to OpenAI when you ask about it.'
+            : 'Start a study session to share a page with Yoyo.'}
+        </p>
+        <button
+          className="button small"
+          disabled={!tutor?.sessionId || !tutor.config.vision || !pdf || busy || sharing}
+          onClick={() => void sharePage()}
+        >
+          {sharing ? 'Sharing page…' : 'Share this page'}
+        </button>
+      </div>
       <div className="pdf-toolbar">
         <div className="toolbar-group">
           <button
@@ -164,7 +226,7 @@ export function PdfViewer({
         ) : text ? (
           <pre className="pdf-text">
             {document.pages[page - 1]?.text ||
-              'No readable text was found on this page. Scanned pages can still be viewed, but OCR is not included in Stage 1.'}
+              'No readable text was found on this page. Scanned pages can still be viewed, but automatic text extraction is unavailable.'}
           </pre>
         ) : (
           <>

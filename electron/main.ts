@@ -19,6 +19,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Id, ImportSchema } from '../shared/model';
 import { Store } from './store';
+import { installTutor } from './tutor-ipc';
+let tutoring: ReturnType<typeof installTutor> | undefined;
 const here = dirname(fileURLToPath(import.meta.url));
 const dev =
   process.env.YOTEACH_DEV_URL === 'http://127.0.0.1:5173' ? 'http://127.0.0.1:5173' : null;
@@ -91,8 +93,11 @@ function createWorkspace() {
       workspace?.hide();
     }
   });
+  workspace.webContents.on('render-process-gone', () => tutoring?.stopSession());
+  workspace.webContents.on('did-start-loading', () => tutoring?.stopSession());
   workspace.on('closed', () => {
     workspace = null;
+    tutoring?.stopSession();
   });
 }
 function clampPosition(x: number, y: number, width: number, height: number) {
@@ -240,11 +245,38 @@ function registerHandlers() {
       }
     });
   }
+  tutoring = installTutor(
+    store,
+    handle,
+    () => workspace,
+    () => companion,
+    () => {
+      sendState();
+    },
+    showWorkspace,
+    resolve(here, '..'),
+  );
   handle('workspace:get', () => store.snapshot());
   handle(
     'workspace:command',
     (input) => {
       store.command(input);
+      if (
+        tutoring?.service.state.sessionId &&
+        !store.snapshot().sessions.some((s) => s.id === tutoring!.service.state.sessionId)
+      )
+        tutoring.stopSession();
+      if (
+        tutoring?.service.state.snapshot?.source.kind === 'pdf' &&
+        !store
+          .snapshot()
+          .documents.some(
+            (d) =>
+              d.id ===
+              (tutoring!.service.state.snapshot!.source as { documentId: string }).documentId,
+          )
+      )
+        tutoring.stopSharing();
       return sendState();
     },
     true,
@@ -351,26 +383,28 @@ else {
         return new Response('Not found', { status: 404 });
       }
     });
-    session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) =>
-      callback(false),
-    );
-    session.defaultSession.setPermissionCheckHandler(() => false);
     session.defaultSession.webRequest.onHeadersReceived((details, callback) =>
       callback({
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self'; script-src 'self'" +
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'" +
               (dev ? " 'unsafe-inline'" : '') +
-              "; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'" +
+              "; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' https://api.elevenlabs.io wss://api.elevenlabs.io" +
               (dev ? ' ws://127.0.0.1:5173' : '') +
-              "; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+              "; media-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
           ],
           'X-Content-Type-Options': ['nosniff'],
         },
       }),
     );
     registerHandlers();
+    // macOS Dock Hide does not emit an app hide event. End media while the application is hidden.
+    const hiddenCheck = setInterval(() => {
+      if (process.platform === 'darwin' && app.isHidden() && tutoring?.service.state.sessionId)
+        tutoring.stopSession();
+    }, 250);
+    hiddenCheck.unref();
     createWorkspace();
     createCompanion();
     const image = nativeImage
@@ -394,9 +428,9 @@ else {
                 dialog.showMessageBox({
                   type: 'info',
                   title: 'yoteach',
-                  message: 'yoteach · Stage 1',
+                  message: 'yoteach · Stage 2',
                   detail:
-                    'Your local learning workspace and Yoyo companion. Voice and screen awareness are not connected.',
+                    'Your learning workspace with voice tutoring and permission-based visual explanations.',
                 }),
             },
             { type: 'separator' },
@@ -407,6 +441,14 @@ else {
             },
             { label: 'Open workspace', click: showWorkspace },
             { type: 'separator' },
+            {
+              label: 'Hide yoteach',
+              accelerator: 'CommandOrControl+H',
+              click: () => {
+                tutoring?.stopSession();
+                app.hide();
+              },
+            },
             { role: 'quit' },
           ],
         },
@@ -437,6 +479,7 @@ else {
   });
   app.on('before-quit', () => {
     quitting = true;
+    tutoring?.stopSession();
     clearTimeout(moveTimer);
     if (store) savePosition();
   });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { StudySessionSchema, MessageSchema, ExplanationSchema, type TutorApi } from './tutor';
 export const Id = z.uuid();
 export const Title = z
   .string()
@@ -56,7 +57,10 @@ export const ActivitySchema = z.object({
   createdAt: Stamp,
 });
 export const StateSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
+  sessions: z.array(StudySessionSchema),
+  messages: z.array(MessageSchema),
+  explanations: z.array(ExplanationSchema),
   courses: z.array(CourseSchema),
   topics: z.array(TopicSchema),
   documents: z.array(DocumentSchema),
@@ -106,6 +110,7 @@ export type ImportPayload = z.infer<typeof ImportSchema>;
 export type PendingImport = { token: string; name: string; bytes: Uint8Array };
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export interface DesktopApi {
+  tutor: TutorApi;
   getState(): Promise<Result<AppState>>;
   command(command: Command): Promise<Result<AppState>>;
   pickPdf(courseId: string, sample?: boolean): Promise<Result<PendingImport | null>>;
@@ -116,7 +121,10 @@ export interface DesktopApi {
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
-  version: 1,
+  version: 2,
+  sessions: [],
+  messages: [],
+  explanations: [],
   courses: [],
   topics: [],
   documents: [],

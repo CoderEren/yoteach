@@ -28,12 +28,16 @@ const PdfViewer = lazy(() =>
 );
 import { Yoyo } from './components/Yoyo';
 import { Companion } from './components/Companion';
+import { TutorWorkspace } from './components/TutorWorkspace';
+import { useTutor } from './tutor';
 type EditModal =
   | { kind: 'course'; course?: Course }
   | { kind: 'topic'; topic?: Topic }
   | { kind: 'delete'; entity: 'course' | 'topic' | 'document'; id: string; title: string }
   | { kind: 'settings' };
 export default function App() {
+  const [study, setStudy] = useState(false);
+  const { runtime: tutor } = useTutor();
   const [data, setData] = useState<AppState | null>(null),
     [fatal, setFatal] = useState(''),
     [error, setError] = useState(''),
@@ -99,11 +103,13 @@ export default function App() {
     setError(e instanceof Error ? e.message : String(e));
   }
   function openCourse(id: string) {
+    setStudy(false);
     setCourseId(id);
     setTopicId(null);
     setQuery('');
   }
   function openTopic(id: string) {
+    setStudy(false);
     if (!id) {
       setTopicId(null);
       return;
@@ -115,6 +121,20 @@ export default function App() {
     setQuery('');
     void command({ type: 'topic.open', id }).catch(report);
   }
+  useEffect(() => {
+    if (!api || companion) return;
+    const off = api.tutor.onIntent((a) => {
+      if (a.type === 'open') {
+        setStudy(true);
+        setQuery('');
+      }
+    });
+    const nav = api.tutor.onNavigate((id) => openTopic(id));
+    return () => {
+      off();
+      nav();
+    };
+  }, [data, companion]);
   function edit(next: EditModal) {
     setFormError('');
     setModal(next);
@@ -263,6 +283,7 @@ export default function App() {
         <button
           className="brand"
           onClick={() => {
+            setStudy(false);
             setCourseId(null);
             setTopicId(null);
             setQuery('');
@@ -277,8 +298,9 @@ export default function App() {
         </button>
         <nav className="primary-nav" aria-label="Main navigation">
           <button
-            className={!courseId && !query ? 'active' : ''}
+            className={!study && !courseId && !query ? 'active' : ''}
             onClick={() => {
+              setStudy(false);
               setCourseId(null);
               setTopicId(null);
               setQuery('');
@@ -286,6 +308,16 @@ export default function App() {
           >
             <Home size={18} />
             Workspace
+          </button>
+          <button
+            className={study ? 'active' : ''}
+            onClick={() => {
+              setStudy(true);
+              setQuery('');
+            }}
+          >
+            <BookOpen size={18} />
+            Study with Yoyo
           </button>
         </nav>
         <div className="sidebar-section-title">
@@ -302,7 +334,7 @@ export default function App() {
           {data.courses.map((c) => (
             <button
               key={c.id}
-              className={courseId === c.id ? 'active' : ''}
+              className={!study && courseId === c.id ? 'active' : ''}
               onClick={() => openCourse(c.id)}
             >
               <span className={`sidebar-course-dot course-${c.color}`} />
@@ -341,14 +373,19 @@ export default function App() {
           </button>
           <div className="sidebar-local">
             <ShieldCheck size={13} />
-            On this Mac · Stage 1
+            On this Mac · Stage 2
           </div>
         </div>
       </aside>
       <main className="main-shell">
         <header className="topbar">
           <div className="breadcrumbs">
-            {course ? (
+            {study ? (
+              <>
+                <BookOpen size={16} />
+                <span>Study with Yoyo</span>
+              </>
+            ) : course ? (
               <>
                 <button
                   onClick={() => {
@@ -449,9 +486,19 @@ export default function App() {
                 </>
               )}
             </section>
+          ) : study ? (
+            <TutorWorkspace
+              data={data}
+              onOpenTopic={openTopic}
+              onOpenPdf={(id, page) => setViewer({ id, page })}
+            />
           ) : course ? (
             <CourseWorkspace
               data={data}
+              onStudy={() => {
+                setStudy(true);
+                setQuery('');
+              }}
               course={course}
               topicId={topicId}
               onTopic={openTopic}
@@ -486,7 +533,7 @@ export default function App() {
           )}
           <footer className="workspace-footer">
             <span>A little clearer, every day.</span>
-            <span>yoteach · Desktop foundation</span>
+            <span>yoteach · A little more clarity</span>
           </footer>
         </div>
       </main>
@@ -547,8 +594,14 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              <h3>Tutoring connections</h3>
+              <p>
+                ElevenLabs: {tutor?.config.voice ? 'Configured' : 'Needs API key and agent ID'} ·
+                Vision: {tutor?.config.vision ? 'Configured' : 'Needs OpenAI key'}. Keys are loaded
+                from the app’s .env file at launch.
+              </p>
               <h3>Desktop companion</h3>
-              <p>Drag Yoyo with the grip above its head. Click Yoyo to preview expressions.</p>
+              <p>Drag Yoyo with the grip above its head. Click Yoyo to open session controls.</p>
               <button
                 className="button"
                 onClick={() =>
@@ -563,10 +616,11 @@ export default function App() {
               <div className="settings-privacy">
                 <ShieldCheck size={22} />
                 <div>
-                  <strong>Your study space stays local.</strong>
+                  <strong>You choose what Yoyo sees.</strong>
                   <p>
-                    Courses, PDFs and notes are saved on this Mac. Microphone and screen access are
-                    off. No AI services are connected in Stage 1.
+                    Courses, PDFs, notes and transcripts are saved on this Mac. Study sessions send
+                    selected topic context to ElevenLabs. Explicitly shared images go to OpenAI on
+                    request. Pause or end a session to stop audio and sharing.
                   </p>
                 </div>
               </div>
@@ -580,9 +634,9 @@ export default function App() {
                   </p>
                   <p className="secondary">
                     {modal.entity === 'course'
-                      ? 'This removes its topics, notes and imported PDF copies from yoteach. Your original files stay where they are.'
+                      ? 'This removes its topics, notes, study sessions, saved explanations and imported PDF copies from yoteach. Your original files stay where they are.'
                       : modal.entity === 'topic'
-                        ? 'This removes the topic and its notes. Subtopics move up one level. Source PDFs stay in your course.'
+                        ? 'This removes the topic, its notes, study sessions and saved explanations. Subtopics move up one level. Source PDFs stay in your course.'
                         : 'This removes the imported copy and its source links. Topics and your notes remain. Your original file stays where it is.'}
                   </p>
                   <p className="delete-warning">This action cannot be undone.</p>

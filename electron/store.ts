@@ -10,6 +10,13 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import {
+  StudySessionSchema,
+  MessageSchema,
+  ExplanationSchema,
+  type TutorMessage,
+  type Explanation,
+} from '../shared/tutor';
 import { randomUUID } from 'node:crypto';
 import {
   AppState,
@@ -34,7 +41,17 @@ export class Store {
     this.file = join(directory, 'workspace.json');
     if (existsSync(this.file)) {
       try {
-        this.state = StateSchema.parse(JSON.parse(readFileSync(this.file, 'utf8')));
+        const raw = JSON.parse(readFileSync(this.file, 'utf8'));
+        this.state = StateSchema.parse(
+          raw.version === 1
+            ? { ...raw, version: 2, sessions: [], messages: [], explanations: [] }
+            : raw,
+        );
+        // A prior process cannot own a live session after relaunch.
+        this.state.sessions.forEach((s) => {
+          if (!s.endedAt) s.endedAt = new Date().toISOString();
+        });
+        this.save(this.state);
       } catch {
         throw new Error(
           `Your saved workspace could not be read. It has been left untouched at ${this.file}. Restore a valid copy before reopening yoteach.`,
@@ -193,6 +210,12 @@ export class Store {
         break;
     }
     if (!n.topics.some((t) => t.id === n.settings.lastTopicId)) n.settings.lastTopicId = null;
+    n.sessions = n.sessions.filter((s) => n.topics.some((t) => t.id === s.topicId));
+    n.messages = n.messages.filter((m) => n.sessions.some((s) => s.id === m.sessionId));
+    n.explanations = n.explanations.filter((e) => n.topics.some((t) => t.id === e.topicId));
+    n.explanations.forEach((e) => {
+      if (e.source && !n.documents.some((d) => d.id === e.source!.documentId)) e.source = null;
+    });
     this.save(n);
     this.cleanupOrphans();
     return this.snapshot();
@@ -259,6 +282,85 @@ export class Store {
     Object.assign(n.settings, patch);
     this.save(n);
     return this.snapshot();
+  }
+  startSession(topicId: string, mode: 'voice' | 'text') {
+    const n = this.snapshot(),
+      t = this.topic(n, topicId);
+    const session = StudySessionSchema.parse({
+      id: randomUUID(),
+      courseId: t.courseId,
+      topicId,
+      mode,
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+    });
+    n.sessions.push(session);
+    this.save(n);
+    return session;
+  }
+  endSession(id: string) {
+    const n = this.snapshot(),
+      s = n.sessions.find((s) => s.id === id);
+    if (s && !s.endedAt) {
+      s.endedAt = new Date().toISOString();
+      this.save(n);
+    }
+  }
+  addMessage(sessionId: string, role: TutorMessage['role'], text: string, eventId?: string) {
+    const n = this.snapshot();
+    if (!n.sessions.some((s) => s.id === sessionId && !s.endedAt))
+      throw new Error('This study session has ended.');
+    const existing =
+      eventId && n.messages.find((m) => m.sessionId === sessionId && m.eventId === eventId);
+    if (existing) {
+      existing.text = text;
+      this.save(n);
+      return existing;
+    }
+    const m = MessageSchema.parse({
+      id: randomUUID(),
+      sessionId,
+      role,
+      text,
+      createdAt: new Date().toISOString(),
+      eventId,
+    });
+    n.messages.push(m);
+    this.save(n);
+    return m;
+  }
+  saveExplanation(sessionId: string, title: string, text: string, source: Explanation['source']) {
+    const n = this.snapshot(),
+      s = n.sessions.find((s) => s.id === sessionId);
+    if (!s) throw new Error('This session no longer exists.');
+    const existing = n.explanations.find((e) => e.sessionId === sessionId && e.text === text);
+    if (existing) return existing;
+    const e = ExplanationSchema.parse({
+      id: randomUUID(),
+      sessionId,
+      courseId: s.courseId,
+      topicId: s.topicId,
+      title,
+      text,
+      source,
+      createdAt: new Date().toISOString(),
+    });
+    n.explanations.push(e);
+    this.activity(n, s.courseId, `Saved ${title}`, s.topicId);
+    this.save(n);
+    return e;
+  }
+  deleteSession(id: string) {
+    const n = this.snapshot();
+    n.sessions = n.sessions.filter((s) => s.id !== id);
+    n.messages = n.messages.filter((m) => m.sessionId !== id);
+    n.explanations = n.explanations.filter((e) => e.sessionId !== id);
+    this.save(n);
+  }
+  deleteExplanation(id: string) {
+    const n = this.snapshot();
+    n.explanations = n.explanations.filter((e) => e.id !== id);
+    this.save(n);
   }
   private cleanupOrphans() {
     // Delete only UUID-owned PDF files. Never follow paths supplied by the renderer.
