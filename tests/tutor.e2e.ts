@@ -18,7 +18,8 @@ async function launch(dir: string) {
     ANTHROPIC_API_KEY: 'test-only-vision',
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
-  delete env.YOTEACH_DEV_URL;
+  if (process.env.YOTEACH_TEST_DEV === '1') env.YOTEACH_DEV_URL = 'http://127.0.0.1:5173';
+  else delete env.YOTEACH_DEV_URL;
   const app = await electron.launch({ args: ['.'], env });
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
   const page = app.windows().find((w) => w.url().endsWith('#/'))!;
@@ -386,6 +387,52 @@ test('held microphone buffers until release, captures screen, cancels drag and s
       await Promise.all((window as any).__testContexts.map((c: AudioContext) => c.close()));
     });
     expect(errors).toEqual([]);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('failed voice startup releases listening and the next hold can connect', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-retry-'));
+  let app: ElectronApplication | undefined;
+  try {
+    const boot = await launch(dir);
+    app = boot.app;
+    const page = boot.page;
+    const provider = await fixtures(app, page);
+    await app.evaluate(() => {
+      const original = globalThis.fetch;
+      let fail = true;
+      globalThis.fetch = async (...args) => {
+        if (fail && String(args[0]).includes('get-signed-url')) {
+          fail = false;
+          return new Response('Unavailable', { status: 503 });
+        }
+        return original(...args);
+      };
+    });
+    await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-start' }));
+    await expect.poll(async () => (await runtime(page)).input).toBe('idle');
+    await expect.poll(async () => (await runtime(page)).sessionId).toBeNull();
+    const pet = app.windows().find((w) => w.url().includes('/companion'))!;
+    await expect(pet.locator('.input-listening')).toHaveCount(0);
+    await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-end' }));
+    expect((await runtime(page)).input).toBe('idle');
+    await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-start' }));
+    await expect.poll(async () => (await runtime(page)).input).toBe('listening');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-end' }));
+    await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
+    await expect.poll(async () => (await runtime(page)).input).toBe('idle');
+    await page.evaluate(() => window.yoteach.tutor.intent({ type: 'end' }));
+    expect(
+      await page.evaluate(() =>
+        (window as any).__testStreams.every((s: MediaStream) =>
+          s.getTracks().every((t) => t.readyState === 'ended'),
+        ),
+      ),
+    ).toBe(true);
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

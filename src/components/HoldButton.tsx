@@ -1,7 +1,14 @@
+import { useRef } from 'react';
 import { Mic } from 'lucide-react';
 import { useTutor } from '../tutor';
 export function HoldButton() {
   const { runtime: r, act } = useTutor();
+  const pressed = useRef(false);
+  function release(cancel = false) {
+    if (!pressed.current) return;
+    pressed.current = false;
+    void act({ type: cancel ? 'hold-cancel' : 'hold-end' });
+  }
   const held = r?.input === 'listening',
     busy = r?.input === 'sending';
   return (
@@ -13,24 +20,25 @@ export function HoldButton() {
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         event.preventDefault();
+        pressed.current = true;
         event.currentTarget.setPointerCapture(event.pointerId);
         void act({ type: 'hold-start' });
       }}
-      onPointerUp={() => void act({ type: 'hold-end' })}
-      onPointerCancel={() => void act({ type: 'hold-cancel' })}
-      onLostPointerCapture={() => {
-        if (r?.input === 'listening' || r?.input === 'arming') void act({ type: 'hold-cancel' });
-      }}
+      onPointerUp={() => release()}
+      onPointerCancel={() => release(true)}
+      onLostPointerCapture={() => release(true)}
+      onBlur={() => release(true)}
       onKeyDown={(event) => {
         if ([' ', 'Enter'].includes(event.key) && !event.repeat) {
           event.preventDefault();
+          pressed.current = true;
           void act({ type: 'hold-start' });
         }
       }}
       onKeyUp={(event) => {
         if ([' ', 'Enter'].includes(event.key)) {
           event.preventDefault();
-          void act({ type: 'hold-end' });
+          release();
         }
       }}
     >

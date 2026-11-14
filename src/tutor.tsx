@@ -64,7 +64,14 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   }
   function report(message: string) {
     const id = sessionId.current;
-    if (id) void api.tutor.update({ sessionId: id, error: message, activity: 'error' });
+    if (id)
+      void api.tutor.update({
+        sessionId: id,
+        error: message,
+        activity: 'error',
+        input: 'idle',
+        mic: false,
+      });
   }
   async function capture() {
     if (live.current?.sharing !== 'window') return;
@@ -211,9 +218,10 @@ export function TutorProvider({ children }: { children: ReactNode }) {
           }
         }
       })();
-      void turn.ready.catch((error) => {
+      void turn.ready.catch(async (error) => {
         if (!turn.cancelled) {
           cancelHold();
+          await api.tutor.intent({ type: 'hold-cancel' });
           report(String(error));
           window.dispatchEvent(new CustomEvent('tutor-error', { detail: String(error) }));
         }
@@ -245,6 +253,11 @@ export function TutorProvider({ children }: { children: ReactNode }) {
             mic: false,
             activity: agentMode.current === 'speaking' ? 'speaking' : sent ? 'thinking' : 'idle',
           });
+      } catch (error) {
+        cancelHold();
+        await api.tutor.intent({ type: 'hold-cancel' });
+        report(error instanceof Error ? error.message : String(error));
+        throw error;
       } finally {
         if (hold.current === turn) hold.current = null;
       }
@@ -390,8 +403,11 @@ export function TutorProvider({ children }: { children: ReactNode }) {
               void api.tutor.end(started.id);
             }
           },
-          onError: () =>
-            report('Voice connection interrupted. End the session and retry, or start with text.'),
+          onError: () => {
+            cancelHold();
+            void api.tutor.intent({ type: 'hold-cancel' });
+            report('Voice connection interrupted. End the session and retry, or start with text.');
+          },
           onUnhandledClientToolCall: () =>
             report('This agent requested an unsupported tool. Check the Yoyo agent configuration.'),
         });
@@ -422,6 +438,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         if (token !== generation.current) return;
         cancelHold();
+        await api.tutor.intent({ type: 'hold-cancel' });
         audioTracks.current.forEach((t) => t.stop());
         audioTracks.current.clear();
         generation.current++;

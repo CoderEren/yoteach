@@ -1,3 +1,4 @@
+import { cpSync } from 'node:fs';
 import { build } from 'esbuild';
 await build({
   entryPoints: ['electron/main.ts'],
@@ -22,3 +23,5 @@ await build({
 });
 
 await import('./build-native.mjs');
+
+cpSync('assets/icons', 'dist-electron/icons', { recursive: true });

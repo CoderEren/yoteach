@@ -463,11 +463,8 @@ else {
       },
     });
     desktop.keySettings();
-    const image = nativeImage
-      .createFromDataURL(
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAAAeUlEQVR4nO3UwQ6AIAwDUP7/p/HiiQji2mVV22QnYLxkhNacD6afJdGnD1XdxyCD0kHj+u4+KFdNZpDVxazvYwqMoMoxqagoRmZUqSAUQ0WxMDTUK0B32J2zNAwKglAGRUFlD9sgg1BQBooSKYwkiIFKiwzkKcz5Rw7B58pEFeJqLAAAAABJRU5ErkJggg==',
-      )
-      .resize({ width: 18, height: 18 });
+    app.dock?.setIcon(nativeImage.createFromPath(join(here, 'icons/yoyo.png')));
+    const image = nativeImage.createFromPath(join(here, 'icons/trayTemplate.png'));
     image.setTemplateImage(true);
     tray = new Tray(image);
     tray.setToolTip('yoteach');

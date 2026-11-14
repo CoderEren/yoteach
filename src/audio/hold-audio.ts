@@ -2,7 +2,7 @@ import { createConnection, setSetupStrategy } from '@elevenlabs/client/internal'
 // Pinned SDK platform adapter: keep ElevenLabs' playback, interruptions, tools and turn-taking.
 // Only microphone transport is replaced so audio leaves this Mac after release.
 import { MediaDeviceOutput } from '../../node_modules/@elevenlabs/client/dist/platform/web/output.js';
-import { WebSocketConnection } from '../../node_modules/@elevenlabs/client/dist/utils/WebSocketConnection.js';
+import type { WebSocketConnection } from '../../node_modules/@elevenlabs/client/dist/utils/WebSocketConnection.js';
 import { attachConnectionToOutput } from '../../node_modules/@elevenlabs/client/dist/utils/attachConnectionToOutput.js';
 import type { BaseConnection } from '../../node_modules/@elevenlabs/client/dist/utils/BaseConnection.js';
 import { pcmChunks } from '../../shared/hold-audio';
@@ -22,7 +22,14 @@ export class HoldAudio {
   install() {
     setSetupStrategy(async (options) => {
       const connection = await createConnection(options);
-      if (!(connection instanceof WebSocketConnection)) {
+      // Vite can prebundle the SDK separately from its platform adapters. Class identity
+      // is not a transport check across those module copies. Check audio capabilities.
+      if (!(
+        'addListener' in connection &&
+        typeof connection.addListener === 'function' &&
+        'removeListener' in connection &&
+        typeof connection.removeListener === 'function'
+      )) {
         connection.close();
         throw new Error('Hold-to-talk requires a WebSocket session.');
       }
@@ -40,7 +47,7 @@ export class HoldAudio {
       this.connection = connection;
       this.output = output;
       if (this.holding) output.setVolume(0);
-      const detach = attachConnectionToOutput(connection, output);
+      const detach = attachConnectionToOutput(connection as WebSocketConnection, output);
       return {
         connection,
         output,

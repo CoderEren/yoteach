@@ -157,10 +157,11 @@ export function installTutor(
       if (app.isHidden()) app.show();
     }
     if (action.type === 'hold-end' || action.type === 'hold-cancel') {
-      if (!holdActive) return;
+      if (!holdActive && (action.type === 'hold-end' || service.state.input === 'idle')) return;
       holdActive = false;
       service.state.input = action.type === 'hold-end' ? 'sending' : 'idle';
       service.state.mic = false;
+      if (action.type === 'hold-cancel') service.state.activity = 'idle';
       if (action.type === 'hold-cancel') {
         captureAbort?.abort();
         if (!service.state.lecture) service.stopSharing(false);
@@ -264,6 +265,9 @@ export function installTutor(
     'tutor:end',
     (input) => {
       const id = Id.parse(input);
+      if (service.state.sessionId !== id) return;
+      holdActive = false;
+      captureAbort?.abort();
       service.end(id);
       selected = null;
       displayGrant = false;

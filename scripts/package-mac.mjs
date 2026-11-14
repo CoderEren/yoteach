@@ -24,8 +24,10 @@ writeFileSync(
   }),
 );
 renameSync(content + '/MacOS/Electron', content + '/MacOS/Yoteach');
+cpSync('assets/icons/Yoyo.icns', content + '/Resources/Yoyo.icns');
 const plist = content + '/Info.plist';
 for (const [key, value] of Object.entries({
+  CFBundleIconFile: 'Yoyo.icns',
   CFBundleName: 'Yoteach',
   CFBundleDisplayName: 'Yoteach',
   CFBundleExecutable: 'Yoteach',
