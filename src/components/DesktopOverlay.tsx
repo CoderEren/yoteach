@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import gsap from 'gsap';
-import { ArrowLeft, ArrowRight, ClipboardCheck, Volume2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { AppState } from '../../shared/model';
 import type { TutorRuntime } from '../../shared/tutor';
 import type { ScreenDrawing } from '../../shared/drawing';
 import { layoutDiagram, type Diagram, type Sketch, type SketchElement } from '../../shared/drawing';
 import { freeSpot, labelSpot } from '../../shared/grounding';
-import { lessonDefinition } from '../../shared/lessons';
 import { api } from '../api';
 import { useTutor } from '../tutor';
 import { AnnotationLayer } from './TutorWorkspace';
@@ -18,9 +17,7 @@ import {
   handUnderline,
   wobbleEllipse,
 } from '../drawing/hand';
-import { LessonScene } from './LessonScene';
 import { GenerationPanel } from './GeneratedMedia';
-import { PracticePanel } from './Practice';
 
 type Box = { x: number; y: number; width: number; height: number };
 function useSize<T extends HTMLElement>() {
@@ -667,99 +664,6 @@ function Interactive({
     </section>
   );
 }
-function ScreenLesson({ data, side }: { data: AppState; side: 'left' | 'right' }) {
-  const { runtime: r, act } = useTutor();
-  const saved = data.lessons.find((l) => l.id === r?.activeLessonId);
-  const [transfer, setTransfer] = useState(100);
-  if (!saved || !r) return null;
-  const definition = lessonDefinition(saved.key),
-    step = definition.steps[saved.step - 1];
-  const go = (n: number) =>
-    n >= 1 &&
-    n <= definition.steps.length &&
-    void act({ type: 'lesson-step', id: saved.id, step: n });
-  if (r.practice)
-    return (
-      <Interactive className={`screen-card glass ${side}`}>
-        <PracticePanel
-          attempts={data.attempts}
-          voiceOnly
-          onReview={(n) => {
-            void act({ type: 'practice-close' }).then(() => go(n));
-          }}
-        />
-      </Interactive>
-    );
-  return (
-    <Interactive className={`screen-card glass ${side}`}>
-      <header className="screen-card-header">
-        <div>
-          <p className="eyebrow">
-            {definition.subtitle} · Step {saved.step} of {definition.steps.length}
-          </p>
-          <h2>{step.title}</h2>
-        </div>
-        <button
-          className="icon-button small"
-          aria-label="Close lesson"
-          onClick={() => void act({ type: 'lesson-close' })}
-        >
-          <X size={16} />
-        </button>
-      </header>
-      <div className="screen-card-scene">
-        <span className="lesson-diagram-label">Schematic · not to scale</span>
-        <LessonScene scene={step.scene} transfer={step.scene === 'transfer' ? transfer : 100} />
-        {step.scene === 'transfer' && (
-          <input
-            aria-label="Phosphate transfer"
-            type="range"
-            min="0"
-            max="100"
-            value={transfer}
-            onChange={(e) => setTransfer(Number(e.target.value))}
-          />
-        )}
-      </div>
-      <p>{step.text}</p>
-      <blockquote>{step.takeaway}</blockquote>
-      <GenerationPanel
-        media={data.media}
-        subject={step.analogy}
-        lessonId={saved.id}
-        lessonStep={saved.step}
-      />
-      <footer className="screen-card-actions">
-        <button
-          className="icon-button small"
-          aria-label="Previous step"
-          disabled={saved.step === 1}
-          onClick={() => go(saved.step - 1)}
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <button
-          className="icon-button small"
-          aria-label="Next step"
-          disabled={saved.step === definition.steps.length}
-          onClick={() => go(saved.step + 1)}
-        >
-          <ArrowRight size={16} />
-        </button>
-        <button
-          className="button small"
-          disabled={!r.config.voice || r.status === 'connecting' || r.input !== 'idle'}
-          onClick={() => void act({ type: 'lesson-narrate' })}
-        >
-          <Volume2 size={15} /> Explain
-        </button>
-        <button className="button small" onClick={() => void act({ type: 'practice-open' })}>
-          <ClipboardCheck size={15} /> Practice
-        </button>
-      </footer>
-    </Interactive>
-  );
-}
 /** Yoyo's drawing surface over the user's own screen. Clicks pass through except on cards. */
 export function DesktopOverlay({ data }: { data: AppState }) {
   const { runtime: r } = useTutor();
@@ -867,9 +771,8 @@ function CursorInk() {
 function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
   const { act } = useTutor();
   const onScreen = r.snapshot?.source.kind === 'screen';
-  const lesson = !!r.activeLessonId && r.lessonSurface === 'screen';
-  const media = !lesson && !!r.generation && r.generation.origin === 'tutor' && !r.activeLessonId;
-  const card = lesson || media;
+  const media = !!r.generation && r.generation.origin === 'tutor';
+  const card = media;
   // Sketches and cards go where they cover the least text and none of Yoyo's marks.
   const marks = onScreen ? (r.drawing?.marks ?? []) : [];
   const text = onScreen ? (r.snapshot?.textBoxes.map((t) => t.box) ?? []) : [];
@@ -903,10 +806,10 @@ function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
       )
     : null;
   // Yoyo flies beside each new sketch, diagram or card it puts on screen.
-  const focusKey = `${r.drawing?.revision ?? ''}:${spot ? 'panel' : ''}:${lesson ? r.activeLessonId : ''}:${media ? r.generation?.id : ''}`;
+  const focusKey = `${r.drawing?.revision ?? ''}:${spot ? 'panel' : ''}:${media ? r.generation?.id : ''}`;
   useEffect(() => {
     if (spot && (r.drawing?.sketch || r.drawing?.diagram)) void api.overlay.focus(spot);
-    else if (cardBox && (lesson || media)) void api.overlay.focus(cardBox);
+    else if (cardBox && media) void api.overlay.focus(cardBox);
   }, [focusKey]);
   const place = spot
     ? { left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, maxWidth: `${panel!.width * 100}%` }
@@ -944,7 +847,6 @@ function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
           />
         </Interactive>
       )}
-      {lesson && <ScreenLesson data={data} side={cardSide} />}
       {media && (
         <Interactive className={`screen-card glass ${cardSide}`}>
           <header className="screen-card-header">

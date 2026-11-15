@@ -168,6 +168,22 @@ From the user's 15 Nov report: questions (matrix in a coordinate system, cholest
   `YOTEACH_STUCK_TICK_MS`, `YOTEACH_STUCK_AFTER_MS`, `YOTEACH_STUCK_IGNORE_IDLE`; new e2e proves
   the offer appears and no network request is made.
 
+## Chunk 12 — built-in lesson and practice removed; proactive help unblocked
+
+- Removed the authored glucose-phosphorylation lesson (chunk 2) and its practice and grading
+  (chunk 4): `shared/lessons.ts`, `shared/practice.ts`, `VisualLesson`, `LessonScene`, `Practice`,
+  their IPC, intents, runtime fields and the student-side "Generate visual analogy / Short clip"
+  buttons. The app has chats and lecture walkthroughs only. Yoyo still makes fal images and clips on
+  request (`generate_illustration`, "Made by Yoyo" card, Saved material).
+- Data v8: drops `lessons` and `attempts` and media lesson fields, exact `.v7.backup`. Checked on a
+  copy of the real workspace: chats, messages, PDFs, media and explanations all kept.
+- Agent: `open_visual_lesson`, `navigate_visual_lesson`, `ask_practice_question`,
+  `record_practice_attempt` detached by the sync (definitions kept in the account and backup);
+  prompt no longer mentions them; quizzing happens in conversation.
+- Proactive help never fired after Yoyo drew anything: `pointing` only cleared on a voice mode
+  change, and counted as busy. Pointing now clears after 6 s and is not busy. With a
+  `YOTEACH_STUCK_*` test hook set, each check logs its decision as `[stuck] …` in the terminal.
+
 ## Remaining
 
 - Live spoken practice through the hosted agent (the tools are synced; not exercised with a microphone).

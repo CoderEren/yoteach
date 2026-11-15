@@ -166,10 +166,8 @@ export function installDesktop(options: {
     const onScreen = r.snapshot?.source.kind === 'screen';
     const marks =
       onScreen && !!(r.focusRegion || r.drawing?.marks.length || r.drawing?.connections.length);
-    const lesson = !!r.activeLessonId && r.lessonSurface === 'screen';
-    const appLesson = !!r.activeLessonId && r.lessonSurface === 'app';
-    const media = !!r.generation && r.generation.origin === 'tutor' && !appLesson;
-    return marks || lesson || media || !!r.drawing?.diagram || !!r.drawing?.sketch;
+    const media = !!r.generation && r.generation.origin === 'tutor';
+    return marks || media || !!r.drawing?.diagram || !!r.drawing?.sketch;
   }
   function syncOverlay(r: TutorRuntime) {
     const layer = overlay();

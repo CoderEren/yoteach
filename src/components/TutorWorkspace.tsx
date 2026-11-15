@@ -18,7 +18,6 @@ import type { AppState } from '../../shared/model';
 import type { Annotation, WindowSource } from '../../shared/tutor';
 import { useTutor } from '../tutor';
 import { GenerationPanel } from './GeneratedMedia';
-import { reviewSuggestions } from '../../shared/practice';
 import { api, unwrap } from '../api';
 import { Yoyo } from './Yoyo';
 import { Modal } from './Modal';
@@ -176,22 +175,6 @@ export function TutorWorkspace({
           )}
         </div>
       </section>
-      <button
-        className="visual-lesson-entry glass"
-        onClick={() => void act({ type: 'lesson-open', lesson: 'glucose-phosphorylation' })}
-      >
-        <BookOpen size={23} />
-        <span>
-          <strong>Why invest ATP in glucose?</strong>
-          <small>
-            Explore a visual lesson · 6 steps · practice
-            {reviewSuggestions(data.attempts).length
-              ? ` · ${reviewSuggestions(data.attempts).length} to review`
-              : ''}
-          </small>
-        </span>
-        <ArrowUpRight size={20} />
-      </button>
       {!r.config.voice && (
         <div className="connection-setup">
           <h2>Connect Yoyo’s voice</h2>

@@ -237,12 +237,10 @@ function workspace(request: typeof fetch) {
   return { dir, store, service, doc: store.snapshot().documents[0] };
 }
 
-test('generated media is saved atomically with lecture, session and lesson links and survives restart', async () => {
+test('generated media is saved atomically with lecture and session links and survives restart', async () => {
   const w = workspace(falFake().request);
   try {
     const session = await w.service.start(null, 'text', w.doc.id, 2);
-    w.service.openLesson();
-    w.service.stepLesson(w.service.state.activeLessonId!, 3);
     const started = (await w.service.tool(session.id, {
       name: 'generate_illustration',
       subject: 'a relay baton handed from a battery to a tile',
@@ -261,8 +259,6 @@ test('generated media is saved atomically with lecture, session and lesson links
     assert.equal(media.id, g.mediaId);
     assert.equal(media.origin, 'tutor');
     assert.equal(media.sessionId, session.id);
-    assert.equal(media.lessonId, w.service.state.activeLessonId);
-    assert.equal(media.lessonStep, 3);
     assert.deepEqual(media.source, { documentId: w.doc.id, page: 2 });
     assert.deepEqual(readdirSync(w.store.mediaDir), [media.filename]);
     assert.deepEqual(w.store.readMedia(media.id).bytes, JPEG);
@@ -317,7 +313,7 @@ test('failed or cancelled generation saves nothing; v4 data migrates with an exa
     writeFileSync(join(w.store.mediaDir, `${randomUUID()}.jpg.tmp`), JPEG);
     writeFileSync(join(w.store.mediaDir, 'keep-me.txt'), 'not owned');
     const migrated = new Store(w.dir);
-    assert.equal(migrated.snapshot().version, 7);
+    assert.equal(migrated.snapshot().version, 8);
     assert.deepEqual(migrated.snapshot().media, []);
     assert.equal(migrated.snapshot().documents[0].id, w.doc.id);
     assert.equal(readFileSync(w.store.file + '.v4.backup', 'utf8'), bytes);

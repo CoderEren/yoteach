@@ -241,35 +241,31 @@ test('drawing attaches only to grounded regions and follows the screen it was ca
   }
 });
 
-test('outside lectures, lessons and practice appear on the screen; lectures keep them in the app', async () => {
+test('pointing at a new mark is a moment: Yoyo goes back to idle on its own', async (t) => {
   const f = setup();
   try {
-    const tutor = await f.service.start(null, 'voice');
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const s = await f.service.start(null, 'voice');
     f.service.state.sharing = 'screen';
-    const still = f.screenStill();
-    f.service.acceptSnapshot(still);
-    await f.service.tool(tutor.id, {
-      name: 'open_visual_lesson',
-      lesson: 'glucose-phosphorylation',
-      step: 3,
-    });
-    assert.equal(f.service.state.lessonSurface, 'screen');
-    assert.equal(f.service.state.snapshot?.id, still.id, 'the screen grounding is kept');
-    await f.service.tool(tutor.id, { name: 'ask_practice_question' });
-    assert.equal(f.service.state.lessonSurface, 'screen');
-    assert.equal(f.opened(), 0);
-    f.service.end();
-    f.service.state.activeLessonId = null;
-    f.service.state.practice = null;
-
-    const lecture = await f.service.start(null, 'voice', f.doc.id, 1);
-    await f.service.tool(lecture.id, {
-      name: 'open_visual_lesson',
-      lesson: 'glucose-phosphorylation',
-      step: 1,
-    });
-    assert.equal(f.service.state.lessonSurface, 'app');
-    assert.equal(f.opened(), 1);
+    f.service.acceptSnapshot(f.screenStill());
+    f.service.preAnalyze();
+    const map = (await Promise.race([
+      f.service.screenMap(0),
+      new Promise((r) => {
+        t.mock.timers.tick(10);
+        setImmediate(r);
+      }),
+    ])) as Awaited<ReturnType<typeof f.service.screenMap>> | undefined;
+    const regionId = map?.regions[0]?.regionId ?? f.service.state.annotations[0]?.id;
+    assert.ok(regionId, 'a region to point at');
+    await f.service.tool(s.id, ToolSchema.parse({ name: 'draw_on_screen', marks: [{ regionId }] }));
+    assert.equal(f.service.state.activity, 'pointing');
+    t.mock.timers.tick(6000);
+    assert.equal(
+      f.service.state.activity,
+      'idle',
+      'never stuck on pointing, which blocked proactive help',
+    );
   } finally {
     f.cleanup();
   }

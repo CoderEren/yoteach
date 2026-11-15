@@ -41,6 +41,15 @@ export class StuckWatch {
     this.offered = true;
     return true;
   }
+  /** One line for diagnostics: how long on this screen, against the threshold. */
+  describe(now: number) {
+    if (this.since === null) return 'no screen yet (or too little text)';
+    const on = Math.round((now - this.since) / 1000),
+      need = Math.round(this.after(this.words.length) / 1000);
+    return this.offered
+      ? `same screen ${on} s · already offered`
+      : `same screen ${on} s of ${need} s`;
+  }
   /** The student acted (asked, changed screen, was away): start over. */
   reset() {
     this.since = null;
