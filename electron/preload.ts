@@ -1,6 +1,63 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi } from '../shared/model';
+function listen<T>(channel: string, fn: (value: T) => void) {
+  const listener = (_event: unknown, value: T) => fn(value);
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
+}
 const api: DesktopApi = {
+  overlay: {
+    interactive: (on) => ipcRenderer.invoke('overlay:interactive', on),
+    focus: (box) => ipcRenderer.invoke('overlay:focus', box),
+    onTrail: (fn) => listen('overlay:trail', fn),
+    onOffset: (fn) => listen('overlay:offset', fn),
+  },
+  tutor: {
+    get: () => ipcRenderer.invoke('tutor:get'),
+    intent: (action) => ipcRenderer.invoke('tutor:intent', action),
+    start: (topicId, mode, documentId, page) =>
+      ipcRenderer.invoke('tutor:start', { topicId, mode, documentId, page }),
+    end: (id) => ipcRenderer.invoke('tutor:end', id),
+    update: (patch) => ipcRenderer.invoke('tutor:update', patch),
+    transcript: (sessionId, role, text, eventId) =>
+      ipcRenderer.invoke('tutor:transcript', { sessionId, role, text, eventId }),
+    tool: (sessionId, tool) => ipcRenderer.invoke('tutor:tool', { sessionId, tool }),
+    spoken: (sessionId, caption, word) =>
+      ipcRenderer.invoke('tutor:spoken', { sessionId, caption, word }),
+    captureScreen: () => ipcRenderer.invoke('tutor:capture-screen'),
+    screenMap: () => ipcRenderer.invoke('tutor:screen-map'),
+    prepareSlide: (snapshot) => ipcRenderer.invoke('tutor:prepare-slide', snapshot),
+    slideBriefing: (waitMs) => ipcRenderer.invoke('tutor:slide-briefing', waitMs),
+    windows: () => ipcRenderer.invoke('tutor:windows'),
+    selectWindow: (id) => ipcRenderer.invoke('tutor:select-window', id),
+    validateWindow: (id, epoch) => ipcRenderer.invoke('tutor:validate-window', { id, epoch }),
+    sharePdf: (snapshot) => ipcRenderer.invoke('tutor:share-pdf', snapshot),
+    snapshot: (snapshot) => ipcRenderer.invoke('tutor:snapshot', snapshot),
+    stopSharing: () => ipcRenderer.invoke('tutor:stop-sharing'),
+    save: (id) => ipcRenderer.invoke('tutor:save', id),
+    deleteSession: (id) => ipcRenderer.invoke('tutor:delete-session', id),
+    deleteExplanation: (id) => ipcRenderer.invoke('tutor:delete-explanation', id),
+    deleteChat: (id) => ipcRenderer.invoke('tutor:delete-chat', id),
+    onChange: (fn) => listen('tutor:changed', fn),
+    onIntent: (fn) => {
+      const off = listen('tutor:intent', fn);
+      const stream = () => fn({ type: 'stop-sharing' });
+      ipcRenderer.on('tutor:stop-stream', stream);
+      return () => {
+        off();
+        ipcRenderer.removeListener('tutor:stop-stream', stream);
+      };
+    },
+    onNavigate: (fn) => listen('tutor:navigate', fn),
+  },
+  media: {
+    cancel: () => ipcRenderer.invoke('media:cancel'),
+    dismiss: () => ipcRenderer.invoke('media:dismiss'),
+    read: (id) => ipcRenderer.invoke('media:read', id),
+    remove: (id) => ipcRenderer.invoke('media:remove', id),
+  },
   getState: () => ipcRenderer.invoke('workspace:get'),
   command: (command) => ipcRenderer.invoke('workspace:command', command),
   pickPdf: (courseId, sample = false) => ipcRenderer.invoke('pdf:pick', { courseId, sample }),
@@ -8,6 +65,10 @@ const api: DesktopApi = {
   cancelImport: (token) => ipcRenderer.invoke('pdf:cancel', token),
   readPdf: (id) => ipcRenderer.invoke('pdf:read', id),
   companion: (action) => ipcRenderer.invoke('companion:action', action),
+  drag: (action) => ipcRenderer.invoke('companion:drag', action),
+  lectureFullScreen: (show) => ipcRenderer.invoke('lecture:fullscreen', show),
+  onPose: (fn) => listen('companion:pose', fn),
+  onCaption: (fn) => listen('caption:text', fn),
   onState: (callback) => {
     const listener = (_event: unknown, state: Parameters<typeof callback>[0]) => callback(state);
     ipcRenderer.on('workspace:changed', listener);

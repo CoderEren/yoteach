@@ -1,0 +1,28 @@
+{
+  "type": "client",
+  "name": "generate_illustration",
+  "description": "Generate an educational image or explanatory video with fal and save it locally. For video, describe the learning goal and the causal process: initial state, what changes, and observable result. The app plans three visible steps and displays readable captions. Use simple stable objects and a fixed view, not cinematic scenery. Never request baked-in text, formulas or labels. Videos take up to a few minutes; keep teaching while they render. Returns when started; a later update reports the result. You cannot see the finished clip, so do not claim its motion is scientifically verified.",
+  "expects_response": true,
+  "response_timeout_secs": 20,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "subject": {
+        "type": "string",
+        "description": "Study topic and what the student should understand, 3\u2013600 characters. Example: Paracrine signaling: a cell releases molecules, they diffuse through extracellular space to a nearby cell, bind matching surface receptors, and trigger a response; no bloodstream."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video"
+        ],
+        "description": "image or video; video is a silent explanation with three captioned steps, and may take a few minutes."
+      }
+    },
+    "required": [
+      "subject",
+      "kind"
+    ]
+  }
+}

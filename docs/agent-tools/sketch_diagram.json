@@ -1,0 +1,86 @@
+{
+  "type": "client",
+  "name": "sketch_diagram",
+  "description": "Sketch a small concept diagram on the student's screen in free space: a left-to-right flow or a cycle of 2\u20137 short nodes with labelled arrows. The app lays it out and draws it in. Use for processes, causes and comparisons that are not visible on screen. Never announce it (no \"Let me draw\", \"I'll sketch\", \"Let's look at\"); talk about the subject while it appears.",
+  "expects_response": true,
+  "response_timeout_secs": 10,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "diagram": {
+        "type": "object",
+        "description": "The diagram.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Short title, up to 60 characters."
+          },
+          "layout": {
+            "type": "string",
+            "enum": [
+              "flow",
+              "cycle"
+            ],
+            "description": "flow: left to right. cycle: around a circle in node order."
+          },
+          "nodes": {
+            "type": "array",
+            "description": "2\u20137 nodes.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Short ID: letters, digits, - or _."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Up to 40 characters."
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ]
+            }
+          },
+          "edges": {
+            "type": "array",
+            "description": "Up to 10 arrows.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "Node ID."
+                },
+                "to": {
+                  "type": "string",
+                  "description": "Node ID."
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Optional, up to 30 characters."
+                }
+              },
+              "required": [
+                "from",
+                "to"
+              ]
+            }
+          }
+        },
+        "required": [
+          "title",
+          "layout",
+          "nodes",
+          "edges"
+        ]
+      }
+    },
+    "required": [
+      "diagram"
+    ]
+  },
+  "pre_tool_speech": "off"
+}

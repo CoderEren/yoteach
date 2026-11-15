@@ -1,0 +1,25 @@
+{
+  "type": "client",
+  "name": "highlight_screen_region",
+  "description": "Highlight a grounded region on the full-screen lecture or desktop overlay and move Yoyo beside it. Use returned snapshotId and regionId only.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "snapshotId": {
+        "type": "string",
+        "description": "Exact snapshotId returned by analysis."
+      },
+      "regionId": {
+        "type": "string",
+        "description": "Exact regionId returned by analysis."
+      }
+    },
+    "required": [
+      "snapshotId",
+      "regionId"
+    ]
+  },
+  "pre_tool_speech": "off"
+}

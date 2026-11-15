@@ -1,0 +1,13 @@
+{
+  "type": "client",
+  "name": "clear_screen",
+  "description": "Remove your drawings and sketch from the student's screen.",
+  "expects_response": true,
+  "response_timeout_secs": 10,
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "pre_tool_speech": "off"
+}

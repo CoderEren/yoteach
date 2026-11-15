@@ -1,0 +1,41 @@
+[
+  {
+    "antipattern": "side-tab",
+    "name": "Side-tab accent border",
+    "description": "Thick colored border on one side of a card — the most recognizable tell of AI-generated UIs. Use a subtler accent or remove it entirely.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "/Users/eersin937/Desktop/YoTeach/src/styles.css",
+    "line": 3194,
+    "snippet": "border-left: 3px solid var(--iris)",
+    "importedBy": [
+      "main.tsx"
+    ]
+  },
+  {
+    "antipattern": "side-tab",
+    "name": "Side-tab accent border",
+    "description": "Thick colored border on one side of a card — the most recognizable tell of AI-generated UIs. Use a subtler accent or remove it entirely.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "/Users/eersin937/Desktop/YoTeach/src/styles.css",
+    "line": 3463,
+    "snippet": "border-left: 3px solid #b5623a",
+    "importedBy": [
+      "main.tsx"
+    ]
+  },
+  {
+    "antipattern": "side-tab",
+    "name": "Side-tab accent border",
+    "description": "Thick colored border on one side of a card — the most recognizable tell of AI-generated UIs. Use a subtler accent or remove it entirely.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "/Users/eersin937/Desktop/YoTeach/src/styles.css",
+    "line": 3658,
+    "snippet": "border-left: 3px solid var(--iris)",
+    "importedBy": [
+      "main.tsx"
+    ]
+  }
+]

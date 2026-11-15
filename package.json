@@ -15,9 +15,14 @@
     "predev": "node scripts/assets.mjs",
     "prebuild": "node scripts/assets.mjs",
     "format": "prettier --write src electron shared scripts tests *.ts",
-    "format:check": "prettier --check src electron shared scripts tests *.ts"
+    "format:check": "prettier --check src electron shared scripts tests *.ts",
+    "package:mac": "npm run build && node scripts/package-mac.mjs"
   },
   "dependencies": {
+    "@alexanderolsen/libsamplerate-js": "^2.1.2",
+    "@elevenlabs/client": "1.36.1",
+    "dotenv": "^18.0.10",
+    "gsap": "^3.14.2",
     "lucide-react": "^0.468.0",
     "pdfjs-dist": "6.5.438",
     "react": "19.3.1",

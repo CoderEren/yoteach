@@ -1,221 +1,302 @@
-import {
-  test,
-  expect,
-  _electron as electron,
-  type ElectronApplication,
-  type Page,
-} from '@playwright/test';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { mkdtempSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
-const captures = resolve('.impeccable/review');
-mkdirSync(captures, { recursive: true });
-async function launch(directory: string) {
-  const env: Record<string, string> = {
-    ...(process.env as Record<string, string>),
-    YOTEACH_DATA_DIR: directory,
-  };
+import { join, resolve } from 'node:path';
+async function launch(dir: string) {
+  const env = {
+    ...process.env,
+    YOTEACH_DATA_DIR: dir,
+    ELEVENLABS_API_KEY: '',
+    ELEVENLABS_AGENT_ID: '',
+    ANTHROPIC_API_KEY: '',
+  } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.YOTEACH_DEV_URL;
   const app = await electron.launch({ args: ['.'], env });
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
   const page = app.windows().find((w) => w.url().endsWith('#/'))!;
-  await expect(page.getByRole('heading', { name: 'Your space to understand.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
   return { app, page };
 }
-async function shot(page: Page, name: string) {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await new Promise(requestAnimationFrame);
-    await new Promise(requestAnimationFrame);
-  });
-  await page.screenshot({ path: join(captures, name + '.png'), animations: 'disabled' });
-}
-test('desktop journey: real PDF import, editing, native companion, security and restart persistence', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yoteach-e2e-'));
+test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-desktop-'));
   let app: ElectronApplication | undefined;
+  mkdirSync('.impeccable/review', { recursive: true });
   try {
-    let launched = await launch(dir);
-    app = launched.app;
-    let page = launched.page;
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await shot(page, 'empty-desktop');
-    await page.getByRole('button', { name: 'Explore a sample course' }).click();
-    await expect(
-      page.getByRole('button', { name: 'Glycolysis: an overview', exact: true }),
-    ).toBeVisible({ timeout: 30000 });
-    await shot(page, 'course-library');
-    await page.getByRole('button', { name: 'Energy investment phase', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Energy investment phase', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Edit topic', exact: true }).click();
-    await page
-      .getByLabel('Your notes & overview')
-      .fill('Why is ATP invested before it is produced?');
-    await page.getByRole('button', { name: 'Save topic', exact: true }).click();
-    await expect(
-      page.getByText('Why is ATP invested before it is produced?', { exact: true }),
-    ).toBeVisible();
-    await shot(page, 'topic-desktop');
-    await page
-      .getByRole('button', { name: 'Open Sample · Introduction to metabolism.pdf', exact: true })
-      .click();
-    await expect(page.getByLabel('Page number')).toHaveValue('3');
-    await expect(page.getByText('Loading page…', { exact: true })).not.toBeVisible();
-    await expect(page.locator('canvas')).toBeVisible();
-    await shot(page, 'pdf-desktop');
-    await page.getByRole('button', { name: 'Next page', exact: true }).click();
-    await expect(page.getByLabel('Page number')).toHaveValue('4');
-    await page.getByRole('button', { name: 'Extracted text', exact: true }).click();
-    await expect(page.locator('.pdf-text')).toContainText('Energy payoff phase');
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    // Native dialog is stubbed only in the test harness; the normal import/extraction path is unchanged.
+    await expect(page.locator('.primary-nav button')).toHaveCount(2);
+    await expect(page.getByText('Study with Yoyo', { exact: true })).toHaveCount(0);
+    await page.screenshot({ path: '.impeccable/review/ai-tutor.png' });
+    await page.getByRole('button', { name: 'Lectures', exact: true }).click();
     await app.evaluate(({ dialog }, path) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [path] });
     }, resolve('public/sample-lecture.pdf'));
-    await page.getByRole('button', { name: 'Add PDF', exact: true }).click();
-    await expect(page.locator('.import-progress')).not.toBeVisible({ timeout: 30000 });
-    await expect(
-      page.getByText('2 documents · 10 topics · Local workspace', { exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Add topic', exact: true }).click();
-    await page.getByLabel('Topic title').fill('Review questions');
-    await page.getByLabel('Place under').selectOption({ label: 'Energy investment phase' });
-    await page.getByRole('button', { name: 'Add topic', exact: true }).last().click();
-    await expect(
-      page.getByRole('heading', { name: 'Review questions', exact: true }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Delete topic', exact: true }).click();
-    await page.getByRole('button', { name: 'Remove', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Review questions', exact: true }),
-    ).not.toBeVisible();
-    await page.getByRole('button', { name: 'Rename course', exact: true }).click();
-    await page.getByLabel('Course name').fill('Biochemistry');
-    await page.getByRole('button', { name: 'Save name', exact: true }).click();
-    await page
-      .getByRole('button', { name: 'Energy investment phase', exact: true })
-      .first()
-      .click();
-    await page.getByRole('button', { name: 'Settings', exact: false }).click();
-    await page.getByRole('button', { name: 'Dark', exact: true }).click();
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await shot(page, 'topic-dark');
-    await page.getByRole('button', { name: 'yoteach home', exact: true }).click();
-    await shot(page, 'dashboard-dark');
-    await page.getByRole('button', { name: 'Settings', exact: false }).click();
-    await page.getByRole('button', { name: 'Light', exact: true }).click();
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await shot(page, 'dashboard-desktop');
-    const companion = app.windows().find((w) => w.url().includes('/companion'))!;
-    await expect(companion.getByRole('button', { name: 'Expand Yoyo panel' })).toBeVisible();
-    const winState = await app.evaluate(({ BrowserWindow }) =>
+    await page.getByRole('button', { name: /Upload a lecture PDF/ }).click();
+    await expect(page.locator('.lecture-upload')).toContainText('sample-lecture.pdf');
+    await page.screenshot({
+      path: `docs/overnight/cycle-3/${process.env.YOTEACH_EVIDENCE_PHASE ?? 'after'}.png`,
+    });
+    await expect(page.getByRole('status')).toContainText('not set up');
+    await expect(page.getByRole('button', { name: 'Run me through the lecture' })).toHaveAttribute(
+      'aria-describedby',
+      'lecture-setup',
+    );
+    await expect(page.locator('.lecture-new button')).toHaveCount(2);
+    await expect(page.getByRole('checkbox')).toHaveCount(0);
+    await expect(page.getByLabel('Ask Yoyo')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Why invest ATP/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0);
+    const state = await page.evaluate(() => window.yoteach.getState());
+    expect(state.ok && state.value.topics.length).toBe(0);
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
+    await page.getByRole('button', { name: 'sample-lecture.pdf', exact: true }).click();
+    await expect(page.locator('canvas')).toBeVisible();
+    await page.getByRole('button', { name: 'Next page', exact: true }).click();
+    await expect(page.getByLabel('Page number')).toHaveValue('2');
+    await page.getByRole('button', { name: 'Extracted text', exact: true }).click();
+    await expect(page.locator('.pdf-text')).toContainText('Glycolysis');
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    await page.screenshot({ path: '.impeccable/review/lecture-library.png' });
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    for (const theme of ['Light', 'System', 'Dark']) {
+      await page.getByRole('radio', { name: theme, exact: true }).click();
+      await expect(page.getByRole('radio', { name: theme, exact: true })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    }
+    await page.getByRole('radio', { name: 'Dark', exact: true }).click();
+    await expect(page.getByRole('radio', { name: 'Dark', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await page.screenshot({ path: '.impeccable/review/settings.png' });
+    for (const key of ['control', 'right-control', 'fn', 'right-option', 'f8']) {
+      await page.getByLabel('Global talk key').selectOption(key);
+      await expect(page.getByLabel('Global talk key')).toHaveValue(key);
+    }
+    await page.getByRole('switch', { name: 'Offer help' }).check();
+    await page.getByRole('switch', { name: 'Offer help' }).uncheck();
+    await page.getByRole('button', { name: 'Close dialog' }).click();
+    await page.screenshot({ path: '.impeccable/review/lecture-dark.png' });
+    const pet = app.windows().find((w) => w.url().includes('/companion'))!;
+    const before = await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().map((w) => ({
+        fullscreen: w.isFullScreenable(),
         url: w.webContents.getURL(),
-        alwaysOnTop: w.isAlwaysOnTop(),
-        bounds: w.getBounds(),
         preferences: (w.webContents as any).getLastWebPreferences(),
       })),
     );
-    expect(winState.find((w) => w.url.includes('/companion'))?.alwaysOnTop).toBe(true);
-    for (const w of winState) {
+    expect(before.find((w) => w.url.includes('/companion'))?.fullscreen).toBe(false);
+    for (const w of before) {
       expect(w.preferences.contextIsolation).toBe(true);
-      expect(w.preferences.nodeIntegration).toBe(false);
       expect(w.preferences.sandbox).toBe(true);
+      expect(w.preferences.nodeIntegration).toBe(false);
     }
-    await companion.getByRole('button', { name: 'Expand Yoyo panel' }).click();
-    await expect(companion.getByText('Animation preview', { exact: true })).toBeVisible();
-    await expect(companion.getByText('Energy investment phase', { exact: true })).toBeVisible();
-    for (const state of [
-      'Listening',
-      'Thinking',
-      'Speaking',
-      'Pointing',
-      'Celebrating',
-      'Unavailable',
-      'Idle',
-    ])
-      await companion.getByRole('button', { name: state, exact: true }).click();
-    await shot(companion, 'companion-expanded');
-    await companion.getByRole('button', { name: 'Hide Yoyo', exact: true }).click();
-    expect(
-      await app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => w.webContents.getURL().includes('/companion'))
-          ?.isVisible(),
-      ),
-    ).toBe(false);
-    await page.getByRole('button', { name: 'Show Yoyo', exact: true }).first().click();
-    expect(
-      await app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => w.webContents.getURL().includes('/companion'))
-          ?.isVisible(),
-      ),
-    ).toBe(true);
-    await companion.getByRole('button', { name: 'Collapse Yoyo', exact: true }).click();
-    await app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().includes('/companion'),
-      )!;
-      w.setPosition(120, 120);
-    });
-    await expect
-      .poll(() =>
-        app!.evaluate(
-          ({ BrowserWindow }) =>
-            BrowserWindow.getAllWindows()
-              .find((w) => w.webContents.getURL().includes('/companion'))
-              ?.getBounds().x,
-        ),
-      )
-      .toBe(120);
-    expect(await page.evaluate(() => typeof (window as any).require)).toBe('undefined');
-    expect((await page.evaluate(() => window.yoteach.readPdf('../../etc/passwd'))).ok).toBe(false);
-    expect(
-      (
-        await companion.evaluate(() =>
-          window.yoteach.command({ type: 'course.create', title: 'Forbidden', color: 'iris' }),
-        )
-      ).ok,
-    ).toBe(false);
-    // Minimum supported desktop viewport.
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
-        .find((w) => !w.webContents.getURL().includes('/companion'))!
+        .find((w) => w.webContents.getURL().includes('/companion'))!
+        .setBounds({ x: 0, y: 0, width: 1512, height: 977 }),
+    );
+    await page.evaluate(() => window.yoteach.companion('hide'));
+    await page.evaluate(() => window.yoteach.companion('show'));
+    const bounds = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().includes('/companion'))!
+        .getBounds(),
+    );
+    expect([bounds.width, bounds.height]).toEqual([150, 165]); // the smaller Yoyo
+    await expect(pet.getByRole('button')).toHaveCount(1);
+    await expect(pet.locator('.drag-grip, .yoyo-caption, .companion-panel')).toHaveCount(0);
+    await pet.evaluate(async () => {
+      await window.yoteach.drag({ phase: 'start', x: 100, y: 100 });
+      await window.yoteach.drag({ phase: 'move', x: 300, y: 240 });
+      await window.yoteach.drag({ phase: 'end', x: 300, y: 240 });
+    });
+    for (const [x, y] of [
+      [-10000, -10000],
+      [10000, -10000],
+      [10000, 10000],
+      [-10000, 10000],
+    ]) {
+      await pet.evaluate(
+        async ({ x, y }) => {
+          await window.yoteach.drag({ phase: 'start', x: 100, y: 100 });
+          await window.yoteach.drag({ phase: 'move', x, y });
+          await window.yoteach.drag({ phase: 'end', x, y });
+        },
+        { x, y },
+      );
+      expect(
+        await app.evaluate(({ BrowserWindow, screen }) => {
+          const b = BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('/companion'))!
+            .getBounds();
+          const a = screen.getDisplayMatching(b).workArea;
+          return (
+            b.x >= a.x &&
+            b.y >= a.y &&
+            b.x + b.width <= a.x + a.width &&
+            b.y + b.height <= a.y + a.height
+          );
+        }),
+      ).toBe(true);
+    }
+    const position = await page.evaluate(() => window.yoteach.getState());
+    expect(position.ok && position.value.settings.mascotPosition).toBeTruthy();
+    await pet.screenshot({ path: '.impeccable/review/yoyo-idle.png', animations: 'disabled' });
+    await pet.emulateMedia({ reducedMotion: 'reduce' });
+    expect(
+      await pet.locator('.yoyo-float').evaluate((el) => getComputedStyle(el).animationName),
+    ).toBe('none');
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().endsWith('#/'))!
         .setSize(1000, 720),
     );
-    await shot(page, 'dashboard-small');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    expect((await pet.evaluate(() => window.yoteach.tutor.start(null, 'text'))).ok).toBe(false);
+    expect((await page.evaluate(() => window.yoteach.readPdf('../../etc/passwd'))).ok).toBe(false);
     await app.close();
     app = undefined;
-    launched = await launch(dir);
-    app = launched.app;
-    page = launched.page;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Saved material', exact: true }).click();
     await expect(
-      page.getByRole('button', { name: 'Continue learning', exact: true }),
+      page.getByRole('button', { name: 'sample-lecture.pdf', exact: true }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Continue learning', exact: true }).click();
-    await expect(
-      page.getByText('Why is ATP invested before it is produced?', { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Biochemistry', exact: true })).toBeVisible();
-    await page
-      .getByRole('button', { name: 'Open Sample · Introduction to metabolism.pdf', exact: true })
-      .click();
-    await expect(page.getByLabel('Page number')).toHaveValue('3');
-    await expect(page.getByText('Loading page…', { exact: true })).not.toBeVisible();
-    await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete course', exact: true }).click();
-    await page.getByRole('button', { name: 'Remove', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Start with something you’re learning.', exact: true }),
-    ).toBeVisible();
+    const restored = await page.evaluate(() => window.yoteach.getState());
+    expect(restored.ok && restored.value.settings.talkKey).toBe('f8');
+    expect(restored.ok && restored.value.settings.theme).toBe('dark');
+    expect(restored.ok && restored.value.settings.proactiveHelp).toBe(false);
+    expect(restored.ok && restored.value.settings.mascotPosition).toEqual(
+      position.ok && position.value.settings.mascotPosition,
+    );
     expect(errors).toEqual([]);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Yoyo visibility is keyboard-operable in Settings and persists both ways', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-visibility-'));
+  let app: ElectronApplication | undefined;
+  try {
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    const visible = page.getByRole('switch', { name: 'Show Yoyo', exact: true });
+    await expect(visible).toBeChecked();
+    const selector =
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]';
+    const count = await dialog.locator(selector).count();
+    const visited = new Set<number>();
+    for (let i = 0; i < count; i++) {
+      await page.keyboard.press('Tab');
+      visited.add(
+        await dialog.evaluate(
+          (el, selector) =>
+            Array.from(el.querySelectorAll(selector)).indexOf(document.activeElement!),
+          selector,
+        ),
+      );
+    }
+    expect([...visited].sort((a, b) => a - b)).toEqual(Array.from({ length: count }, (_, i) => i));
+    await expect(page.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.locator(selector).last()).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+    await visible.focus();
+    await page.keyboard.press('Space');
+    await expect(visible).not.toBeChecked();
+    await expect
+      .poll(() =>
+        app!.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('/companion'))!
+            .isVisible(),
+        ),
+      )
+      .toBe(false);
+    await page.screenshot({ path: 'docs/overnight/cycle-5/after.png', animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(page.locator('.sidebar-companion')).toContainText('Yoyo is hidden.');
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeFocused();
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const restored = page.getByRole('switch', { name: 'Show Yoyo', exact: true });
+    await expect(restored).not.toBeChecked();
+    await restored.focus();
+    await page.keyboard.press('Space');
+    await expect(restored).toBeChecked();
+    await expect
+      .poll(() =>
+        app!.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('/companion'))!
+            .isVisible(),
+        ),
+      )
+      .toBe(true);
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    const state = await boot.page.evaluate(() => window.yoteach.getState());
+    expect(state.ok && state.value.settings.mascotVisible).toBe(true);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('packaged Yoteach starts with its own identity and isolated data', async () => {
+  test.skip(
+    !existsSync('release/Yoteach.app/Contents/MacOS/Yoteach'),
+    'Run npm run package:mac to include the packaged launch check.',
+  );
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-bundle-'));
+  const env = {
+    ...process.env,
+    YOTEACH_DATA_DIR: dir,
+    ELEVENLABS_API_KEY: '',
+    ELEVENLABS_AGENT_ID: '',
+    ANTHROPIC_API_KEY: '',
+  } as Record<string, string>;
+  delete env.ELECTRON_RUN_AS_NODE;
+  delete env.YOTEACH_DEV_URL;
+  let app: ElectronApplication | undefined;
+  try {
+    app = await electron.launch({
+      executablePath: resolve('release/Yoteach.app/Contents/MacOS/Yoteach'),
+      args: [],
+      env,
+    });
+    await expect.poll(() => app!.windows().some((w) => w.url().endsWith('#/'))).toBe(true);
+    const page = app.windows().find((w) => w.url().endsWith('#/'))!;
+    await expect(page.getByRole('button', { name: 'Chats', exact: true })).toBeVisible();
+    const info = await app.evaluate(({ app }) => ({
+      packaged: app.isPackaged,
+      name: app.getName(),
+      data: app.getPath('userData'),
+    }));
+    expect(info).toEqual({ packaged: true, name: 'yoteach', data: dir });
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

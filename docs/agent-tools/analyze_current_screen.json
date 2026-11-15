@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "analyze_current_screen",
+  "description": "Analyze the current lecture PDF slide or screen snapshot automatically captured for the held question. Returns explanation, snapshotId and grounded regionIds. Use before explaining visible content; never claim continuous screen access.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "question": {
+        "type": "string",
+        "description": "The student\u2019s specific question about the visible material."
+      }
+    },
+    "required": [
+      "question"
+    ]
+  }
+}

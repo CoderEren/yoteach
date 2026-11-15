@@ -1,0 +1,18 @@
+{
+  "type": "client",
+  "name": "celebrate",
+  "description": "Yoyo does a short happy celebration on the student's screen. Use it when the student confirms they understood (\"yes, that's clear\"), gets a question right, or finishes a lecture. At most once per success; never for routine replies.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "reason": {
+        "type": "string",
+        "description": "Optional few words on what is being celebrated."
+      }
+    },
+    "required": []
+  },
+  "pre_tool_speech": "off"
+}

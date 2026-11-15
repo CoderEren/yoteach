@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "save_explanation",
+  "description": "Save the most recent assistant explanation in the current tutoring or lecture session, only when the student asks to save it. Explain first, then call this tool.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "A concise meaningful title, at most 120 characters."
+      }
+    },
+    "required": [
+      "title"
+    ]
+  }
+}

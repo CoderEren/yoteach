@@ -1,0 +1,83 @@
+{
+  "type": "client",
+  "name": "draw_on_screen",
+  "description": "Draw directly on the student's screen or lecture slide, on what is already there: circle a term, underline a phrase, highlight a definition, box a structure, arrow to a step, and connect parts with labelled arrows. Target each mark by quoting the exact visible words (quote), or by a regionId from the screen map. Animated like handwriting; Yoyo flies to the first mark. Build an explanation with several small calls (clear:false) as you speak: two or three marks per idea, each added when you reach that part; the app draws at most 3 marks and 2 connections per call and keeps 5 marks on screen. If the content is on screen, annotate it here rather than copying it into a sketch, and show the mechanism behind it moving with sketch_on_screen: marks point, the sketch explains. Never announce it (no \"Let me draw\", \"I'll sketch\", \"Let's look at\"); talk about the subject while it appears. Quotes target text only. For a cell, molecule, diagram or other pictured object, use a regionId whose target is visual. Never box a caption or heading to stand in for the object. If the map lacks the object, call analyze_current_screen with the specific target first; do not guess. A missed quote means no mark was drawn: use the returned error to recover, not claim success.",
+  "expects_response": true,
+  "response_timeout_secs": 10,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "marks": {
+        "type": "array",
+        "description": "Up to 3 marks: the parts your current sentence is about.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "quote": {
+              "type": "string",
+              "description": "Exact visible words to mark (two to eight words, copied as written on screen or slide). Preferred."
+            },
+            "regionId": {
+              "type": "string",
+              "description": "Alternatively, a regionId from the screen map."
+            },
+            "shape": {
+              "type": "string",
+              "enum": [
+                "highlight",
+                "circle",
+                "underline",
+                "box",
+                "arrow",
+                "point"
+              ],
+              "description": "How to mark the region."
+            },
+            "label": {
+              "type": "string",
+              "description": "Optional few-word label, up to 60 characters."
+            }
+          },
+          "required": [
+            "shape"
+          ]
+        }
+      },
+      "connections": {
+        "type": "array",
+        "description": "Up to 2 labelled arrows between two regions.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "description": "Start: an exact visible quote or a regionId."
+            },
+            "to": {
+              "type": "string",
+              "description": "End: an exact visible quote or a regionId."
+            },
+            "label": {
+              "type": "string",
+              "description": "Optional label, up to 40 characters."
+            }
+          },
+          "required": [
+            "from",
+            "to"
+          ]
+        }
+      },
+      "clear": {
+        "type": "boolean",
+        "description": "true replaces your previous drawing; false adds to it."
+      }
+    },
+    "required": [
+      "marks",
+      "connections",
+      "clear"
+    ]
+  },
+  "pre_tool_speech": "off"
+}

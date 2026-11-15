@@ -1,0 +1,92 @@
+
+Running 12 tests using 1 worker
+
+(node:34904) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore (5.4s)
+  ✘   2 tests/app.e2e.ts:189:1 › Yoyo visibility is keyboard-operable in Settings and persists both ways (6.2s)
+(node:35105) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -   3 tests/app.e2e.ts:269:1 › packaged Yoteach starts with its own identity and isolated data
+  ✓   4 tests/tutor.e2e.ts:179:1 › full-screen lecture teaches, grounds six tools, accepts questions and preserves history (4.9s)
+  ✘   5 tests/tutor.e2e.ts:287:1 › held microphone streams only while held, captures screen, cancels drag and stops on pause (7.4s)
+(node:35198) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   6 tests/tutor.e2e.ts:417:1 › proactive help: a screen held too long gets one on-device "Stuck?" offer (5.2s)
+  ✓   7 tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect (2.2s)
+  ✓   8 tests/tutor.e2e.ts:515:1 › Yoyo teaches on the screen: draws on regions, sketches, celebrates, and captures each held question (10.3s)
+  ✓   9 tests/tutor.e2e.ts:752:1 › images Yoyo makes with fal show progress, explain failure and survive restart (9.4s)
+  ✓  10 tests/tutor.e2e.ts:898:1 › Stage 3 demo: lecture → fal media → saved restart → replay (7.0s)
+  ✓  11 tests/tutor.e2e.ts:1000:1 › flow particles stay separated on short paths and respect live reduced-motion changes (3.1s)
+  ✓  12 tests/tutor.e2e.ts:1062:1 › recorded live answers render across twelve subjects (9.2s)
+
+
+  1) tests/app.e2e.ts:189:1 › Yoyo visibility is keyboard-operable in Settings and persists both ways 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  getByRole('button', { name: 'Settings', exact: true })
+    Expected: focused
+    Received: inactive
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeFocused" getByRole('button', { name: 'Settings', exact: true }) with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Settings', exact: true })
+        14 × locator resolved to <button class="sidebar-setting">…</button>
+           - unexpected value "inactive"
+
+
+      234 |     await expect(dialog).not.toBeVisible();
+      235 |     await expect(page.locator('.sidebar-companion')).toContainText('Yoyo is hidden.');
+    > 236 |     await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeFocused();
+          |                                                                               ^
+      237 |     await app.close();
+      238 |     app = undefined;
+      239 |     boot = await launch(dir);
+        at /Users/eersin937/Desktop/YoTeach/tests/app.e2e.ts:236:79
+
+    Error Context: test-results/app.e2e.ts-Yoyo-visibility-d85d9-ings-and-persists-both-ways/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/app.e2e.ts-Yoyo-visibility-d85d9-ings-and-persists-both-ways/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/app.e2e.ts-Yoyo-visibility-d85d9-ings-and-persists-both-ways/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) tests/tutor.e2e.ts:287:1 › held microphone streams only while held, captures screen, cancels drag and stops on pause 
+
+    Error: expect(received).toBeGreaterThan(expected)
+
+    Expected: > 9
+    Received:   9
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      308 |     const held = provider.chunks();
+      309 |     await page.mouse.up();
+    > 310 |     await expect.poll(() => provider.chunks()).toBeGreaterThan(held);
+          |                                                ^
+      311 |     await expect.poll(async () => (await runtime(page)).input).toBe('idle');
+      312 |     expect(provider.messages.filter((m) => m.type === 'user_activity')).toHaveLength(0);
+      313 |     // Nothing more leaves once the hold is over.
+        at /Users/eersin937/Desktop/YoTeach/tests/tutor.e2e.ts:310:48
+
+    Error Context: test-results/tutor.e2e.ts-held-micropho-8f79a-els-drag-and-stops-on-pause/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tutor.e2e.ts-held-micropho-8f79a-els-drag-and-stops-on-pause/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tutor.e2e.ts-held-micropho-8f79a-els-drag-and-stops-on-pause/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    tests/app.e2e.ts:189:1 › Yoyo visibility is keyboard-operable in Settings and persists both ways 
+    tests/tutor.e2e.ts:287:1 › held microphone streams only while held, captures screen, cancels drag and stops on pause 
+  1 skipped
+  9 passed (1.2m)

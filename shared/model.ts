@@ -1,4 +1,13 @@
 import { z } from 'zod';
+import { GeneratedMediaSchema, type MediaType } from './media';
+import {
+  StudySessionSchema,
+  MessageSchema,
+  ExplanationSchema,
+  ChatSchema,
+  SlideDrawingSchema,
+  type TutorApi,
+} from './tutor';
 export const Id = z.uuid();
 export const Title = z
   .string()
@@ -34,7 +43,7 @@ export const HeadingSchema = z.object({
 });
 export const DocumentSchema = z.object({
   id: Id,
-  courseId: Id,
+  courseId: Id.nullable(),
   originalName: z.string().max(240),
   filename: z.string().regex(/^[a-f0-9-]{36}\.pdf$/),
   pageCount: z.number().int().min(1).max(500),
@@ -47,16 +56,25 @@ export const SettingsSchema = z.object({
   mascotVisible: z.boolean(),
   mascotPosition: z.object({ x: z.number().int(), y: z.number().int() }).nullable(),
   lastTopicId: Id.nullable(),
+  talkKey: z.enum(['control', 'fn', 'right-control', 'right-option', 'f8']).default('control'),
+  /** Offer help when the student seems stuck on one screen (checked on-device only). */
+  proactiveHelp: z.boolean().default(true),
 });
 export const ActivitySchema = z.object({
   id: Id,
-  courseId: Id,
+  courseId: Id.nullable(),
   topicId: Id.nullable(),
   text: z.string().max(300),
   createdAt: Stamp,
 });
 export const StateSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(8),
+  chats: z.array(ChatSchema),
+  slideDrawings: z.array(SlideDrawingSchema),
+  media: z.array(GeneratedMediaSchema),
+  sessions: z.array(StudySessionSchema),
+  messages: z.array(MessageSchema),
+  explanations: z.array(ExplanationSchema),
   courses: z.array(CourseSchema),
   topics: z.array(TopicSchema),
   documents: z.array(DocumentSchema),
@@ -92,34 +110,85 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('topic.delete'), id: Id }),
   z.object({ type: z.literal('topic.open'), id: Id }),
   z.object({ type: z.literal('document.delete'), id: Id }),
-  z.object({ type: z.literal('settings.update'), theme: SettingsSchema.shape.theme }),
+  z.object({
+    type: z.literal('settings.update'),
+    theme: SettingsSchema.shape.theme.optional(),
+    // Defaults belong to loading old workspaces, never to partial edits.
+    talkKey: SettingsSchema.shape.talkKey.removeDefault().optional(),
+    proactiveHelp: z.boolean().optional(),
+  }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 export const ImportSchema = z.object({
   token: Id,
-  courseId: Id,
+  courseId: Id.nullable(),
   pages: z.array(PageSchema).min(1).max(500),
-  headings: z.array(HeadingSchema).max(100),
-  organization: DocumentSchema.shape.organization,
+  headings: z.array(HeadingSchema).max(100).default([]),
+  organization: DocumentSchema.shape.organization.default('fallback'),
 });
 export type ImportPayload = z.infer<typeof ImportSchema>;
 export type PendingImport = { token: string; name: string; bytes: Uint8Array };
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+export interface MediaApi {
+  cancel(): Promise<Result<void>>;
+  dismiss(): Promise<Result<void>>;
+  read(id: string): Promise<Result<{ bytes: Uint8Array; contentType: MediaType }>>;
+  remove(id: string): Promise<Result<void>>;
+}
 export interface DesktopApi {
+  /** Only the on-screen layer uses this: make the area under the pointer clickable. */
+  overlay: {
+    interactive(on: boolean): Promise<Result<void>>;
+    /** Ask Yoyo to fly beside a box on the overlay (normalized). */
+    focus(box: { x: number; y: number; width: number; height: number }): Promise<Result<void>>;
+    /** How far the layer sits from where it was asked to be (macOS can move windows). */
+    onOffset(fn: (offset: { x: number; y: number }) => void): () => void;
+    /** Cursor ink while the talk key is held (display-normalised points, t in ms). */
+    onTrail(
+      fn: (
+        e:
+          | { type: 'start'; points: { x: number; y: number; t: number }[] }
+          | { type: 'add'; point: { x: number; y: number; t: number } }
+          | { type: 'end' },
+      ) => void,
+    ): () => void;
+  };
+  tutor: TutorApi;
+  media: MediaApi;
   getState(): Promise<Result<AppState>>;
   command(command: Command): Promise<Result<AppState>>;
-  pickPdf(courseId: string, sample?: boolean): Promise<Result<PendingImport | null>>;
+  pickPdf(courseId: string | null, sample?: boolean): Promise<Result<PendingImport | null>>;
   finishImport(payload: ImportPayload): Promise<Result<AppState>>;
   cancelImport(token: string): Promise<Result<void>>;
   readPdf(id: string): Promise<Result<Uint8Array>>;
   companion(action: 'show' | 'hide' | 'expand' | 'collapse' | 'workspace'): Promise<Result<void>>;
+  drag(action: { phase: 'start' | 'move' | 'end'; x: number; y: number }): Promise<Result<void>>;
+  lectureFullScreen(show: boolean): Promise<Result<void>>;
+  onPose(callback: (pose: { direction: 'left' | 'right' | null }) => void): () => void;
+  /** Only the subtitle window uses this: the phrase Yoyo is saying and where Yoyo is. */
+  onCaption(
+    callback: (caption: { text: string; placement: 'above' | 'below' }) => void,
+  ): () => void;
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
-  version: 1,
+  version: 8,
+  chats: [],
+  slideDrawings: [],
+  media: [],
+  sessions: [],
+  messages: [],
+  explanations: [],
   courses: [],
   topics: [],
   documents: [],
   activities: [],
-  settings: { theme: 'system', mascotVisible: true, mascotPosition: null, lastTopicId: null },
+  settings: {
+    theme: 'system',
+    mascotVisible: true,
+    mascotPosition: null,
+    lastTopicId: null,
+    talkKey: 'control',
+    proactiveHelp: true,
+  },
 });

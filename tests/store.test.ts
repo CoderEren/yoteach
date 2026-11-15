@@ -13,6 +13,21 @@ function setup() {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
+test('partial settings changes preserve a chosen talk key across restart', () => {
+  const { dir, store, cleanup } = setup();
+  try {
+    store.command({ type: 'settings.update', talkKey: 'f8' });
+    store.command({ type: 'settings.update', proactiveHelp: false });
+    assert.equal(store.snapshot().settings.talkKey, 'f8');
+    store.command({ type: 'settings.update', theme: 'dark' });
+    const settings = new Store(dir).snapshot().settings;
+    assert.equal(settings.talkKey, 'f8');
+    assert.equal(settings.proactiveHelp, false);
+    assert.equal(settings.theme, 'dark');
+  } finally {
+    cleanup();
+  }
+});
 test('courses, nested topics, notes and settings survive reopening', () => {
   const { dir, store, cleanup } = setup();
   try {
@@ -109,10 +124,9 @@ test('PDF ownership, source refs and deletion preserve originals and remove owne
       'Lecture.pdf',
       bytes,
     );
-    const doc = state.documents[0],
-      topic = state.topics[0];
+    const doc = state.documents[0];
     assert.deepEqual(store.readPdf(doc.id), bytes);
-    assert.equal(topic.sourceRefs[0].documentId, doc.id);
+    assert.equal(state.topics.length, 0);
     assert.throws(
       () =>
         store.importPdf(
@@ -130,7 +144,7 @@ test('PDF ownership, source refs and deletion preserve originals and remove owne
     );
     store.command({ type: 'document.delete', id: doc.id });
     assert.equal(readdirSync(store.documentsDir).length, 0);
-    assert.equal(store.snapshot().topics[0].sourceRefs.length, 0);
+    assert.equal(store.snapshot().topics.length, 0);
     assert.ok(existsSync(original));
     store.command({ type: 'course.delete', id: c.id });
     assert.equal(store.snapshot().topics.length, 0);

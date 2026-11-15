@@ -1,0 +1,82 @@
+
+Running 2 tests using 1 worker
+
+(node:8523) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore (7.4s)
+(node:8647) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect (6.5s)
+
+
+  1) tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByRole('status')
+    Expected substring: "not set up"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByRole('status') with timeout 5000ms
+      - waiting for getByRole('status')
+
+
+      39 |     await expect(page.locator('.lecture-upload')).toContainText('sample-lecture.pdf');
+      40 |     await page.screenshot({ path: `docs/overnight/cycle-3/${process.env.YOTEACH_EVIDENCE_PHASE ?? 'after'}.png` });
+    > 41 |     await expect(page.getByRole('status')).toContainText('not set up');
+         |                                            ^
+      42 |     await expect(page.getByRole('button', { name: 'Run me through the lecture' })).toHaveAttribute('aria-describedby', 'lecture-setup');
+      43 |     await expect(page.locator('.lecture-new button')).toHaveCount(2);
+      44 |     await expect(page.getByRole('checkbox')).toHaveCount(0);
+        at /Users/eersin937/Desktop/YoTeach/tests/app.e2e.ts:41:44
+
+    Error Context: test-results/app.e2e.ts-Chats-and-Lectu-4b34d-gable-companion-and-restore/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/app.e2e.ts-Chats-and-Lectu-4b34d-gable-companion-and-restore/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/app.e2e.ts-Chats-and-Lectu-4b34d-gable-companion-and-restore/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByRole('alert')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByRole('alert') with timeout 5000ms
+      - waiting for getByRole('alert')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      490 |     await expect(page.getByRole('alert')).toBeVisible();
+      491 |     await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+    > 492 |     await expect(page.getByRole('alert')).toHaveCount(0);
+          |                                           ^
+      493 |     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-end' }));
+      494 |     expect((await runtime(page)).input).toBe('idle');
+      495 |     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-start' }));
+        at /Users/eersin937/Desktop/YoTeach/tests/tutor.e2e.ts:492:43
+
+    Error Context: test-results/tutor.e2e.ts-failed-voice--5a1eb-d-the-next-hold-can-connect/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tutor.e2e.ts-failed-voice--5a1eb-d-the-next-hold-can-connect/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tutor.e2e.ts-failed-voice--5a1eb-d-the-next-hold-can-connect/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2 failed
+    tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore 
+    tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect 

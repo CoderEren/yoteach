@@ -1,0 +1,222 @@
+{
+  "type": "client",
+  "name": "sketch_on_screen",
+  "description": "Silently show one compact, legible teaching scene of the real thing, moving: the molecules, forces, flows or objects behind what the student is looking at (an enzyme binding substrate behind a saturation curve, electrons behind a circuit law). Use it on most explanations, also when the topic is already on screen: annotate the screen with draw_on_screen and sketch the mechanism here beside it. First say a short subject-matter sentence, then call this tool without announcing it. Prefer 4\u20138 elements and 1\u20132 build steps for the initial answer, with one flow or pulse where useful (the app keeps at most two flows and one pulse). One sketch per idea; it replaces the previous one. Draw actual objects, graphs, maps or sentence structure rather than a box chart. Space labels apart. Use soft filled shapes, curves and arrows. flow moves particles; pulse travels along a path; moveTo moves an object. Use near to sit beside a grounded screen region. Keep teaching after the result; never describe tool use or say \u201cLet me show you\u201d.",
+  "expects_response": true,
+  "response_timeout_secs": 10,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Short title, up to 60 characters."
+      },
+      "elements": {
+        "type": "array",
+        "description": "1-30 elements in explanation order.",
+        "items": {
+          "type": "object",
+          "description": "One element. Coordinates are [x,y] on a 100x70 canvas, y down.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "arrow",
+                "line",
+                "curve",
+                "circle",
+                "box",
+                "dot",
+                "text",
+                "axes",
+                "shape",
+                "ellipse",
+                "flow",
+                "pulse"
+              ],
+              "description": "Element kind. shape: closed smooth outline through points (cell body, organ, membrane patch). ellipse: at + rx/ry. flow: particles moving along path forever. pulse: travelling glow along path."
+            },
+            "from": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "arrow/line start [x,y]."
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "arrow/line end [x,y]."
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "description": "x then y."
+                },
+                "description": "[x,y]"
+              },
+              "description": "curve points 2-24, or shape outline points (3+, it closes itself)."
+            },
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "circle centre, box top-left, dot or text position [x,y]."
+            },
+            "r": {
+              "type": "number",
+              "description": "circle radius."
+            },
+            "w": {
+              "type": "number",
+              "description": "box width."
+            },
+            "h": {
+              "type": "number",
+              "description": "box height."
+            },
+            "origin": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "axes origin [x,y]."
+            },
+            "xLabel": {
+              "type": "string",
+              "description": "axes x label."
+            },
+            "yLabel": {
+              "type": "string",
+              "description": "axes y label."
+            },
+            "label": {
+              "type": "string",
+              "description": "Up to 40 characters."
+            },
+            "text": {
+              "type": "string",
+              "description": "text element content, up to 60 characters."
+            },
+            "dashed": {
+              "type": "boolean",
+              "description": "Dashed stroke (e.g. a resultant or guide line)."
+            },
+            "tone": {
+              "type": "string",
+              "enum": [
+                "ink",
+                "accent",
+                "muted",
+                "blue",
+                "green",
+                "pink",
+                "yellow"
+              ],
+              "description": "Stroke colour."
+            },
+            "step": {
+              "type": "integer",
+              "description": "Build step 1-8 this element appears in; the scene pauses between steps. Omit for step 1."
+            },
+            "moveTo": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "Optional [x,y]: after drawing, glide the element so its start point lands here (animation)."
+            },
+            "path": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "description": "x then y."
+                },
+                "description": "[x,y]"
+              },
+              "description": "flow/pulse route, 2-40 points [x,y]; particles or the glow travel from first to last."
+            },
+            "rx": {
+              "type": "number",
+              "description": "ellipse horizontal radius."
+            },
+            "ry": {
+              "type": "number",
+              "description": "ellipse vertical radius."
+            },
+            "fill": {
+              "type": "string",
+              "enum": [
+                "ink",
+                "accent",
+                "muted",
+                "blue",
+                "green",
+                "pink",
+                "yellow"
+              ],
+              "description": "Soft fill for shape, ellipse, circle or box."
+            },
+            "width": {
+              "type": "number",
+              "description": "Stroke width 0.3-6 (default 0.7); 2-4 for an axon, vessel or wire."
+            },
+            "count": {
+              "type": "number",
+              "description": "flow: number of particles 1-12 (default 5)."
+            },
+            "symbol": {
+              "type": "string",
+              "description": "flow: text inside each particle, up to 4 characters, e.g. Na+, K+, e-, O2."
+            },
+            "seconds": {
+              "type": "number",
+              "description": "flow: seconds for one trip (default 3). pulse: seconds per sweep (default 2)."
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      },
+      "near": {
+        "type": "string",
+        "description": "Optional regionId from the screen map to sit beside."
+      },
+      "captions": {
+        "type": "array",
+        "description": "Optional caption per step, shown under the scene as it plays (up to 120 characters each).",
+        "items": {
+          "type": "string",
+          "description": "Caption for that step."
+        }
+      },
+      "size": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "large"
+        ],
+        "description": "large for a detailed scene (neuron, heart, cell); default normal."
+      }
+    },
+    "required": [
+      "title",
+      "elements"
+    ]
+  },
+  "pre_tool_speech": "off"
+}

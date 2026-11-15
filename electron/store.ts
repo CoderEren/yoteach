@@ -10,6 +10,22 @@ import {
   closeSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import {
+  StudySessionSchema,
+  MessageSchema,
+  ExplanationSchema,
+  ChatSchema,
+  type Chat,
+  type TutorMessage,
+  type Explanation,
+} from '../shared/tutor';
+import {
+  GeneratedMediaSchema,
+  MediaFilename,
+  mediaExtension,
+  type GeneratedMedia,
+  type MediaType,
+} from '../shared/media';
 import { randomUUID } from 'node:crypto';
 import {
   AppState,
@@ -26,15 +42,71 @@ import {
 export class Store {
   private state: AppState;
   readonly documentsDir: string;
+  readonly mediaDir: string;
   readonly file: string;
   constructor(readonly directory: string) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     this.documentsDir = join(directory, 'documents');
     mkdirSync(this.documentsDir, { recursive: true, mode: 0o700 });
+    this.mediaDir = join(directory, 'media');
+    mkdirSync(this.mediaDir, { recursive: true, mode: 0o700 });
     this.file = join(directory, 'workspace.json');
     if (existsSync(this.file)) {
       try {
-        this.state = StateSchema.parse(JSON.parse(readFileSync(this.file, 'utf8')));
+        const raw = JSON.parse(readFileSync(this.file, 'utf8'));
+        const original = raw.version;
+        if ([1, 2, 3, 4, 5, 6].includes(raw.version)) {
+          // Keep an exact pre-migration snapshot, including legacy notes and associations.
+          const backup = this.file + `.v${raw.version}.backup`;
+          if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
+          raw.version = 7;
+          raw.media ??= [];
+          raw.slideDrawings ??= [];
+          raw.sessions ??= [];
+          raw.messages ??= [];
+          raw.explanations ??= [];
+        }
+        if (!raw.chats) {
+          // One chat per earlier session, titled by its lecture or its first question.
+          raw.chats = [];
+          for (const s of raw.sessions ?? []) {
+            const messages = (raw.messages ?? []).filter((m: any) => m.sessionId === s.id);
+            if (!messages.length && !s.documentId) continue;
+            const doc = (raw.documents ?? []).find((d: any) => d.id === s.documentId);
+            const first = messages.find((m: any) => m.role === 'user')?.text ?? '';
+            const id = randomUUID();
+            raw.chats.push({
+              id,
+              kind: doc ? 'lecture' : 'chat',
+              title: doc ? doc.originalName.slice(0, 80) : firstWords(first) || 'Earlier chat',
+              named: !!doc,
+              documentId: doc?.id ?? null,
+              sessionId: s.id,
+              createdAt: s.startedAt,
+              updatedAt: messages.at(-1)?.createdAt ?? s.startedAt,
+            });
+            for (const m of messages) m.chatId = id;
+          }
+        }
+        if (raw.version === 7) {
+          // v8 drops the authored glucose lesson and its practice answers; generated media stay.
+          const backup = this.file + '.v7.backup';
+          if (original === 7 && !existsSync(backup))
+            writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
+          raw.version = 8;
+          delete raw.lessons;
+          delete raw.attempts;
+          for (const m of raw.media ?? []) {
+            delete m.lessonId;
+            delete m.lessonStep;
+          }
+        }
+        this.state = StateSchema.parse(raw);
+        // A prior process cannot own a live session after relaunch.
+        this.state.sessions.forEach((s) => {
+          if (!s.endedAt) s.endedAt = new Date().toISOString();
+        });
+        this.save(this.state);
       } catch {
         throw new Error(
           `Your saved workspace could not be read. It has been left untouched at ${this.file}. Restore a valid copy before reopening yoteach.`,
@@ -44,6 +116,69 @@ export class Store {
       this.state = freshState();
       this.save(this.state);
     }
+    this.cleanupOrphans();
+  }
+  /** Write the file first, then reference it; a failed save removes the unreferenced file. */
+  addMedia(
+    meta: Omit<GeneratedMedia, 'id' | 'filename' | 'bytes' | 'createdAt' | 'source'>,
+    bytes: Uint8Array,
+  ) {
+    const n = this.snapshot(),
+      id = randomUUID(),
+      filename = `${id}.${mediaExtension[meta.contentType]}`,
+      path = join(this.mediaDir, filename);
+    const session = meta.sessionId ? n.sessions.find((s) => s.id === meta.sessionId) : null;
+    const source = session?.documentId
+      ? { documentId: session.documentId, page: session.page }
+      : null;
+    const media = GeneratedMediaSchema.parse({
+      ...meta,
+      id,
+      filename,
+      bytes: bytes.byteLength,
+      source,
+      sessionId: session ? session.id : null,
+      createdAt: new Date().toISOString(),
+    });
+    const temporary = path + '.tmp',
+      fd = openSync(temporary, 'w', 0o600);
+    try {
+      writeFileSync(fd, bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(temporary, path);
+    n.media.push(media);
+    this.activity(
+      n,
+      session?.courseId ?? null,
+      `Generated ${media.kind}: ${media.subject.slice(0, 200)}`,
+    );
+    try {
+      this.save(n);
+    } catch (error) {
+      unlinkSync(path);
+      throw error;
+    }
+    return media;
+  }
+  readMedia(id: string): { bytes: Uint8Array; contentType: MediaType } {
+    const media = this.state.media.find((m) => m.id === id);
+    if (!media) throw new Error('This generated media no longer exists.');
+    try {
+      return {
+        bytes: new Uint8Array(readFileSync(join(this.mediaDir, media.filename))),
+        contentType: media.contentType,
+      };
+    } catch {
+      throw new Error('The saved media file is missing. Generate it again.');
+    }
+  }
+  deleteMedia(id: string) {
+    const n = this.snapshot();
+    n.media = n.media.filter((m) => m.id !== id);
+    this.save(n);
     this.cleanupOrphans();
   }
   snapshot() {
@@ -62,7 +197,12 @@ export class Store {
     renameSync(temporary, this.file);
     this.state = valid;
   }
-  private activity(next: AppState, courseId: string, text: string, topicId: string | null = null) {
+  private activity(
+    next: AppState,
+    courseId: string | null,
+    text: string,
+    topicId: string | null = null,
+  ) {
     next.activities.unshift({
       id: randomUUID(),
       courseId,
@@ -189,10 +329,24 @@ export class Store {
         break;
       }
       case 'settings.update':
-        n.settings.theme = cmd.theme;
+        if (cmd.theme) n.settings.theme = cmd.theme;
+        if (cmd.talkKey) n.settings.talkKey = cmd.talkKey;
+        if (cmd.proactiveHelp !== undefined) n.settings.proactiveHelp = cmd.proactiveHelp;
         break;
     }
     if (!n.topics.some((t) => t.id === n.settings.lastTopicId)) n.settings.lastTopicId = null;
+    n.sessions = n.sessions.filter((s) => !s.topicId || n.topics.some((t) => t.id === s.topicId));
+    n.messages = n.messages.filter((m) => n.sessions.some((s) => s.id === m.sessionId));
+    n.explanations = n.explanations.filter(
+      (e) => !e.topicId || n.topics.some((t) => t.id === e.topicId),
+    );
+    n.explanations.forEach((e) => {
+      if (e.source && !n.documents.some((d) => d.id === e.source!.documentId)) e.source = null;
+    });
+    for (const m of n.media) {
+      if (m.source && !n.documents.some((d) => d.id === m.source!.documentId)) m.source = null;
+      if (m.sessionId && !n.sessions.some((s) => s.id === m.sessionId)) m.sessionId = null;
+    }
     this.save(n);
     this.cleanupOrphans();
     return this.snapshot();
@@ -200,7 +354,7 @@ export class Store {
   importPdf(input: ImportPayload, originalName: string, bytes: Uint8Array) {
     const payload = ImportSchema.parse(input),
       n = this.snapshot();
-    this.course(n, payload.courseId);
+    if (payload.courseId) this.course(n, payload.courseId);
     if (
       payload.pages.some((p, i) => p.page !== i + 1) ||
       payload.headings.some((h) => h.page > payload.pages.length)
@@ -220,22 +374,6 @@ export class Store {
       organization: payload.organization,
       createdAt,
     });
-    let parents: { level: number; id: string }[] = [];
-    for (const h of payload.headings) {
-      while (parents.length && parents[parents.length - 1].level >= h.level) parents.pop();
-      const topicId = randomUUID();
-      n.topics.push({
-        id: topicId,
-        courseId: payload.courseId,
-        parentId: parents.at(-1)?.id ?? null,
-        title: h.title,
-        overview: '',
-        order: n.topics.length,
-        sourceRefs: [{ documentId: id, page: h.page }],
-        createdAt,
-      });
-      parents.push({ level: h.level, id: topicId });
-    }
     this.activity(n, payload.courseId, `Added ${originalName.slice(0, 220)}`);
     try {
       this.save(n);
@@ -260,20 +398,210 @@ export class Store {
     this.save(n);
     return this.snapshot();
   }
+  startSession(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
+    const n = this.snapshot();
+    const t = topicId ? this.topic(n, topicId) : null;
+    const doc = documentId ? n.documents.find((d) => d.id === documentId) : null;
+    if (documentId && (!doc || page > doc.pageCount))
+      throw new Error('Choose an existing lecture and slide.');
+    const session = StudySessionSchema.parse({
+      id: randomUUID(),
+      courseId: t?.courseId ?? doc?.courseId ?? null,
+      topicId,
+      documentId: documentId ?? null,
+      page,
+      mode,
+      startedAt: new Date().toISOString(),
+      endedAt: null,
+    });
+    n.sessions.push(session);
+    this.save(n);
+    return session;
+  }
+  setSlide(id: string, page: number) {
+    const n = this.snapshot(),
+      s = n.sessions.find((s) => s.id === id && !s.endedAt);
+    const d = n.documents.find((d) => d.id === s?.documentId);
+    if (!s || !d || page < 1 || page > d.pageCount) throw new Error('That slide is unavailable.');
+    s.page = page;
+    this.save(n);
+  }
+  endSession(id: string) {
+    const n = this.snapshot(),
+      s = n.sessions.find((s) => s.id === id);
+    if (s && !s.endedAt) {
+      s.endedAt = new Date().toISOString();
+      this.save(n);
+    }
+  }
+  createChat(
+    kind: Chat['kind'],
+    title: string,
+    sessionId: string | null,
+    documentId: string | null = null,
+  ) {
+    const n = this.snapshot(),
+      now = new Date().toISOString();
+    const chat = ChatSchema.parse({
+      id: randomUUID(),
+      kind,
+      title: title.slice(0, 80) || 'New chat',
+      named: kind === 'lecture',
+      documentId,
+      sessionId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    n.chats.push(chat);
+    this.save(n);
+    return chat;
+  }
+  renameChat(id: string, title: string) {
+    const n = this.snapshot(),
+      chat = n.chats.find((c) => c.id === id);
+    if (!chat) return;
+    chat.title = title.trim().slice(0, 80) || chat.title;
+    chat.named = true;
+    this.save(n);
+  }
+  /** Move messages (a topic change detected after they were saved) into another chat. */
+  moveMessages(ids: string[], chatId: string) {
+    const n = this.snapshot();
+    for (const m of n.messages) if (ids.includes(m.id)) m.chatId = chatId;
+    const touched = n.chats.find((c) => c.id === chatId);
+    if (touched) touched.updatedAt = new Date().toISOString();
+    // A chat left empty by the move disappears.
+    n.chats = n.chats.filter(
+      (c) => c.kind === 'lecture' || n.messages.some((m) => m.chatId === c.id),
+    );
+    this.save(n);
+  }
+  deleteChat(id: string) {
+    const n = this.snapshot();
+    n.chats = n.chats.filter((c) => c.id !== id);
+    n.messages = n.messages.filter((m) => m.chatId !== id);
+    n.slideDrawings = n.slideDrawings.filter((d) => d.chatId !== id);
+    this.save(n);
+  }
+  logSlideDrawing(
+    chatId: string,
+    page: number,
+    marks: {
+      shape: string;
+      label: string | null;
+      box: { x: number; y: number; width: number; height: number };
+    }[],
+  ) {
+    const n = this.snapshot();
+    n.slideDrawings.push({
+      id: randomUUID(),
+      chatId,
+      page,
+      marks: marks.slice(0, 12),
+      createdAt: new Date().toISOString(),
+    });
+    this.save(n);
+  }
+  addMessage(
+    sessionId: string,
+    role: TutorMessage['role'],
+    text: string,
+    eventId?: string,
+    place: { chatId?: string | null; page?: number } = {},
+  ) {
+    const n = this.snapshot();
+    if (!n.sessions.some((s) => s.id === sessionId && !s.endedAt))
+      throw new Error('This study session has ended.');
+    const existing =
+      eventId && n.messages.find((m) => m.sessionId === sessionId && m.eventId === eventId);
+    if (existing) {
+      existing.text = text;
+      // A reply can carry on onto the next slide; keep it with the slide it ended on.
+      if (place.page) existing.page = place.page;
+      this.save(n);
+      return existing;
+    }
+    const m = MessageSchema.parse({
+      id: randomUUID(),
+      sessionId,
+      chatId: place.chatId ?? null,
+      page: place.page,
+      role,
+      text,
+      createdAt: new Date().toISOString(),
+      eventId,
+    });
+    n.messages.push(m);
+    const chat = place.chatId ? n.chats.find((c) => c.id === place.chatId) : undefined;
+    if (chat) chat.updatedAt = m.createdAt;
+    this.save(n);
+    return m;
+  }
+  saveExplanation(sessionId: string, title: string, text: string, source: Explanation['source']) {
+    const n = this.snapshot(),
+      s = n.sessions.find((s) => s.id === sessionId);
+    if (!s) throw new Error('This session no longer exists.');
+    const existing = n.explanations.find((e) => e.sessionId === sessionId && e.text === text);
+    if (existing) return existing;
+    const e = ExplanationSchema.parse({
+      id: randomUUID(),
+      sessionId,
+      courseId: s.courseId,
+      topicId: s.topicId,
+      title,
+      text,
+      source,
+      createdAt: new Date().toISOString(),
+    });
+    n.explanations.push(e);
+    this.activity(n, s.courseId, `Saved ${title}`, s.topicId);
+    this.save(n);
+    return e;
+  }
+  deleteSession(id: string) {
+    const n = this.snapshot();
+    n.sessions = n.sessions.filter((s) => s.id !== id);
+    n.messages = n.messages.filter((m) => m.sessionId !== id);
+    n.explanations = n.explanations.filter((e) => e.sessionId !== id);
+    n.media = n.media.filter((m) => m.sessionId !== id);
+    n.chats = n.chats.filter((c) => n.messages.some((m) => m.chatId === c.id));
+    n.slideDrawings = n.slideDrawings.filter((d) => n.chats.some((c) => c.id === d.chatId));
+    this.save(n);
+    this.cleanupOrphans();
+  }
+  deleteExplanation(id: string) {
+    const n = this.snapshot();
+    n.explanations = n.explanations.filter((e) => e.id !== id);
+    this.save(n);
+  }
   private cleanupOrphans() {
-    // Delete only UUID-owned PDF files. Never follow paths supplied by the renderer.
-    const retained = new Set(this.state.documents.map((d) => d.filename));
-    for (const name of readdirOwned(this.documentsDir))
-      if (!retained.has(name)) {
-        try {
-          unlinkSync(join(this.documentsDir, name));
-        } catch {
-          /* Retry on next launch/mutation; no data references remain. */
+    // Delete only UUID-owned files. Never follow paths supplied by the renderer.
+    const owned: [string, Set<string>, RegExp][] = [
+      [
+        this.documentsDir,
+        new Set(this.state.documents.map((d) => d.filename)),
+        /^[a-f0-9-]{36}\.pdf$/,
+      ],
+      [this.mediaDir, new Set(this.state.media.map((m) => m.filename)), MediaFilename],
+    ];
+    for (const [dir, retained, pattern] of owned)
+      for (const name of readdirSync(dir))
+        if (
+          (pattern.test(name) && !retained.has(name)) ||
+          /^[a-f0-9-]{36}\.(jpg|png|webp|mp4|webm)\.tmp$/.test(name)
+        ) {
+          try {
+            unlinkSync(join(dir, name));
+          } catch {
+            /* Retry on next launch/mutation; no data references remain. */
+          }
         }
-      }
   }
 }
 import { readdirSync } from 'node:fs';
-function readdirOwned(dir: string) {
-  return readdirSync(dir).filter((name) => /^[a-f0-9-]{36}\.pdf$/.test(name));
+
+/** A readable fallback title: the first few words of the first question. */
+export function firstWords(text: string) {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ').slice(0, 6).join(' ');
+  return words.length > 2 ? words.replace(/[?.!,;:]+$/, '') : '';
 }

@@ -2,7 +2,7 @@
 <!-- impeccable:product-schema 1 -->
 
 ## Platform
-web
+desktop
 
 Electron desktop application, targeting macOS first. React is rendered inside isolated desktop windows.
 
@@ -13,22 +13,22 @@ User-specified Electron, React, TypeScript; token-based CSS; lightweight SVG mas
 University students studying lecture PDFs, notes, websites, and problem sets alongside other applications.
 
 ## Product Purpose
-One connected learning workspace and desktop companion. Stage 1 establishes local course organization, PDF reading, editable roadmaps and a floating mascot.
+One connected learning workspace and desktop companion. The approved glass visual system now serves exactly two modes: topic-free AI tutoring and PDF lecture walkthroughs. Saved material, history and settings directly support them.
 
 ## Capabilities and Constraints
-Build Stage 1 only. No live voice, screen capture, model APIs, generated media, or simulated learning analytics. Later stages require explicit approval. All data stays local. No credentials are needed for Stage 1. Preserve the canonical CoderEren/yoteach repository; use a separate branch; never merge without approval.
+Stage 3 was explicitly authorized on 14 November 2026 and is being delivered in committed chunks. Real ElevenLabs conversations and Anthropic visual analysis require user-configured credentials. Local study data persists on this Mac; lecture context, released voice questions and activation-scoped screen snapshots go to the configured providers. Each held question captures only the display under the pointer, including whatever the user has on that display. Never retain screenshots in the local database or continue capture after pause/stop. macOS permissions are requested once; no per-question application consent checkbox. The built-in glucose lesson and practice were deliberately removed. Conversational quizzes are possible, but no saved practice or grading is offered. Generated images and clips are labelled AI-generated and illustrative. Outside lectures, Yoyo teaches on the user's screen through a click-through overlay with grounded marks, animated sketches and media cards. The app window is not brought forward. Proactive help uses only on-device text recognition and never infers mastery from dwell time. Preserve the canonical CoderEren/yoteach repository; use a separate branch; never merge without approval.
 
 ## Brand Commitments
-Name: yoteach. Tagline: A tutor that sees what you see. Mascot: replaceable Yoyo, a hovering pear-shaped frosted lavender and icy-blue creature. Premium restrained liquid glass, readable surfaces, system typography, iris accents. Intelligent, approachable and concise tone.
+Name: yoteach. Tagline: A tutor that sees what you see. Mascot: replaceable Yoyo, a twin-disc frosted lavender and icy-blue yo-yo with an expressive string. Premium restrained liquid glass, readable surfaces, system typography, iris accents. Intelligent, approachable and concise tone.
 
 ## Accessibility & Inclusion
 Keyboard navigation, clear focus, reduced motion, readable contrast, light and dark themes. Explain empty, loading and error states. Never equate time spent with understanding.
 
 ## Evidence on Hand
-The user supplied a complete product specification. No existing repository files or personal lecture documents. Sample materials must be explicitly labelled and optional.
+The user supplied a complete product specification. The Stage 1 implementation and design were approved. The user supplied a screenshot of an oversized black companion surface after hide/show; this is a regression target. The user supplied a yo-yo character reference. No personal lecture documents were supplied. Sample materials must be explicitly labelled and optional.
 
 ## Product Principles
 - Desktop companion and workspace share persistent local context.
 - Student control over data and permissions.
 - Honest previews and explicit stage boundaries.
-- Useful organization before AI integration.
+- Teach from actual shared content; preserve existing material during migration.

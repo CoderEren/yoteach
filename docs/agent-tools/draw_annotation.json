@@ -1,0 +1,37 @@
+{
+  "type": "client",
+  "name": "draw_annotation",
+  "description": "Point out a grounded region with an arrow, circle, point, label or highlight on the full-screen lecture or desktop overlay. Yoyo moves beside it and returns home. Never invent coordinates or region identifiers.",
+  "expects_response": true,
+  "response_timeout_secs": 60,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "snapshotId": {
+        "type": "string",
+        "description": "Exact snapshotId returned by analysis."
+      },
+      "regionId": {
+        "type": "string",
+        "description": "Exact regionId returned by analysis."
+      },
+      "shape": {
+        "type": "string",
+        "description": "One of highlight, arrow, circle, point, label.",
+        "enum": [
+          "highlight",
+          "arrow",
+          "circle",
+          "point",
+          "label"
+        ]
+      }
+    },
+    "required": [
+      "snapshotId",
+      "regionId",
+      "shape"
+    ]
+  },
+  "pre_tool_speech": "off"
+}

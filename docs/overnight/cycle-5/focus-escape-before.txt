@@ -1,0 +1,61 @@
+
+Running 12 tests using 1 worker
+
+(node:33350) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore (5.4s)
+  ✘   2 tests/app.e2e.ts:189:1 › Yoyo visibility is keyboard-operable in Settings and persists both ways (1.6s)
+(node:33463) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  -   3 tests/app.e2e.ts:264:1 › packaged Yoteach starts with its own identity and isolated data
+  ✓   4 tests/tutor.e2e.ts:179:1 › full-screen lecture teaches, grounds six tools, accepts questions and preserves history (4.9s)
+  ✓   5 tests/tutor.e2e.ts:287:1 › held microphone streams only while held, captures screen, cancels drag and stops on pause (18.9s)
+  ✓   6 tests/tutor.e2e.ts:417:1 › proactive help: a screen held too long gets one on-device "Stuck?" offer (5.5s)
+  ✓   7 tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect (6.2s)
+  ✓   8 tests/tutor.e2e.ts:515:1 › Yoyo teaches on the screen: draws on regions, sketches, celebrates, and captures each held question (10.5s)
+  ✓   9 tests/tutor.e2e.ts:752:1 › images Yoyo makes with fal show progress, explain failure and survive restart (8.8s)
+  ✓  10 tests/tutor.e2e.ts:898:1 › Stage 3 demo: lecture → fal media → saved restart → replay (7.0s)
+  ✓  11 tests/tutor.e2e.ts:1000:1 › flow particles stay separated on short paths and respect live reduced-motion changes (2.9s)
+  ✓  12 tests/tutor.e2e.ts:1062:1 › recorded live answers render across twelve subjects (9.1s)
+
+
+  1) tests/app.e2e.ts:189:1 › Yoyo visibility is keyboard-operable in Settings and persists both ways 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -1,7 +1,7 @@
+      Array [
+    -   0,
+    +   -1,
+        1,
+        2,
+        3,
+        4,
+        5,
+
+      212 |       );
+      213 |     }
+    > 214 |     expect([...visited].sort((a, b) => a - b)).toEqual(Array.from({ length: count }, (_, i) => i));
+          |                                                ^
+      215 |     await visible.focus();
+      216 |     await page.keyboard.press('Space');
+      217 |     await expect(visible).not.toBeChecked();
+        at /Users/eersin937/Desktop/YoTeach/tests/app.e2e.ts:214:48
+
+    Error Context: test-results/app.e2e.ts-Yoyo-visibility-d85d9-ings-and-persists-both-ways/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/app.e2e.ts-Yoyo-visibility-d85d9-ings-and-persists-both-ways/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/app.e2e.ts-Yoyo-visibility-d85d9-ings-and-persists-both-ways/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/app.e2e.ts:189:1 › Yoyo visibility is keyboard-operable in Settings and persists both ways 
+  1 skipped
+  10 passed (1.4m)

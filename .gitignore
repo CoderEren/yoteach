@@ -13,3 +13,4 @@ work/
 .impeccable/review/
 *.log
 public/pdfjs/
+public/voice/
