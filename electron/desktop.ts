@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { Store } from './store';
 import type { TutorRuntime, TutorIntent } from '../shared/tutor';
 import { PET, fitImage, pointBeside } from '../shared/desktop-geometry';
+import type { TrailPoint } from '../shared/gesture';
 
 export function installDesktop(options: {
   store: Store;
@@ -13,6 +14,8 @@ export function installDesktop(options: {
   overlay: () => BrowserWindow | null;
   intent: (action: TutorIntent) => void;
   keyError: (error: string) => void;
+  /** The cursor path drawn while the talk key was held (null when the hold was cancelled). */
+  trail?: (trail: { startedAt: number; points: TrailPoint[]; aspect: number } | null) => void;
 }) {
   const { store, pet, main, overlay } = options;
   let helper: ChildProcess | undefined,
@@ -49,6 +52,94 @@ export function installDesktop(options: {
     }, 16);
   }
   let stage: Electron.Rectangle | null = null;
+  let last: TutorRuntime | null = null;
+  /**
+   * Cursor ink: while the talk key is held the cursor leaves a fading trace on the overlay, so
+   * the student can circle or point at what they are asking about.
+   */
+  let trailing: {
+    bounds: Electron.Rectangle;
+    startedAt: number;
+    points: TrailPoint[];
+    shown: boolean;
+    timer: ReturnType<typeof setInterval>;
+  } | null = null;
+  let trailShown: Electron.Rectangle | null = null,
+    trailFade: ReturnType<typeof setTimeout> | undefined;
+  function startTrail() {
+    stopTrail();
+    if (last?.lecture) return;
+    const c0 = screen.getCursorScreenPoint();
+    const bounds = screen.getDisplayNearestPoint(c0).bounds;
+    const startedAt = Date.now();
+    const t: NonNullable<typeof trailing> = {
+      bounds,
+      startedAt,
+      points: [],
+      shown: false,
+      timer: setInterval(() => {
+        const c = screen.getCursorScreenPoint();
+        const p = {
+          x: (c.x - bounds.x) / bounds.width,
+          y: (c.y - bounds.y) / bounds.height,
+          t: Date.now() - startedAt,
+        };
+        const prev = t.points.at(-1);
+        t.points.push(p);
+        if (t.points.length > 4000) t.points.shift();
+        // Only show ink once the cursor really moves; a resting cursor draws nothing.
+        if (!t.shown) {
+          const first = t.points[0];
+          if (Math.hypot(p.x - first.x, p.y - first.y) < 0.008) return;
+          t.shown = true;
+          clearTimeout(trailFade);
+          trailShown = bounds;
+          if (last) syncOverlay(last);
+          else showStage(bounds);
+          overlay()?.webContents.send('overlay:trail', { type: 'start', points: t.points });
+          return;
+        }
+        if (!prev || prev.x !== p.x || prev.y !== p.y)
+          overlay()?.webContents.send('overlay:trail', { type: 'add', point: p });
+      }, 16),
+    };
+    trailing = t;
+  }
+  /** Stop tracking; the trace fades out on screen. Returns the path for reading the gesture. */
+  function stopTrail() {
+    const t = trailing;
+    if (!t) return null;
+    clearInterval(t.timer);
+    trailing = null;
+    if (t.shown) {
+      overlay()?.webContents.send('overlay:trail', { type: 'end' });
+      clearTimeout(trailFade);
+      trailFade = setTimeout(() => {
+        trailShown = null;
+        if (last) syncOverlay(last);
+      }, 2400);
+    }
+    return {
+      startedAt: t.startedAt,
+      points: t.points,
+      aspect: t.bounds.width / t.bounds.height,
+    };
+  }
+  function showStage(want: Electron.Rectangle) {
+    const layer = overlay();
+    if (!layer || layer.isDestroyed()) return;
+    if (
+      !stage ||
+      stage.x !== want.x ||
+      stage.y !== want.y ||
+      stage.width !== want.width ||
+      stage.height !== want.height
+    ) {
+      stage = want;
+      layer.setBounds(want);
+    }
+    if (!layer.isVisible()) layer.showInactive();
+  }
   let tour: ReturnType<typeof setTimeout>[] = [];
   const stopTour = () => {
     tour.forEach(clearTimeout);
@@ -69,7 +160,7 @@ export function installDesktop(options: {
     const layer = overlay();
     if (!layer || layer.isDestroyed()) return;
     layer.webContents.send('tutor:changed', r);
-    if (!needsOverlay(r)) {
+    if (!needsOverlay(r) && !trailShown) {
       stage = null;
       if (layer.isVisible()) {
         layer.setIgnoreMouseEvents(true, { forward: true });
@@ -79,31 +170,23 @@ export function installDesktop(options: {
     }
     const source = r.snapshot?.source;
     // Grounded drawings must cover the captured display exactly; otherwise stay where we are.
-    const want =
-      source?.kind === 'screen' &&
-      screen
-        .getAllDisplays()
-        .some(
-          (d) =>
-            String(d.id) === source.id &&
-            d.bounds.x === source.bounds.x &&
-            d.bounds.y === source.bounds.y &&
-            d.bounds.width === source.bounds.width &&
-            d.bounds.height === source.bounds.height,
-        )
+    // While the cursor is inking, cover the display it is on.
+    const want = trailShown
+      ? trailShown
+      : source?.kind === 'screen' &&
+          screen
+            .getAllDisplays()
+            .some(
+              (d) =>
+                String(d.id) === source.id &&
+                d.bounds.x === source.bounds.x &&
+                d.bounds.y === source.bounds.y &&
+                d.bounds.width === source.bounds.width &&
+                d.bounds.height === source.bounds.height,
+            )
         ? source.bounds
         : (stage ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds);
-    if (
-      !stage ||
-      stage.x !== want.x ||
-      stage.y !== want.y ||
-      stage.width !== want.width ||
-      stage.height !== want.height
-    ) {
-      stage = want;
-      layer.setBounds(want);
-    }
-    if (!layer.isVisible()) layer.showInactive();
+    showStage(want);
   }
   function returnHome() {
     clearTimeout(returnTimer);
@@ -123,6 +206,8 @@ export function installDesktop(options: {
     if (binding === next || disposed) return;
     binding = next;
     helper?.kill();
+    stopTrail();
+    options.trail?.(null);
     options.intent({ type: 'hold-cancel' });
     if (process.platform !== 'darwin') {
       options.keyError('Global hold keys require macOS. Hold Yoyo to speak.');
@@ -146,11 +231,17 @@ export function installDesktop(options: {
         if (line === 'ready') options.keyError('');
         if (line === 'down') {
           options.intent({ type: 'hold-start' });
+          startTrail();
           clearTimeout(safetyTimer);
-          safetyTimer = setTimeout(() => options.intent({ type: 'hold-end' }), 60000);
+          safetyTimer = setTimeout(() => {
+            options.trail?.(stopTrail());
+            options.intent({ type: 'hold-end' });
+          }, 60000);
         }
         if (line === 'up') {
           clearTimeout(safetyTimer);
+          // The path goes first, so it is there when the screen map is asked for.
+          options.trail?.(stopTrail());
           options.intent({ type: 'hold-end' });
         }
       }
@@ -162,12 +253,15 @@ export function installDesktop(options: {
     );
     processChild.on('exit', () => {
       if (helper === processChild && !disposed) {
+        stopTrail();
+        options.trail?.(null);
         options.intent({ type: 'hold-cancel' });
         options.keyError('Global talk key stopped. Restart Yoteach; holding Yoyo still works.');
       }
     });
   }
   function update(r: TutorRuntime) {
+    last = r;
     keySettings();
     syncOverlay(r);
     if (r.input === 'arming' || r.input === 'listening') {
@@ -272,6 +366,7 @@ export function installDesktop(options: {
   }
   app.on('before-quit', () => {
     disposed = true;
+    stopTrail();
     helper?.kill();
     clearInterval(flight);
     clearTimeout(returnTimer);

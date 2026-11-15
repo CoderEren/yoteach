@@ -476,6 +476,7 @@ else {
       main: () => workspace,
       overlay: () => overlay,
       intent: (action) => tutoring?.intent(action),
+      trail: (trail) => tutoring?.service.setTrail(trail),
       keyError: (error) => {
         if (tutoring && tutoring.service.state.hotkeyError !== error) {
           tutoring.service.state.hotkeyError = error;

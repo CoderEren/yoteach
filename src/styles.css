@@ -2835,8 +2835,8 @@ html:has(.companion-body),
 
 /* The desktop companion is the interaction surface, without a separate panel or drag grip. */
 .companion-bare {
-  width: 200px;
-  height: 220px;
+  width: 150px;
+  height: 165px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -2844,8 +2844,8 @@ html:has(.companion-body),
 }
 .companion-bare .mascot-button {
   position: relative;
-  width: 200px;
-  height: 220px;
+  width: 150px;
+  height: 165px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -4537,4 +4537,121 @@ kbd {
 }
 .switch:checked::after {
   transform: translateX(17px);
+}
+/* Richer sketches: palette, soft fills, flowing particles and travelling pulses. */
+.sketch-canvas .tone-blue .draw {
+  stroke: #3b7ddd;
+  color: #3b7ddd;
+}
+.sketch-canvas .tone-green .draw {
+  stroke: #2f9e6e;
+  color: #2f9e6e;
+}
+.sketch-canvas .tone-pink .draw {
+  stroke: #d6487e;
+  color: #d6487e;
+}
+.sketch-canvas .tone-yellow .draw {
+  stroke: #d39a12;
+  color: #f2b51d;
+}
+.sketch-canvas .fill-ink .shape {
+  fill: rgba(106, 69, 216, 0.14);
+}
+.sketch-canvas .fill-accent .shape {
+  fill: rgba(208, 96, 63, 0.14);
+}
+.sketch-canvas .fill-muted .shape {
+  fill: rgba(139, 147, 168, 0.14);
+}
+.sketch-canvas .fill-blue .shape {
+  fill: rgba(59, 125, 221, 0.15);
+}
+.sketch-canvas .fill-green .shape {
+  fill: rgba(47, 158, 110, 0.15);
+}
+.sketch-canvas .fill-pink .shape {
+  fill: rgba(214, 72, 126, 0.13);
+}
+.sketch-canvas .fill-yellow .shape {
+  fill: rgba(240, 190, 60, 0.2);
+}
+.flow-track {
+  fill: none;
+  stroke: none;
+}
+.flow .particle circle {
+  fill: #fff;
+  stroke: currentColor;
+  stroke-width: 0.45;
+}
+.flow .particle text {
+  font:
+    700 1.6px/1 -apple-system,
+    sans-serif;
+  fill: currentColor;
+}
+.flow.tone-ink,
+.pulse.tone-ink {
+  color: #5545c9;
+}
+.flow.tone-accent,
+.pulse.tone-accent {
+  color: #d0603f;
+}
+.flow.tone-blue,
+.pulse.tone-blue {
+  color: #3b7ddd;
+}
+.flow.tone-green,
+.pulse.tone-green {
+  color: #2f9e6e;
+}
+.flow.tone-pink,
+.pulse.tone-pink {
+  color: #d6487e;
+}
+.flow.tone-yellow,
+.pulse.tone-yellow {
+  color: #f2b51d;
+}
+.flow.tone-muted,
+.pulse.tone-muted {
+  color: #8b93a8;
+}
+.pulse-band {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-dasharray: 0.12 1;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 1.2px currentColor);
+  animation: pulse-run 2s linear infinite;
+}
+@keyframes pulse-run {
+  from {
+    stroke-dashoffset: 1.12;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-band {
+    animation: none;
+    stroke-dasharray: none;
+    opacity: 0.4;
+  }
+}
+.sketch-canvas.large svg {
+  max-width: min(780px, 60vw);
+}
+/* The cursor's ink while the talk key is held. */
+.cursor-ink {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 50;
 }

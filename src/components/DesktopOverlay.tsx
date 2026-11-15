@@ -233,7 +233,64 @@ export function DrawingLayer({
     </div>
   );
 }
-const tone = (t?: 'ink' | 'accent' | 'muted') => `tone-${t ?? 'ink'}`;
+const tone = (t?: string) => `tone-${t ?? 'ink'}`;
+/** Smooth closed outline through points (closed Catmull-Rom). */
+function smoothClosed(points: [number, number][]) {
+  const n = points.length,
+    at = (k: number) => points[(k + n) % n];
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = at(i - 1),
+      p1 = at(i),
+      p2 = at(i + 1),
+      p3 = at(i + 2);
+    d += ` C ${p1[0] + (p2[0] - p0[0]) / 6} ${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6} ${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]} ${p2[1]}`;
+  }
+  return d + ' Z';
+}
+/** Particles that keep travelling along a path (ions, blood, electrons). Loops forever. */
+function Flow({ e }: { e: Extract<SketchElement, { type: 'flow' }> }) {
+  const path = useRef<SVGPathElement>(null),
+    group = useRef<SVGGElement>(null);
+  const d = smooth(e.path);
+  useEffect(() => {
+    const p = path.current,
+      g = group.current;
+    if (!p || !g || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const L = p.getTotalLength();
+    const dots = Array.from(g.querySelectorAll<SVGGElement>('.particle'));
+    const tweens = dots.map((dot, k) => {
+      const state = { t: k / dots.length };
+      return gsap.to(state, {
+        t: state.t + 1,
+        duration: e.seconds,
+        ease: 'none',
+        repeat: -1,
+        onUpdate: () => {
+          const pt = p.getPointAtLength((state.t % 1) * L);
+          dot.setAttribute('transform', `translate(${pt.x} ${pt.y})`);
+        },
+      });
+    });
+    return () => tweens.forEach((t) => t.kill());
+  }, [d, e.count, e.seconds]);
+  return (
+    <g className={`flow ${tone(e.tone)} ink-label`} ref={group}>
+      <path ref={path} className="flow-track" d={d} />
+      {Array.from({ length: e.count }, (_, k) => (
+        <g key={k} className="particle" transform={`translate(${e.path[0][0]} ${e.path[0][1]})`}>
+          <circle r={e.symbol ? 2 : 1.1} />
+          {e.symbol && (
+            <text textAnchor="middle" y={0.6}>
+              {e.symbol}
+            </text>
+          )}
+        </g>
+      ))}
+    </g>
+  );
+}
+
 /** Smooth path through points (Catmull-Rom as cubic Béziers). */
 function smooth(points: [number, number][]) {
   if (points.length < 3) return `M ${points.map((p) => p.join(' ')).join(' L ')}`;
@@ -295,7 +352,12 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
     case 'curve':
       return (
         <g className={tone(e.tone)}>
-          <path className={dash(e.dashed)} style={s} d={smooth(e.points)} pathLength={1} />
+          <path
+            className={dash(e.dashed)}
+            style={{ ...s, strokeWidth: e.width }}
+            d={smooth(e.points)}
+            pathLength={1}
+          />
           {label(e.points.at(-1)![0] + 1.5, e.points.at(-1)![1] - 1.5, e.label, 'start')}
         </g>
       );
@@ -338,6 +400,56 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
       );
     case 'text':
       return <g className={tone(e.tone)}>{label(e.at[0], e.at[1], e.text, 'start')}</g>;
+    case 'shape':
+      return (
+        <g className={`${tone(e.tone)} ${e.fill ? `fill-${e.fill}` : ''}`}>
+          <path
+            className="draw ink shape"
+            style={{ ...s, strokeWidth: e.width }}
+            d={smoothClosed(e.points)}
+            pathLength={1}
+          />
+          {label(
+            e.points.reduce((a, p) => a + p[0], 0) / e.points.length,
+            e.points.reduce((a, p) => a + p[1], 0) / e.points.length + 1.2,
+            e.label,
+          )}
+        </g>
+      );
+    case 'ellipse':
+      return (
+        <g className={`${tone(e.tone)} ${e.fill ? `fill-${e.fill}` : ''}`}>
+          <ellipse
+            className="draw ink shape"
+            style={s}
+            cx={e.at[0]}
+            cy={e.at[1]}
+            rx={e.rx}
+            ry={e.ry}
+            pathLength={1}
+          />
+          {label(e.at[0], e.at[1] + 1.2, e.label)}
+        </g>
+      );
+    case 'flow':
+      return (
+        <>
+          <Flow e={e} />
+          {label(e.path.at(-1)![0] + 1.5, e.path.at(-1)![1] - 1.8, e.label, 'start')}
+        </>
+      );
+    case 'pulse':
+      return (
+        <g className={`pulse ${tone(e.tone)} ink-label`}>
+          <path
+            className="pulse-band"
+            d={smooth(e.path)}
+            pathLength={1}
+            style={{ animationDuration: `${e.seconds}s`, strokeWidth: (e.width ?? 1.4) * 2.2 }}
+          />
+          {label(e.path[0][0], e.path[0][1] - 2.5, e.label, 'start')}
+        </g>
+      );
     case 'axes': {
       const [x, y] = e.origin;
       return (
@@ -374,7 +486,11 @@ function anchorOf(e: SketchElement): [number, number] {
     case 'line':
       return e.from;
     case 'curve':
+    case 'shape':
       return e.points[0];
+    case 'flow':
+    case 'pulse':
+      return e.path[0];
     case 'axes':
       return e.origin;
     default:
@@ -394,19 +510,25 @@ export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: ()
   useEffect(() => {
     if (!ref.current) return;
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (title.current && !reduced)
-      gsap.from(title.current.querySelectorAll('i'), {
-        y: 10,
-        opacity: 0,
-        duration: 0.35,
-        stagger: 0.06,
-        ease: 'power2.out',
-      });
-    return drawOn(ref.current, { reduced, onStep: setStep, delay: 0.25 });
+    // Explicit end values: a title replaced mid-animation must not freeze half-faded.
+    const words = title.current ? Array.from(title.current.querySelectorAll('i')) : [];
+    const intro = reduced
+      ? gsap.set(words, { y: 0, opacity: 1 })
+      : gsap.fromTo(
+          words,
+          { y: 10, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.35, stagger: 0.06, ease: 'power2.out' },
+        );
+    const stop = drawOn(ref.current, { reduced, onStep: setStep, delay: 0.25 });
+    return () => {
+      intro.kill();
+      gsap.set(words, { y: 0, opacity: 1 });
+      stop();
+    };
     // Replay only when the sketch itself changes, not on every runtime update.
   }, [JSON.stringify(sketch)]);
   return (
-    <figure className="diagram-sketch sketch-canvas">
+    <figure className={`diagram-sketch sketch-canvas ${sketch.size === 'large' ? 'large' : ''}`}>
       <figcaption>
         <span ref={title}>
           {sketch.title.split(' ').map((w, i) => (
@@ -424,8 +546,8 @@ export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: ()
       <svg
         ref={ref}
         viewBox="-2 -2 104 74"
-        width={560}
-        height={400}
+        width={sketch.size === 'large' ? 780 : 560}
+        height={sketch.size === 'large' ? 557 : 400}
         role="img"
         aria-label={sketch.title}
       >
@@ -641,8 +763,106 @@ function ScreenLesson({ data, side }: { data: AppState; side: 'left' | 'right' }
 /** Yoyo's drawing surface over the user's own screen. Clicks pass through except on cards. */
 export function DesktopOverlay({ data }: { data: AppState }) {
   const { runtime: r } = useTutor();
-  if (!r || r.lecture) return <main className="desktop-overlay" />;
-  return <ScreenLayer data={data} r={r} />;
+  return (
+    <>
+      {!r || r.lecture ? <main className="desktop-overlay" /> : <ScreenLayer data={data} r={r} />}
+      <CursorInk />
+    </>
+  );
+}
+/**
+ * The cursor's ink while the talk key is held: a violet trace that follows the pointer and
+ * fades behind it, so circling or pointing at something is visible. Fades out on release.
+ */
+function CursorInk() {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = canvas.current;
+    if (!c || !api.overlay?.onTrail) return;
+    const ctx = c.getContext('2d')!;
+    let points: { x: number; y: number; t: number }[] = [],
+      clock = { at: 0, offset: 0 },
+      ended: number | null = null,
+      frame = 0;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const KEEP = 2600; // ms a segment stays before it has faded away
+    const draw = () => {
+      frame = 0;
+      const dpr = window.devicePixelRatio || 1,
+        w = window.innerWidth,
+        h = window.innerHeight;
+      if (c.width !== Math.round(w * dpr)) {
+        c.width = Math.round(w * dpr);
+        c.height = Math.round(h * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const now = performance.now() - clock.offset;
+      const fadeOut = ended === null ? 1 : Math.max(0, 1 - (performance.now() - ended) / 1200);
+      if (!points.length || fadeOut <= 0) return;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      // Segments of similar age go in one stroke; overlapping round caps of separate
+      // translucent strokes would otherwise bead the line.
+      let run: number[] = [],
+        level = -1;
+      const flush = () => {
+        if (run.length && level > 0) {
+          ctx.strokeStyle = `rgba(106, 69, 216, ${((0.92 * level) / 8).toFixed(3)})`;
+          ctx.lineWidth = 3 + (2 * level) / 8;
+          ctx.beginPath();
+          const first = points[run[0] - 1],
+            before = points[run[0] - 2] ?? first;
+          ctx.moveTo(((before.x + first.x) / 2) * w, ((before.y + first.y) / 2) * h);
+          for (const i of run) {
+            const a = points[i - 1],
+              b = points[i];
+            // Through midpoints, so the ink is smooth rather than a polyline.
+            ctx.quadraticCurveTo(a.x * w, a.y * h, ((a.x + b.x) / 2) * w, ((a.y + b.y) / 2) * h);
+          }
+          ctx.stroke();
+        }
+        run = [];
+      };
+      for (let i = 1; i < points.length; i++) {
+        const age = reduced ? 0 : now - points[i].t;
+        const l = Math.round(Math.max(0, 1 - age / KEEP) * fadeOut * 8);
+        if (l !== level) {
+          flush();
+          level = l;
+        }
+        run.push(i);
+      }
+      flush();
+      const head = points.at(-1)!;
+      if (ended === null) {
+        ctx.fillStyle = '#6a45d8';
+        ctx.beginPath();
+        ctx.arc(head.x * w, head.y * h, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      frame = requestAnimationFrame(draw);
+    };
+    const kick = () => {
+      if (!frame) frame = requestAnimationFrame(draw);
+    };
+    const off = api.overlay.onTrail((e) => {
+      if (e.type === 'start') {
+        points = e.points.slice(-600);
+        clock = { at: performance.now(), offset: performance.now() - (points.at(-1)?.t ?? 0) };
+        ended = null;
+      } else if (e.type === 'add') {
+        points.push(e.point);
+        if (points.length > 600) points.shift();
+      } else ended = performance.now();
+      kick();
+    });
+    return () => {
+      off();
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+  return <canvas ref={canvas} className="cursor-ink" aria-hidden="true" />;
 }
 function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
   const { act } = useTutor();
@@ -664,7 +884,9 @@ function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
     ? { x: cardSide === 'left' ? 0.02 : 1 - 0.02 - 460 / vw, y: 0.08, width: 460 / vw, height: 0.8 }
     : null;
   const panel = r.drawing?.sketch
-    ? { width: 600 / vw, height: 470 / vh }
+    ? r.drawing.sketch.size === 'large'
+      ? { width: Math.min(820, vw * 0.62) / vw, height: Math.min(640, vh * 0.8) / vh }
+      : { width: 600 / vw, height: 470 / vh }
     : r.drawing?.diagram
       ? (() => {
           const l = layoutDiagram(r.drawing!.diagram!);
@@ -726,7 +948,7 @@ function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
       {media && (
         <Interactive className={`screen-card glass ${cardSide}`}>
           <header className="screen-card-header">
-            <h2>Yoyo’s visual analogy</h2>
+            <h2>Made by Yoyo</h2>
           </header>
           <GenerationPanel media={data.media} />
         </Interactive>

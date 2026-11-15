@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { Store } from '../electron/store';
 import { Providers } from '../electron/providers';
 import { TutorService } from '../electron/tutor';
-import { DiagramSchema, layoutDiagram } from '../shared/drawing';
+import { DiagramSchema, SketchSchema, layoutDiagram } from '../shared/drawing';
 import { ToolSchema, type SharedSnapshot } from '../shared/tutor';
 
 const vision = {
@@ -380,5 +380,113 @@ test('every agent tool in docs/agent-tools is registered as a client tool and va
       ToolSchema.options.some((o) => o.shape.name.value === name),
       `${name} has no ToolSchema entry`,
     );
+  }
+});
+
+test('rich sketches: filled shapes, flowing ions and pulses parse forgivingly', () => {
+  const neuron = SketchSchema.parse({
+    title: 'A neuron fires',
+    size: 'large',
+    elements: [
+      {
+        type: 'shape',
+        points: [
+          [10, 30],
+          [18, 22],
+          [26, 30],
+          [18, 38],
+        ],
+        fill: 'pink',
+        label: 'soma',
+      },
+      {
+        type: 'curve',
+        points: [
+          [26, 30],
+          [60, 31],
+          [92, 30],
+        ],
+        width: 9,
+        tone: 'blue',
+      },
+      {
+        type: 'pulse',
+        path: [
+          [26, 30],
+          [92, 30],
+        ],
+        seconds: 1.5,
+      },
+      {
+        type: 'flow',
+        path: [
+          [50, 10],
+          [50, 29],
+        ],
+        symbol: 'Na+',
+        count: 40,
+        tone: 'green',
+      },
+      {
+        type: 'flow',
+        path: [
+          [70, 29],
+          [70, 8],
+        ],
+        symbol: 'K+',
+        tone: 'nope',
+      },
+      { type: 'ellipse', at: [40, 50], rx: 6, ry: 3, fill: 'yellow' },
+      { type: 'sparkles', at: [1, 1] },
+    ],
+  });
+  assert.equal(neuron.size, 'large');
+  assert.deepEqual(
+    neuron.elements.map((e) => e.type),
+    ['shape', 'curve', 'pulse', 'flow', 'flow', 'ellipse'],
+  );
+  const [, axon, , na, k] = neuron.elements as any[];
+  assert.equal(axon.width, 6, 'stroke width is clamped');
+  assert.equal(na.count, 12, 'particle count is clamped');
+  assert.equal(na.seconds, 3);
+  assert.equal(k.tone, undefined, 'an unknown colour falls back to ink');
+});
+
+test('circling words with the cursor while asking becomes a region the tutor is told about', async () => {
+  const f = setup();
+  try {
+    const s = await f.service.start(null, 'voice');
+    f.service.state.sharing = 'screen';
+    const startedAt = Date.now() - 50;
+    const ring = Array.from({ length: 70 }, (_, k) => {
+      const a = (k / 60) * 2 * Math.PI;
+      return { x: 0.32 + 0.08 * Math.cos(a), y: 0.4 + 0.04 * Math.sin(a), t: k * 16 };
+    });
+    // The path can arrive before the screen it was drawn over.
+    f.service.setTrail({ startedAt, points: ring, aspect: 1512 / 982 });
+    f.service.acceptSnapshot({
+      ...f.screenStill(),
+      textBoxes: [
+        { text: 'HMG-CoA reductase', box: { x: 0.26, y: 0.39, width: 0.12, height: 0.02 } },
+      ],
+      words: [
+        { text: 'HMG-CoA', line: 0, box: { x: 0.26, y: 0.39, width: 0.06, height: 0.02 } },
+        { text: 'reductase', line: 0, box: { x: 0.325, y: 0.39, width: 0.055, height: 0.02 } },
+      ],
+    });
+    const map = await f.service.screenMap(50);
+    assert.equal(map?.pointer?.kind, 'circle');
+    assert.equal(map!.pointer!.quote, 'HMG-CoA reductase');
+    await f.service.tool(
+      s.id,
+      ToolSchema.parse({ name: 'draw_on_screen', marks: [{ regionId: map!.pointer!.regionId }] }),
+    );
+    assert.equal(f.service.state.drawing!.marks.length, 1);
+    // A trail from an earlier hold never applies to a newer question's screen.
+    f.service.setTrail({ startedAt: Date.now() + 60_000, points: ring, aspect: 1.5 });
+    f.service.acceptSnapshot(f.screenStill());
+    assert.equal(await f.service.screenMap(10), null);
+  } finally {
+    f.cleanup();
   }
 });

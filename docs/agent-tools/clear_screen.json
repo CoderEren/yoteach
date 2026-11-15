@@ -8,5 +8,6 @@
     "type": "object",
     "properties": {},
     "required": []
-  }
+  },
+  "pre_tool_speech": "off"
 }

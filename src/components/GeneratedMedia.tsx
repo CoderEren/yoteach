@@ -25,7 +25,8 @@ export function MediaView({ media }: { media: GeneratedMedia }) {
       if (made) URL.revokeObjectURL(made);
     };
   }, [media.id]);
-  const alt = `AI-generated visual analogy: ${media.subject}`;
+  const what = media.kind === 'video' ? 'clip' : 'image';
+  const alt = `AI-generated ${what}: ${media.subject}`;
   return (
     <figure className="generated-media">
       <div
@@ -45,7 +46,7 @@ export function MediaView({ media }: { media: GeneratedMedia }) {
         )}
       </div>
       <figcaption>
-        <strong>AI-generated visual analogy</strong> · not a scientific diagram · fal{' '}
+        <strong>AI-generated {what}</strong> · illustrative, not a precise diagram · fal{' '}
         <code>{media.model}</code>
       </figcaption>
     </figure>
@@ -96,7 +97,7 @@ export function GenerationPanel({
   }
   const config = r?.config.media;
   return (
-    <section className="generation-panel" aria-label="Generated visual analogy">
+    <section className="generation-panel" aria-label="Generated image or clip">
       {relevant && busy && (
         <div className="generation-status" role="status">
           <span className="generation-pulse" aria-hidden="true" />

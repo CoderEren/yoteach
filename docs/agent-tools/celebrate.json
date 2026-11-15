@@ -13,5 +13,6 @@
       }
     },
     "required": []
-  }
+  },
+  "pre_tool_speech": "off"
 }

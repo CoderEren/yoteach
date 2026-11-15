@@ -194,13 +194,25 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const Pt = z
   .tuple([z.number(), z.number()])
   .transform(([x, y]) => [clamp(x, 0, 100), clamp(y, 0, 70)] as [number, number]);
-const Tone = z.enum(['ink', 'accent', 'muted']).optional().catch(undefined);
+export const Tones = ['ink', 'accent', 'muted', 'blue', 'green', 'pink', 'yellow'] as const;
+const Tone = z.enum(Tones).optional().catch(undefined);
+/** Optional soft fill in a tone, for drawing real things (a cell, an organ, a membrane). */
+const Fill = z.enum(Tones).optional().catch(undefined);
+const Width = z
+  .number()
+  .optional()
+  .transform((w) => (w === undefined ? undefined : Math.min(6, Math.max(0.3, w))))
+  .catch(undefined);
 const Short = z
   .string()
   .trim()
   .min(1)
   .transform((t) => t.slice(0, 40));
 /** Animation: which build step an element appears in, and where it slides afterwards. */
+const Path = z
+  .array(Pt)
+  .min(2)
+  .transform((p) => p.slice(0, 40));
 const Motion = {
   step: z.number().int().min(1).max(8).optional().catch(undefined),
   moveTo: Pt.optional().catch(undefined),
@@ -213,6 +225,7 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     label: Short.optional(),
     dashed: z.boolean().optional(),
     tone: Tone,
+    width: Width,
     ...Motion,
   }),
   z.object({
@@ -222,6 +235,7 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     label: Short.optional(),
     dashed: z.boolean().optional(),
     tone: Tone,
+    width: Width,
     ...Motion,
   }),
   z.object({
@@ -233,6 +247,7 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     label: Short.optional(),
     dashed: z.boolean().optional(),
     tone: Tone,
+    width: Width,
     ...Motion,
   }),
   z.object({
@@ -241,6 +256,7 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     r: z.number().transform((r) => clamp(r, 1, 35)),
     label: Short.optional(),
     tone: Tone,
+    fill: Fill,
     ...Motion,
   }),
   z.object({
@@ -250,6 +266,7 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     h: z.number().transform((h) => clamp(h, 2, 70)),
     label: Short.optional(),
     tone: Tone,
+    fill: Fill,
     ...Motion,
   }),
   z.object({ type: z.literal('dot'), at: Pt, label: Short.optional(), tone: Tone, ...Motion }),
@@ -262,6 +279,63 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
       .min(1)
       .transform((t) => t.slice(0, 60)),
     tone: Tone,
+    ...Motion,
+  }),
+  z.object({
+    type: z.literal('shape'),
+    // A smooth closed outline through the points: a cell body, an organ, a membrane patch.
+    points: z
+      .array(Pt)
+      .min(3)
+      .transform((p) => p.slice(0, 40)),
+    label: Short.optional(),
+    tone: Tone,
+    fill: Fill,
+    width: Width,
+    ...Motion,
+  }),
+  z.object({
+    type: z.literal('ellipse'),
+    at: Pt,
+    rx: z.number().transform((r) => clamp(r, 0.5, 50)),
+    ry: z.number().transform((r) => clamp(r, 0.5, 35)),
+    label: Short.optional(),
+    tone: Tone,
+    fill: Fill,
+    ...Motion,
+  }),
+  z.object({
+    type: z.literal('flow'),
+    // Particles that keep travelling along the path: ions through a channel, blood, electrons.
+    path: Path,
+    count: z
+      .number()
+      .int()
+      .optional()
+      .transform((n) => Math.min(12, Math.max(1, n ?? 5)))
+      .catch(5),
+    symbol: z.string().trim().max(4).optional().catch(undefined),
+    seconds: z
+      .number()
+      .optional()
+      .transform((d) => Math.min(10, Math.max(1, d ?? 3)))
+      .catch(3),
+    label: Short.optional(),
+    tone: Tone,
+    ...Motion,
+  }),
+  z.object({
+    type: z.literal('pulse'),
+    // A glowing band that keeps running along the path: an action potential, a signal, a wave.
+    path: Path,
+    seconds: z
+      .number()
+      .optional()
+      .transform((d) => Math.min(10, Math.max(0.6, d ?? 2)))
+      .catch(2),
+    label: Short.optional(),
+    tone: Tone,
+    width: Width,
     ...Motion,
   }),
   z.object({
@@ -292,6 +366,8 @@ export const SketchSchema = z.object({
         .slice(0, 40),
     )
     .refine((items) => items.length > 0, 'No drawable elements.'),
+  /** Large scenes get a bigger frame for detailed drawings. */
+  size: z.enum(['normal', 'large']).optional().catch(undefined),
   /** One caption per build step, shown under the sketch as it plays. */
   captions: z
     .array(

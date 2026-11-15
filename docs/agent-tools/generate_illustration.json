@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "generate_illustration",
-  "description": "Start one AI-generated visual analogy (fal) shown to the student and saved locally with the current lesson step, session and lecture slide. Use simple concrete scenes and everyday analogies; never request text, labels, formulas, molecules or diagrams. Returns immediately once started; a later contextual update reports whether it was displayed or failed. You cannot see the result.",
+  "description": "Generate an image or a short video clip with fal and show it on the student's screen (also saved locally). Use it whenever the student asks for a picture or a video, and on your own when a realistic visual helps: a neuron firing, ions crossing a membrane, blood flowing through the heart, a cell dividing, a real instrument or place. Describe the scene concretely (subject, what moves, viewpoint); never ask for text, labels or equations in it. Images take a few seconds; video clips about 40 seconds, so say so and keep teaching. Returns once started; a later update says when it is shown or if it failed.",
   "expects_response": true,
   "response_timeout_secs": 20,
   "parameters": {
@@ -9,7 +9,7 @@
     "properties": {
       "subject": {
         "type": "string",
-        "description": "A concrete scene to illustrate, 3\u2013600 characters, for example: a small glowing orb handed from a battery to a hexagonal glass tile like a relay baton."
+        "description": "Concrete scene, 3\u2013600 characters, e.g. 'close-up 3D render of a neuron membrane: sodium ions rushing inward through open channels as an electrical pulse travels along the axon, soft lighting, no text'."
       },
       "kind": {
         "type": "string",
@@ -17,7 +17,7 @@
           "image",
           "video"
         ],
-        "description": "image (default). video only when the app reports a video model; it can take minutes."
+        "description": "image (a few seconds) or video (a short silent clip, about 40 seconds to make)."
       }
     },
     "required": [

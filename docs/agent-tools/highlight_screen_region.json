@@ -20,5 +20,6 @@
       "snapshotId",
       "regionId"
     ]
-  }
+  },
+  "pre_tool_speech": "off"
 }

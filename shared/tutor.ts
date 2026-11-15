@@ -303,6 +303,8 @@ export interface TutorApi {
       snapshotId: string;
       summary: string;
       regions: { regionId: string; label: string; evidence: string }[];
+      /** What the student circled or pointed at with the cursor while asking. */
+      pointer: { kind: 'circle' | 'point'; quote: string; regionId: string } | null;
     } | null>
   >;
   windows(): Promise<import('./model').Result<WindowSource[]>>;

@@ -595,6 +595,124 @@ test('Yoyo teaches on the screen: draws on regions, sketches, and opens lesson a
     await expect
       .poll(async () => JSON.stringify(await petBounds()))
       .not.toBe(JSON.stringify(before));
+    // Real pictures, alive: a neuron with a travelling pulse and ions flowing in and out.
+    await provider.tool('sketch_on_screen', {
+      title: 'A neuron fires',
+      size: 'large',
+      captions: [
+        'The cell body collects input',
+        'The signal races down the axon',
+        'Na+ rushes in, K+ leaks out',
+      ],
+      elements: [
+        {
+          type: 'shape',
+          points: [
+            [8, 30],
+            [16, 20],
+            [26, 24],
+            [28, 36],
+            [18, 42],
+          ],
+          fill: 'pink',
+          tone: 'pink',
+          label: 'soma',
+          step: 1,
+        },
+        {
+          type: 'curve',
+          points: [
+            [10, 22],
+            [4, 12],
+            [2, 6],
+          ],
+          step: 1,
+        },
+        {
+          type: 'curve',
+          points: [
+            [12, 40],
+            [6, 50],
+            [3, 58],
+          ],
+          step: 1,
+        },
+        {
+          type: 'curve',
+          points: [
+            [28, 31],
+            [55, 33],
+            [90, 31],
+          ],
+          width: 3,
+          tone: 'blue',
+          label: 'axon',
+          step: 2,
+        },
+        {
+          type: 'pulse',
+          path: [
+            [28, 31],
+            [55, 33],
+            [90, 31],
+          ],
+          seconds: 1.6,
+          tone: 'yellow',
+          step: 2,
+        },
+        {
+          type: 'flow',
+          path: [
+            [50, 10],
+            [50, 30],
+          ],
+          symbol: 'Na+',
+          count: 4,
+          tone: 'green',
+          step: 3,
+        },
+        {
+          type: 'flow',
+          path: [
+            [66, 32],
+            [66, 56],
+          ],
+          symbol: 'K+',
+          count: 4,
+          tone: 'accent',
+          step: 3,
+        },
+      ],
+    });
+    await expect(layer.getByRole('img', { name: 'A neuron fires' })).toBeVisible();
+    await expect(layer.locator('.flow .particle')).toHaveCount(8);
+    await expect(layer.locator('.pulse-band')).toHaveCount(1);
+    await layer.waitForTimeout(4200);
+    mkdirSync('.impeccable/review', { recursive: true });
+    await layer.screenshot({ path: '.impeccable/review/neuron-sketch.png' });
+    // Cursor ink: the trace the cursor leaves while the talk key is held.
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) =>
+        x.webContents.getURL().includes('/overlay'),
+      )!;
+      const points = Array.from({ length: 80 }, (_, k) => {
+        const a = (k / 70) * 2 * Math.PI;
+        return { x: 0.3 + 0.07 * Math.cos(a), y: 0.3 + 0.06 * Math.sin(a), t: k * 16 };
+      });
+      w.webContents.send('overlay:trail', { type: 'start', points });
+    });
+    await layer.waitForTimeout(150);
+    await expect
+      .poll(() =>
+        layer.locator('canvas.cursor-ink').evaluate((c: HTMLCanvasElement) => {
+          const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+          let n = 0;
+          for (let i = 3; i < d.length; i += 16) if (d[i] > 0) n++;
+          return n;
+        }),
+      )
+      .toBeGreaterThan(50);
+    await layer.screenshot({ path: '.impeccable/review/cursor-ink.png' });
     const companion = app.windows().find((w) => w.url().includes('/companion'))!;
     await provider.tool('celebrate', { reason: 'understood vector addition' });
     await expect(companion.locator('.yoyo--success')).toBeVisible();
@@ -748,11 +866,11 @@ test('fal visual analogy shows progress, saves with the lesson step, explains fa
     await page.getByRole('button', { name: 'Generate visual analogy', exact: true }).click();
     await expect(page.getByText(/Waiting in fal’s queue/)).toBeVisible();
     const image = page.getByRole('img', {
-      name: /AI-generated visual analogy: a small glowing orb/,
+      name: /AI-generated image: a small glowing orb/,
     });
     await expect(image).toBeVisible({ timeout: 15000 });
     await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1024);
-    await expect(page.getByText('not a scientific diagram')).toBeVisible();
+    await expect(page.getByText('illustrative, not a precise diagram')).toBeVisible();
     const calls = await app.evaluate(
       () => (globalThis as any).falCalls as { url: string; auth: string | null }[],
     );
@@ -767,7 +885,7 @@ test('fal visual analogy shows progress, saves with the lesson step, explains fa
     await page.screenshot({ path: '.impeccable/review/visual-lesson-fal.png' });
     // Another step has its own media; a failure explains itself and offers a retry.
     await page.getByRole('button', { name: 'Next step', exact: true }).click();
-    await expect(page.getByRole('img', { name: /AI-generated visual analogy/ })).toHaveCount(0);
+    await expect(page.getByRole('img', { name: /AI-generated (image|clip)/ })).toHaveCount(0);
     await app.evaluate(() => {
       (globalThis as any).falMode = 'credit';
     });
@@ -782,7 +900,7 @@ test('fal visual analogy shows progress, saves with the lesson step, explains fa
     await page.getByRole('button', { name: 'Saved material', exact: true }).click();
     await page.getByRole('button', { name: /Visual analogy · Lesson step 3/ }).click();
     await expect(
-      page.getByRole('dialog').getByRole('img', { name: /AI-generated visual analogy/ }),
+      page.getByRole('dialog').getByRole('img', { name: /AI-generated (image|clip)/ }),
     ).toBeVisible();
     await expect(page.getByText('requested by you')).toBeVisible();
   } finally {
@@ -875,7 +993,7 @@ test('Stage 3 demo: lecture → visual lesson → fal media → practice misconc
       kind: 'image',
     });
     expect(started.started).toBe(true);
-    await expect(page.getByRole('img', { name: /AI-generated visual analogy/ })).toBeVisible();
+    await expect(page.getByRole('img', { name: /AI-generated (image|clip)/ })).toBeVisible();
     await expect
       .poll(() =>
         provider.messages.some(
