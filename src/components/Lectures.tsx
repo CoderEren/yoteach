@@ -62,6 +62,7 @@ export function Lectures({
         </button>
         <button
           className="button primary lecture-run"
+          aria-describedby={!r?.config.voice || !r?.config.vision ? 'lecture-setup' : undefined}
           disabled={
             !lectureId ||
             !!busy ||
@@ -79,6 +80,12 @@ export function Lectures({
           {r?.status === 'connecting' ? 'Opening lecture…' : 'Run me through the lecture'}
         </button>
       </div>
+      {r && (!r.config.voice || !r.config.vision) && (
+        <p id="lecture-setup" role="status" className="settings-hint">
+          Voice and screen understanding are not set up yet. Follow <code>SETUP_REQUIRED.md</code>,
+          then restart Yoteach. You can still upload and read PDFs in Saved material.
+        </p>
+      )}
       {(error || r?.error) && (
         <p role="alert" className="error-message">
           {error || r?.error}
@@ -135,11 +142,11 @@ export function Lectures({
             if (!deleting) setRemove(null);
           }}
         >
-          <p>
+          <p className="confirmation-copy">
             This removes its narration and drawings from this Mac. Your PDF stays in Saved material.
             Provider-side records are not affected.
           </p>
-          <div className="form-actions">
+          <div className="form-actions confirmation-actions">
             <button className="button" disabled={deleting} onClick={() => setRemove(null)}>
               Keep walkthrough
             </button>

@@ -1,0 +1,1479 @@
+[
+  {
+    "subject": "biology",
+    "question": "Why does a neuron fire an action potential?",
+    "firstWordsMs": 4319,
+    "speech": [
+      "A neuron fires when enough sodium rushes in to cross a voltage threshold.\n",
+      "At rest, a neuron sits around minus seventy millivolts. When incoming signals depolarize the membrane to the threshold of minus fifty-five millivolts, voltage-gated sodium channels snap open, flooding the cell with positive ions until the peak. Potassium channels then open while sodium channels close, letting potassium rush out to reset the electrical balance."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Neuron Action Potential",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                55
+              ],
+              "xLabel": "Time (ms)",
+              "yLabel": "Voltage (mV)",
+              "tone": "muted"
+            },
+            {
+              "type": "line",
+              "from": [
+                15,
+                40
+              ],
+              "to": [
+                85,
+                40
+              ],
+              "label": "Threshold (-55mV)",
+              "dashed": true,
+              "tone": "muted"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  15,
+                  48
+                ],
+                [
+                  30,
+                  48
+                ],
+                [
+                  40,
+                  40
+                ],
+                [
+                  50,
+                  15
+                ],
+                [
+                  60,
+                  52
+                ],
+                [
+                  75,
+                  48
+                ]
+              ],
+              "tone": "accent",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                50,
+                11
+              ],
+              "label": "Depolarization (+30mV)",
+              "tone": "accent",
+              "step": 1
+            },
+            {
+              "type": "flow",
+              "tone": "blue",
+              "step": 1,
+              "path": [
+                [
+                  40,
+                  40
+                ],
+                [
+                  50,
+                  15
+                ]
+              ],
+              "symbol": "Na+",
+              "seconds": 2
+            },
+            {
+              "type": "flow",
+              "tone": "green",
+              "step": 2,
+              "path": [
+                [
+                  50,
+                  15
+                ],
+                [
+                  60,
+                  52
+                ]
+              ],
+              "symbol": "K+",
+              "seconds": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                60,
+                57
+              ],
+              "label": "Repolarization",
+              "tone": "green",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "Voltage-gated sodium channels open rapidly at threshold.",
+            "Potassium channels open to repolarize the membrane."
+          ]
+        },
+        "atMs": 4319
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "chemistry",
+    "question": "Why does a catalyst speed up a reaction?",
+    "firstWordsMs": 4088,
+    "speech": [
+      "A catalyst lowers the activation energy needed for a reaction.\n",
+      "Chemical reactions require reactant particles to collide with at least a minimum threshold of energy, known as activation energy, to break existing bonds and form new ones. \n\nWhen you introduce a catalyst, it offers an alternative reaction pathway that has a significantly lower energy barrier. Because the barrier is lower, a much higher fraction of colliding molecules possess enough kinetic energy to react successfully at the same temperature. The catalyst facilitates this without being consumed in the process. \n\nDoes this distinction between the reaction pathways make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Catalyst and Activation Energy",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                55
+              ],
+              "xLabel": "Reaction Progress",
+              "yLabel": "Energy",
+              "tone": "ink"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  18,
+                  45
+                ],
+                [
+                  30,
+                  45
+                ]
+              ],
+              "label": "Reactants",
+              "tone": "ink",
+              "width": 1.5
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  75,
+                  50
+                ],
+                [
+                  88,
+                  50
+                ]
+              ],
+              "label": "Products",
+              "tone": "ink",
+              "width": 1.5
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  30,
+                  45
+                ],
+                [
+                  52,
+                  15
+                ],
+                [
+                  75,
+                  50
+                ]
+              ],
+              "label": "Uncatalyzed (higher barrier)",
+              "tone": "pink",
+              "width": 1.5
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  30,
+                  45
+                ],
+                [
+                  52,
+                  30
+                ],
+                [
+                  75,
+                  50
+                ]
+              ],
+              "label": "Catalyzed (lower barrier)",
+              "tone": "accent",
+              "width": 1.5
+            },
+            {
+              "type": "arrow",
+              "from": [
+                52,
+                45
+              ],
+              "to": [
+                52,
+                31
+              ],
+              "label": "Lower Ea",
+              "tone": "accent"
+            }
+          ],
+          "captions": [
+            "A catalyst provides an alternative pathway with lower activation energy."
+          ]
+        },
+        "atMs": 4088
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "physics",
+    "question": "How does a pendulum exchange energy?",
+    "firstWordsMs": 3739,
+    "speech": [
+      "It swaps between height and speed, keeping the total steady.\n",
+      "At the highest point of its swing, the pendulum momentarily pauses, so all its energy is stored as gravitational potential energy. As gravity pulls the bob downward, it accelerates, converting that potential energy into kinetic energy. When it reaches the lowest point, it moves fastest and all of that energy has turned into kinetic energy, which carries it back up the opposite side to trade speed for height again. Does that make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Energy in a Pendulum",
+          "elements": [
+            {
+              "type": "line",
+              "from": [
+                50,
+                10
+              ],
+              "to": [
+                50,
+                12
+              ],
+              "tone": "ink",
+              "width": 2
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                12
+              ],
+              "to": [
+                25,
+                45
+              ],
+              "dashed": true,
+              "tone": "muted"
+            },
+            {
+              "type": "circle",
+              "at": [
+                25,
+                45
+              ],
+              "r": 4,
+              "label": "Max PE",
+              "tone": "pink",
+              "fill": "pink"
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                12
+              ],
+              "to": [
+                50,
+                55
+              ],
+              "tone": "ink"
+            },
+            {
+              "type": "circle",
+              "at": [
+                50,
+                55
+              ],
+              "r": 4,
+              "label": "Max KE",
+              "tone": "accent",
+              "fill": "accent"
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                12
+              ],
+              "to": [
+                75,
+                45
+              ],
+              "dashed": true,
+              "tone": "muted"
+            },
+            {
+              "type": "circle",
+              "at": [
+                75,
+                45
+              ],
+              "r": 4,
+              "label": "Max PE",
+              "tone": "pink",
+              "fill": "pink"
+            },
+            {
+              "type": "pulse",
+              "tone": "accent",
+              "path": [
+                [
+                  25,
+                  48
+                ],
+                [
+                  50,
+                  58
+                ],
+                [
+                  75,
+                  48
+                ]
+              ],
+              "seconds": 2
+            }
+          ],
+          "captions": [
+            "Maximum potential energy at the peak converts to pure kinetic energy at the bottom."
+          ]
+        },
+        "atMs": 3739
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "vectors",
+    "question": "How do I add two vectors?",
+    "firstWordsMs": 3281,
+    "speech": [
+      "You place the tail of the second vector at the head of the first.\n",
+      "To add vectors graphically, slide the second vector without rotating it so its start sits directly on the arrow tip of the first. The total, or resultant vector, is the straight line drawn from the starting point of the first vector to the final tip of the second. \n\nIf you are working with numbers in component form, like horizontal and vertical parts, you simply add their corresponding x-components together and their y-components together."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Vector Addition: Tip-to-Tail Method",
+          "elements": [
+            {
+              "type": "arrow",
+              "from": [
+                20,
+                45
+              ],
+              "to": [
+                45,
+                45
+              ],
+              "label": "Vector A",
+              "tone": "blue",
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                45,
+                45
+              ],
+              "to": [
+                65,
+                25
+              ],
+              "label": "Vector B",
+              "tone": "green",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                20,
+                45
+              ],
+              "to": [
+                65,
+                25
+              ],
+              "label": "Resultant (A + B)",
+              "dashed": true,
+              "tone": "accent",
+              "step": 2,
+              "width": 2.5
+            }
+          ],
+          "captions": [
+            "Place vector B at the tip of vector A.",
+            "The resultant vector R connects the start of A to the tip of B."
+          ]
+        },
+        "atMs": 3282
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "matrices",
+    "question": "What does a rotation matrix do to a grid?",
+    "firstWordsMs": 5025,
+    "speech": [
+      "It spins the whole grid around the origin while keeping lengths and angles exactly the same.\n",
+      "Every point moves along a circle centered at the origin by the exact same angle. The standard basis vectors land on new coordinates determined by sine and cosine, which form the columns of the rotation matrix. Does that coordinate shift make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "2D Matrix Rotation",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                30,
+                55
+              ],
+              "xLabel": "x",
+              "yLabel": "y",
+              "tone": "muted"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                30,
+                55
+              ],
+              "to": [
+                55,
+                55
+              ],
+              "label": "i-hat",
+              "tone": "blue",
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                30,
+                55
+              ],
+              "to": [
+                30,
+                30
+              ],
+              "label": "j-hat",
+              "tone": "green",
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                30,
+                55
+              ],
+              "to": [
+                50,
+                40
+              ],
+              "label": "[cos θ, sin θ]",
+              "dashed": true,
+              "tone": "blue",
+              "step": 2,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                30,
+                55
+              ],
+              "to": [
+                15,
+                35
+              ],
+              "label": "[-sin θ, cos θ]",
+              "dashed": true,
+              "tone": "green",
+              "step": 2,
+              "width": 2
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  45,
+                  55
+                ],
+                [
+                  44,
+                  48
+                ],
+                [
+                  41,
+                  45
+                ]
+              ],
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                47,
+                50
+              ],
+              "text": "θ",
+              "tone": "accent",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "Original basis vectors i-hat and j-hat rotate by angle theta"
+          ]
+        },
+        "atMs": 5028
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "calculus",
+    "question": "What does a derivative mean?",
+    "firstWordsMs": 2489,
+    "speech": [
+      "It measures how fast something is changing at a specific moment. Let me draw that for you.\n",
+      "When you look at a curve, the slope changes at every point. The derivative gives you the exact slope of the tangent line touching the curve right at that single point. \n\nFor instance, if the curve represents your position over time, the derivative at any instant tells you your exact speedometer reading. Does that visual make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Instantaneous Rate of Change",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                60
+              ],
+              "xLabel": "x",
+              "yLabel": "y",
+              "tone": "muted"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  18,
+                  55
+                ],
+                [
+                  35,
+                  50
+                ],
+                [
+                  55,
+                  35
+                ],
+                [
+                  75,
+                  12
+                ]
+              ],
+              "tone": "ink",
+              "width": 2
+            },
+            {
+              "type": "dot",
+              "at": [
+                55,
+                35
+              ],
+              "label": "(x, f(x))",
+              "tone": "ink"
+            },
+            {
+              "type": "line",
+              "from": [
+                35,
+                55
+              ],
+              "to": [
+                75,
+                15
+              ],
+              "label": "slope = derivative",
+              "tone": "accent",
+              "width": 1.5
+            }
+          ],
+          "captions": [
+            "A curve with a tangent line showing instantaneous rate of change."
+          ]
+        },
+        "atMs": 2489
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "economics",
+    "question": "Why does a supply shortage raise prices?",
+    "firstWordsMs": 3970,
+    "speech": [
+      "A shortage means fewer goods are available while demand stays the same, so buyers compete for what's left and push the price up. I'll sketch how that works.\n",
+      "When the quantity supplied drops, sellers can charge more because eager buyers are willing to outbid each other to secure the limited supply. As the price climbs toward the new equilibrium, demand cools down until the market balances out again. Does that explanation make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Supply Shortage and Price Increase",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                55
+              ],
+              "xLabel": "Quantity",
+              "yLabel": "Price",
+              "tone": "ink"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  25,
+                  15
+                ],
+                [
+                  75,
+                  50
+                ]
+              ],
+              "tone": "blue"
+            },
+            {
+              "type": "text",
+              "at": [
+                77,
+                50
+              ],
+              "text": "Demand",
+              "tone": "blue"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  25,
+                  50
+                ],
+                [
+                  75,
+                  15
+                ]
+              ],
+              "tone": "ink"
+            },
+            {
+              "type": "text",
+              "at": [
+                77,
+                15
+              ],
+              "text": "S1",
+              "tone": "ink"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  15,
+                  32.5
+                ],
+                [
+                  60,
+                  32.5
+                ]
+              ],
+              "dashed": true,
+              "tone": "muted"
+            },
+            {
+              "type": "text",
+              "at": [
+                8,
+                33
+              ],
+              "text": "P1",
+              "tone": "muted"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  15,
+                  22
+                ],
+                [
+                  45,
+                  22
+                ]
+              ],
+              "dashed": true,
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                8,
+                22
+              ],
+              "text": "P2",
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  15,
+                  45
+                ],
+                [
+                  60,
+                  10
+                ]
+              ],
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                62,
+                10
+              ],
+              "text": "S2",
+              "tone": "accent",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "Supply shifts left, leaving demand unmet at the old price.",
+            "Bidding pushes the market to a higher equilibrium price."
+          ]
+        },
+        "atMs": 3972
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "history",
+    "question": "How did Roman roads help trade?",
+    "firstWordsMs": 5269,
+    "speech": [
+      "Roman roads sped up trade by letting merchants move goods safely and quickly between cities.\n",
+      "These paved, all-weather routes cut down travel time significantly and linked inland agricultural hubs directly to major ports and markets. Because the military patrolled them regularly, merchants could transport valuable cargo like grain, olive oil, and wine with far less risk of banditry."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Roman Trade Network",
+          "elements": [
+            {
+              "type": "circle",
+              "at": [
+                50,
+                15
+              ],
+              "r": 4,
+              "label": "Rome",
+              "tone": "accent",
+              "fill": "accent"
+            },
+            {
+              "type": "circle",
+              "at": [
+                20,
+                45
+              ],
+              "r": 3.5,
+              "label": "Gaul",
+              "tone": "ink",
+              "fill": "muted"
+            },
+            {
+              "type": "circle",
+              "at": [
+                80,
+                50
+              ],
+              "r": 3.5,
+              "label": "Alexandria",
+              "tone": "ink",
+              "fill": "muted"
+            },
+            {
+              "type": "line",
+              "from": [
+                20,
+                45
+              ],
+              "to": [
+                50,
+                15
+              ],
+              "label": "Via Agrippa",
+              "tone": "ink",
+              "width": 2
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                15
+              ],
+              "to": [
+                80,
+                50
+              ],
+              "label": "Via Appia / Sea route",
+              "tone": "ink",
+              "width": 2
+            },
+            {
+              "type": "flow",
+              "tone": "blue",
+              "path": [
+                [
+                  20,
+                  45
+                ],
+                [
+                  50,
+                  15
+                ]
+              ],
+              "count": 4,
+              "symbol": "Wine",
+              "seconds": 3
+            },
+            {
+              "type": "flow",
+              "tone": "yellow",
+              "path": [
+                [
+                  80,
+                  50
+                ],
+                [
+                  50,
+                  15
+                ]
+              ],
+              "count": 4,
+              "symbol": "Grain",
+              "seconds": 3
+            }
+          ],
+          "captions": [
+            "Direct paved roads connected ports and distant provinces to Rome."
+          ]
+        },
+        "atMs": 5269
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "computing",
+    "question": "How do packets travel across a network?",
+    "firstWordsMs": 4128,
+    "speech": [
+      "Packets are small data units that route individually through various network nodes to reach their destination.\n",
+      "When you send data like a webpage or file, the network breaks it into smaller chunks called packets. Each packet carries headers containing the source and destination IP addresses, along with sequence numbers so they can be reassembled in order.\n\nRouters inspect these headers at each hop and choose the best available path across the network based on current traffic. Because of dynamic routing, different packets from the exact same file might travel along entirely different physical routes before arriving at the receiver and getting reordered.\n\nDoes that general journey from sender to receiver make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Packet Routing Across Nodes",
+          "elements": [
+            {
+              "type": "circle",
+              "at": [
+                15,
+                35
+              ],
+              "r": 6,
+              "label": "Sender",
+              "tone": "blue"
+            },
+            {
+              "type": "circle",
+              "at": [
+                40,
+                20
+              ],
+              "r": 5,
+              "label": "Router A",
+              "tone": "ink"
+            },
+            {
+              "type": "circle",
+              "at": [
+                40,
+                50
+              ],
+              "r": 5,
+              "label": "Router B",
+              "tone": "ink"
+            },
+            {
+              "type": "circle",
+              "at": [
+                65,
+                35
+              ],
+              "r": 5,
+              "label": "Router C",
+              "tone": "ink"
+            },
+            {
+              "type": "circle",
+              "at": [
+                85,
+                35
+              ],
+              "r": 6,
+              "label": "Receiver",
+              "tone": "green"
+            },
+            {
+              "type": "line",
+              "from": [
+                21,
+                32
+              ],
+              "to": [
+                35,
+                22
+              ],
+              "tone": "muted"
+            },
+            {
+              "type": "line",
+              "from": [
+                21,
+                38
+              ],
+              "to": [
+                35,
+                48
+              ],
+              "tone": "muted"
+            },
+            {
+              "type": "line",
+              "from": [
+                45,
+                20
+              ],
+              "to": [
+                60,
+                32
+              ],
+              "tone": "muted"
+            },
+            {
+              "type": "line",
+              "from": [
+                45,
+                50
+              ],
+              "to": [
+                60,
+                38
+              ],
+              "tone": "muted"
+            },
+            {
+              "type": "line",
+              "from": [
+                71,
+                35
+              ],
+              "to": [
+                79,
+                35
+              ],
+              "tone": "muted"
+            },
+            {
+              "type": "flow",
+              "tone": "accent",
+              "path": [
+                [
+                  15,
+                  35
+                ],
+                [
+                  40,
+                  20
+                ],
+                [
+                  65,
+                  35
+                ],
+                [
+                  85,
+                  35
+                ]
+              ],
+              "count": 4,
+              "symbol": "P",
+              "seconds": 2.5
+            }
+          ],
+          "captions": [
+            "Routers forward packets along different paths toward the destination."
+          ]
+        },
+        "atMs": 4128
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "geography",
+    "question": "Why do tectonic plates cause earthquakes?",
+    "firstWordsMs": 3997,
+    "speech": [
+      "Earthquakes happen because plates get stuck while the rest of the Earth keeps moving, building up stress until it suddenly snaps.\n",
+      "As the plates push past or grind against each other, friction keeps the contact surfaces locked in place. Even though the fault itself is stuck, the rest of the plate keeps pushing, warping and bending the surrounding rock like a loaded spring. Eventually, the built-up strain overcomes the frictional force, causing the rock to rupture and snap forward violently in what geologists call elastic rebound. That sudden release sends shockwaves rippling out through the crust, which is what we feel as an earthquake. Does this elastic rebound concept make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Fault Rupture and Seismic Waves",
+          "elements": [
+            {
+              "type": "shape",
+              "points": [
+                [
+                  15,
+                  20
+                ],
+                [
+                  48,
+                  20
+                ],
+                [
+                  45,
+                  55
+                ],
+                [
+                  15,
+                  55
+                ]
+              ],
+              "tone": "ink",
+              "fill": "muted"
+            },
+            {
+              "type": "shape",
+              "points": [
+                [
+                  52,
+                  20
+                ],
+                [
+                  85,
+                  20
+                ],
+                [
+                  85,
+                  55
+                ],
+                [
+                  49,
+                  55
+                ]
+              ],
+              "tone": "ink",
+              "fill": "accent"
+            },
+            {
+              "type": "line",
+              "from": [
+                48,
+                15
+              ],
+              "to": [
+                46,
+                60
+              ],
+              "label": "Locked fault",
+              "dashed": true,
+              "tone": "pink"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                25,
+                12
+              ],
+              "to": [
+                40,
+                12
+              ],
+              "label": "Plate motion",
+              "tone": "blue"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                75,
+                12
+              ],
+              "to": [
+                60,
+                12
+              ],
+              "label": "Plate motion",
+              "tone": "blue"
+            },
+            {
+              "type": "dot",
+              "at": [
+                47,
+                38
+              ],
+              "label": "Focus",
+              "tone": "pink",
+              "step": 2
+            },
+            {
+              "type": "pulse",
+              "tone": "pink",
+              "step": 2,
+              "path": [
+                [
+                  47,
+                  38
+                ],
+                [
+                  30,
+                  30
+                ],
+                [
+                  20,
+                  22
+                ]
+              ],
+              "seconds": 1.5
+            },
+            {
+              "type": "pulse",
+              "tone": "pink",
+              "step": 2,
+              "path": [
+                [
+                  47,
+                  38
+                ],
+                [
+                  65,
+                  30
+                ],
+                [
+                  75,
+                  22
+                ]
+              ],
+              "seconds": 1.5
+            },
+            {
+              "type": "pulse",
+              "tone": "pink",
+              "step": 2,
+              "path": [
+                [
+                  47,
+                  38
+                ],
+                [
+                  47,
+                  15
+                ]
+              ],
+              "seconds": 1.2
+            }
+          ],
+          "captions": [
+            "Friction locks the fault line while deeper rock keeps moving, bending the crust.",
+            "When stress exceeds rock strength, it snaps forward, releasing seismic waves."
+          ]
+        },
+        "atMs": 3997
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "language",
+    "question": "How does the subject relate to the verb in a sentence?",
+    "firstWordsMs": 3543,
+    "speech": [
+      "Subject-verb agreement means the verb must match the subject's number and person. I'll draw a quick example to show how this works.\n",
+      "The subject tells you who or what performs the action, while the verb expresses that action or state. Because they are directly linked, their forms must agree in grammatical number and person. Does that distinction make sense, or would you like to look at compound subjects next?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Subject-Verb Relationship",
+          "elements": [
+            {
+              "type": "text",
+              "at": [
+                25,
+                20
+              ],
+              "text": "The dog",
+              "tone": "blue"
+            },
+            {
+              "type": "text",
+              "at": [
+                65,
+                20
+              ],
+              "text": "barks",
+              "tone": "accent"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                38,
+                20
+              ],
+              "to": [
+                62,
+                20
+              ],
+              "label": "singular match",
+              "tone": "ink"
+            },
+            {
+              "type": "text",
+              "at": [
+                25,
+                48
+              ],
+              "text": "The dogs",
+              "tone": "blue",
+              "step": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                65,
+                48
+              ],
+              "text": "bark",
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                40,
+                48
+              ],
+              "to": [
+                62,
+                48
+              ],
+              "label": "plural match",
+              "tone": "ink",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "A singular subject takes a singular verb.",
+            "A plural subject takes a plural verb."
+          ]
+        },
+        "atMs": 3544
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "literature",
+    "question": "How does dramatic irony work in Romeo and Juliet?",
+    "firstWordsMs": 4423,
+    "speech": [
+      "Dramatic irony in Romeo and Juliet works by letting the audience know things the characters don't. I'll sketch how this builds tension.\n",
+      "The most famous example is the climax in the Capulet tomb: we know Juliet took a sleeping potion and is about to wake up, but Romeo genuinely believes she has died. Every word of grief he speaks and every step he takes toward drinking the poison creates unbearable suspense because we see the disaster coming while he remains completely unaware. \n\nDoes this distinction between audience knowledge and character belief make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Dramatic Irony in Romeo and Juliet",
+          "elements": [
+            {
+              "type": "circle",
+              "at": [
+                25,
+                20
+              ],
+              "r": 12,
+              "label": "Audience Knowledge",
+              "tone": "blue",
+              "fill": "blue"
+            },
+            {
+              "type": "text",
+              "at": [
+                12,
+                20
+              ],
+              "text": "Juliet is alive (potion)"
+            },
+            {
+              "type": "circle",
+              "at": [
+                75,
+                20
+              ],
+              "r": 12,
+              "label": "Romeo's Belief",
+              "tone": "pink",
+              "fill": "pink"
+            },
+            {
+              "type": "text",
+              "at": [
+                65,
+                20
+              ],
+              "text": "Juliet is dead"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                38,
+                20
+              ],
+              "to": [
+                62,
+                20
+              ],
+              "label": "Knowledge Gap",
+              "tone": "accent"
+            },
+            {
+              "type": "box",
+              "at": [
+                50,
+                45
+              ],
+              "w": 40,
+              "h": 12,
+              "label": "Dramatic Tension & Tragedy",
+              "tone": "accent",
+              "fill": "accent"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                25
+              ],
+              "to": [
+                50,
+                44
+              ],
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                50,
+                62
+              ],
+              "text": "The audience is powerless to stop the disaster",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "The audience knows Juliet is merely asleep, but Romeo believes she is dead.",
+            "This knowledge gap turns Romeo's actions into unbearable tragedy for the viewer."
+          ]
+        },
+        "atMs": 4423
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  }
+]

@@ -1,0 +1,1 @@
+{"visualToolsMatch":true,"promptMatches":true,"temperatureSet":true,"toolsMatch":true,"voiceUnchanged":true,"modelUnchanged":true,"authUnchanged":true,"overridesUnchanged":true,"originalToolsPreserved":true,"retiredDetached":true,"backup":"work/agent-visual-1794709992268"}

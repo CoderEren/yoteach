@@ -253,8 +253,8 @@ export default function App() {
                 <div>
                   <label htmlFor="proactive-help">Offer help</label>
                   <p>
-                    If you stay on the same screen longer than it should take, Yoyo offers to help.
-                    This check reads the screen on your Mac only; nothing is sent.
+                    Offer help when the same text stays on screen for a while. This check reads the
+                    screen on your Mac only; nothing is sent.
                   </p>
                 </div>
                 <input

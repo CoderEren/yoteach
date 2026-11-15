@@ -487,6 +487,9 @@ test('failed voice startup releases listening and the next hold can connect', as
     await expect.poll(async () => (await runtime(page)).sessionId).toBeNull();
     const pet = app.windows().find((w) => w.url().includes('/companion'))!;
     await expect(pet.locator('.input-listening')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toBeVisible();
+    await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-end' }));
     expect((await runtime(page)).input).toBe('idle');
     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'hold-start' }));

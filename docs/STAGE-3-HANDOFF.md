@@ -184,18 +184,19 @@ From the user's 15 Nov report: questions (matrix in a coordinate system, cholest
   change, and counted as busy. Pointing now clears after 6 s and is not busy. With a
   `YOTEACH_STUCK_*` test hook set, each check logs its decision as `[stuck] …` in the terminal.
 
-## Remaining
+## Current state and remaining validation
 
-- Live spoken practice through the hosted agent (the tools are synced; not exercised with a microphone).
-- A manual pass on a real Mac: hold the talk key over another app, ask about something visible, and confirm the drawing lands on it and the cards are clickable.
+The built-in glucose lesson, saved practice and four related tools were deliberately removed in chunk 12. Do not restore them. The product has exactly Chats and Lectures, with screen teaching, generated media, Saved material and Settings.
 
-Do not claim Stage 3 complete until the user reviews it. Keep the lecture launch page at two controls and preserve the two-mode workspace. No wake phrase was implemented; always-listening support remains deferred.
+The overnight sprint is on `overnight-polish`, based on `d74a4c7`. Read `docs/overnight/REPORT.md` and `USE-CASES.md` for current evidence and limitations rather than treating historical chunk results as current certification. Real hand-made gestures and live-provider variability need explicit evidence; fixture tests alone do not establish them.
 
 ## Resume instructions
 
-1. Open `/Users/borakurtulus/Desktop/YoTeach`, inspect `git status`, stay on `stage-3-visual-learning`, and read this file plus PRODUCT.md. The original Stage 3 scope is in HANDOFF.md and `docs/ORIGINAL-PRODUCT-SPEC.md`, adapted to the two-mode workflow.
-2. fal is done (chunk 3). With the user's go-ahead, run `node scripts/sync-visual-agent.mjs` to attach `generate_illustration` and the updated prompt to the existing agent, then verify a live tool call. Video stays off until the user picks `FAL_VIDEO_MODEL`.
-3. Add practice answer/feedback evidence and review suggestions, not time-based mastery. Preserve v4 data through any subsequent schema changes. Complete the lecture → visual lesson → generated media → practice → saved restart demo.
-4. Commit/push each tested chunk. No merge, and no claim of full Stage 3 completion until its acceptance criteria pass.
+1. Work in `/Users/eersin937/Desktop/YoTeach`, inspect `git status`, and preserve any pre-existing Yoyo edits. Stay on `overnight-polish`; never merge or force-push.
+2. Read `docs/OVERNIGHT-GOAL.md`, the overnight report, PRODUCT.md and the current agent prompt. Historical lessons/practice sections above document migrations, not current features.
+3. Use isolated `YOTEACH_DATA_DIR` under the system temporary directory for every app launch. Never use the user's Application Support workspace. Keep `.env` values private.
+4. Run `npm test`, `npm run check`, `npm run format:check`; remove `dist` before `npm run build`, then run the full `npx playwright test` with native macOS GUI access. The packaged smoke test skips only when no local bundle exists.
+5. Hosted changes go exclusively through `node scripts/sync-visual-agent.mjs`. It backs up and verifies prompt, all managed visual tools, retired-tool detachment, and unchanged voice/model/auth/overrides. Count all live requests in `docs/overnight/spend.md`.
+6. Design UI refinements in the linked Figma file before implementation, then retain screenshot and test evidence. Commit/push verified cycles to `overnight-polish`. Stop every launched app and caffeinate when finished.
 
-Useful commands: `npm test`, `npm run check`, `npm run format:check`, `npm run build`, `npx playwright test`, `YOTEACH_TEST_DEV=1 npx playwright test tests/tutor.e2e.ts`. Electron GUI tests require a macOS GUI context; in Codex this session used shell `require_escalated` successfully, without asking the user to run commands. Use isolated `YOTEACH_DATA_DIR`. Build packaging deliberately refuses to overwrite `release/Yoteach.app`; move the old bundle under ignored `work/` before `node scripts/package-mac.mjs`. Restart `npm run dev` after main/shared changes; HMR does not restart the Electron main process.
+There are no Pause or End controls and no wake phrase. Preserve two lecture launch controls. No schema change was required by the overnight UI fixes; workspace schema remains v8 with exact historical backups.

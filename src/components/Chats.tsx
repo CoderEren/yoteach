@@ -130,7 +130,13 @@ export function Chats({ data }: { data: AppState }) {
         {(error || r?.error) && (
           <div className="banner error" role="alert">
             {error || r?.error}
-            <button className="text-button" onClick={() => setError('')}>
+            <button
+              className="text-button"
+              onClick={() => {
+                setError('');
+                void act({ type: 'dismiss-error' });
+              }}
+            >
               Dismiss
             </button>
           </div>
@@ -216,15 +222,16 @@ export function Chats({ data }: { data: AppState }) {
         </form>
         {!r?.config.voice && (
           <p className="chat-setup">
-            Add <code>ELEVENLABS_API_KEY</code> and <code>ELEVENLABS_AGENT_ID</code> to{' '}
-            <code>.env</code>, then restart to talk to Yoyo.
+            Voice is not set up yet. Follow <code>SETUP_REQUIRED.md</code>, then restart Yoteach.
           </p>
         )}
       </div>
       {remove && (
         <Modal title={`Delete “${remove.title}”?`} onClose={() => setRemove(null)}>
-          <p>This removes the chat from this Mac. Provider-side records are not affected.</p>
-          <div className="form-actions">
+          <p className="confirmation-copy">
+            This removes the chat from this Mac. Provider-side records are not affected.
+          </p>
+          <div className="form-actions confirmation-actions">
             <button className="button" onClick={() => setRemove(null)}>
               Keep chat
             </button>

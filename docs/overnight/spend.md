@@ -17,3 +17,16 @@ Caps: fal 40 images / 4 videos; Anthropic approximately 400 live calls; ElevenLa
 | 2026-11-15T02:26:04.457Z | ElevenLabs | 1 conversation attempt | before: geography |
 | 2026-11-15T02:26:18.157Z | ElevenLabs | 1 conversation attempt | before: language |
 | 2026-11-15T02:26:32.068Z | ElevenLabs | 1 conversation attempt | before: literature |
+| 2026-11-15T02:33:58.430Z | ElevenLabs | 1 conversation attempt | after: biology |
+| 2026-11-15T02:34:11.558Z | ElevenLabs | 1 conversation attempt | after: chemistry |
+| 2026-11-15T02:34:24.656Z | ElevenLabs | 1 conversation attempt | after: physics |
+| 2026-11-15T02:34:37.032Z | ElevenLabs | 1 conversation attempt | after: vectors |
+| 2026-11-15T02:34:48.925Z | ElevenLabs | 1 conversation attempt | after: matrices |
+| 2026-11-15T02:35:02.483Z | ElevenLabs | 1 conversation attempt | after: calculus |
+| 2026-11-15T02:35:13.928Z | ElevenLabs | 1 conversation attempt | after: economics |
+| 2026-11-15T02:35:26.164Z | ElevenLabs | 1 conversation attempt | after: history |
+| 2026-11-15T02:35:39.681Z | ElevenLabs | 1 conversation attempt | after: computing |
+| 2026-11-15T02:35:52.528Z | ElevenLabs | 1 conversation attempt | after: geography |
+| 2026-11-15T02:36:05.542Z | ElevenLabs | 1 conversation attempt | after: language |
+| 2026-11-15T02:36:18.107Z | ElevenLabs | 1 conversation attempt | after: literature |
+| 2026-11-15T08:34:07.718Z | fal | 1 image attempt | Live Electron result and restart check |
