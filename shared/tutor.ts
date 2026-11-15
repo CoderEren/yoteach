@@ -140,11 +140,17 @@ export type TutorRuntime = {
   status: 'idle' | 'connecting' | 'connected' | 'paused' | 'error';
   mode: 'voice' | 'text';
   activity: 'idle' | 'listening' | 'thinking' | 'speaking' | 'pointing' | 'success' | 'error';
+  /** Yoyo's voice is playing right now. Independent of activity, which tools change briefly. */
+  speaking: boolean;
   mic: boolean;
   input: 'idle' | 'arming' | 'listening' | 'sending';
   hotkeyError: string;
   focusRegion: string | null;
   focusRevision: number;
+  /** 'speech' = Yoyo points at what it is saying, without drawing a highlight there. */
+  focusSource: 'draw' | 'speech';
+  /** Drawings are fading out (they leave by themselves 20 seconds after the last change). */
+  drawingFading: boolean;
   sharing: 'off' | 'window' | 'pdf' | 'screen';
   sourceName: string;
   epoch: number;
@@ -233,6 +239,7 @@ export const RuntimeUpdateSchema = z.object({
   activity: z
     .enum(['idle', 'listening', 'thinking', 'speaking', 'pointing', 'success', 'error'])
     .optional(),
+  speaking: z.boolean().optional(),
   mic: z.boolean().optional(),
   error: z.string().max(500).optional(),
 });
@@ -255,6 +262,8 @@ export interface TutorApi {
     eventId: string,
   ): Promise<import('./model').Result<void>>;
   tool(sessionId: string, tool: TutorTool): Promise<import('./model').Result<unknown>>;
+  /** What Yoyo is saying, as it plays: the subtitle phrase and the word just spoken. */
+  spoken(sessionId: string, caption: string, word: string): Promise<import('./model').Result<void>>;
   captureScreen(): Promise<import('./model').Result<void>>;
   prepareSlide(snapshot: SharedSnapshot): Promise<import('./model').Result<{ queued: boolean }>>;
   slideBriefing(waitMs?: number): Promise<

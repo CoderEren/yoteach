@@ -125,7 +125,7 @@ export function TutorWorkspace({
           <Yoyo state={r.activity} />
           <span role="status">
             {r.status === 'connected'
-              ? r.activity === 'speaking'
+              ? r.speaking || r.activity === 'speaking'
                 ? 'Yoyo is speaking'
                 : r.activity === 'thinking'
                   ? 'Looking closely…'

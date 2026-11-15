@@ -4234,3 +4234,52 @@ kbd {
   white-space: normal;
   text-align: left;
 }
+
+/* Drawings leave by themselves 20 seconds after their last change. */
+.drawings-fading
+  :is(.drawing-layer, .annotation-layer, .lecture-sketch, .screen-sketch, .screen-clear) {
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+/* Yoyo's subtitles: a few words at a time, riding just above (or below) Yoyo. */
+.yoyo-subtitles {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 6px;
+  pointer-events: none;
+}
+.yoyo-subtitles.below {
+  align-items: flex-start;
+}
+.yoyo-subtitles p {
+  margin: 0;
+  max-width: 100%;
+  padding: 4px 10px 5px;
+  border-radius: 10px;
+  background: rgba(29, 34, 53, 0.86);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 550;
+  line-height: 1.35;
+  letter-spacing: 0.1px;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: opacity 0.35s ease;
+}
+.yoyo-subtitles p.off {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .yoyo-subtitles p,
+  .drawings-fading
+    :is(.drawing-layer, .annotation-layer, .lecture-sketch, .screen-sketch, .screen-clear) {
+    transition: none;
+  }
+}

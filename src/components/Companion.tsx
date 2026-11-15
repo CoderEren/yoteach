@@ -5,7 +5,11 @@ import { api } from '../api';
 import { useTutor } from '../tutor';
 export function Companion({ data: _data }: { data: AppState }) {
   const { runtime: r, act } = useTutor();
-  const [direction, setDirection] = useState<'left' | 'right' | null>(null);
+  const [pose, setPose] = useState<{ direction: 'left' | 'right' | null; seq: number }>({
+    direction: null,
+    seq: 0,
+  });
+  const direction = pose.direction;
   const gesture = useRef<{
     x: number;
     y: number;
@@ -13,7 +17,11 @@ export function Companion({ data: _data }: { data: AppState }) {
     timer: ReturnType<typeof setTimeout>;
     listening: boolean;
   } | null>(null);
-  useEffect(() => api.onPose((p) => setDirection(p.direction)), []);
+  // Every new spot replays the string's pointing throw, even when the side stays the same.
+  useEffect(
+    () => api.onPose((p) => setPose((old) => ({ direction: p.direction, seq: old.seq + 1 }))),
+    [],
+  );
   const stop = (cancel: boolean, x: number, y: number) => {
     const g = gesture.current;
     if (!g) return;
@@ -33,20 +41,23 @@ export function Companion({ data: _data }: { data: AppState }) {
     [],
   );
   const input = r?.input ?? 'idle';
+  // Talking wins over the brief gestures tools trigger (pointing, thinking after a lookup), so
+  // the mouth keeps moving for as long as the voice plays. Pointing shows through the string.
+  const activity = r?.activity ?? 'idle';
   const state =
     input === 'listening'
       ? 'listening'
-      : r?.activity === 'success'
+      : activity === 'success'
         ? 'success'
         : input === 'arming'
           ? 'thinking'
-          : r?.activity === 'speaking'
+          : r?.speaking
             ? 'speaking'
             : input === 'sending'
               ? 'thinking'
-              : r?.activity === 'pointing' && !direction
+              : activity === 'speaking' || (activity === 'pointing' && !direction)
                 ? 'idle'
-                : (r?.activity ?? 'idle');
+                : activity;
   return (
     <main className={`companion companion-bare input-${input}`}>
       <button
@@ -101,6 +112,7 @@ export function Companion({ data: _data }: { data: AppState }) {
         <Yoyo
           state={state}
           direction={direction}
+          gestureKey={pose.seq}
           className={
             input === 'listening'
               ? 'ring-listening'

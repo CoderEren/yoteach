@@ -128,8 +128,80 @@ function showCompanion(show: boolean) {
     companion.setBackgroundColor('#00000000');
     companion.showInactive();
     companion.webContents.invalidate();
-  } else companion.hide();
+  } else {
+    companion.hide();
+    showCaption('');
+  }
   sendState();
+}
+/** Subtitles: a small click-through window that rides just above (or below) Yoyo. */
+let caption: BrowserWindow | null = null,
+  captionText = '',
+  captionHide: ReturnType<typeof setTimeout> | undefined;
+const CAPTION = { width: 300, height: 66, overlap: 26 } as const;
+function placeCaption() {
+  if (!caption || caption.isDestroyed() || !companion) return;
+  const b = companion.getBounds(),
+    area = screen.getDisplayMatching(b).workArea;
+  const above = b.y - CAPTION.height + CAPTION.overlap >= area.y;
+  const x = Math.round(
+    Math.max(
+      area.x,
+      Math.min(b.x + b.width / 2 - CAPTION.width / 2, area.x + area.width - CAPTION.width),
+    ),
+  );
+  const y = above ? b.y - CAPTION.height + CAPTION.overlap : b.y + b.height - 14;
+  const current = caption.getBounds();
+  if (current.x !== x || current.y !== y)
+    caption.setBounds({ x, y, width: CAPTION.width, height: CAPTION.height });
+  caption.webContents.send('caption:text', {
+    text: captionText,
+    placement: above ? 'above' : 'below',
+  });
+}
+function showCaption(text: string) {
+  captionText = text;
+  if (!caption || caption.isDestroyed()) return;
+  clearTimeout(captionHide);
+  const visible = !!text && store.snapshot().settings.mascotVisible && !!companion?.isVisible();
+  placeCaption();
+  if (visible) {
+    if (!caption.isVisible()) caption.showInactive();
+  } else captionHide = setTimeout(() => caption?.hide(), 450);
+}
+function createCaption() {
+  caption = new BrowserWindow({
+    width: CAPTION.width,
+    height: CAPTION.height,
+    frame: false,
+    type: 'panel',
+    focusable: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    hasShadow: false,
+    resizable: false,
+    fullscreenable: false,
+    maximizable: false,
+    minimizable: false,
+    hiddenInMissionControl: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: join(here, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+    },
+  });
+  caption.setIgnoreMouseEvents(true);
+  caption.setAlwaysOnTop(true, 'pop-up-menu');
+  caption.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  load(caption, '/caption');
+  caption.on('closed', () => {
+    caption = null;
+  });
+  companion?.on('move', placeCaption);
 }
 function createCompanion() {
   const area = screen.getPrimaryDisplay().workArea;
@@ -252,9 +324,28 @@ function registerHandlers() {
     () => {
       sendState();
       if (tutoring) desktop?.update(tutoring.service.get());
+      // Subtitles never outlive the conversation or someone else talking.
+      if (captionText && (!tutoring?.service.state.sessionId || tutoring.service.state.mic))
+        showCaption('');
     },
     showWorkspace,
     resolve(here, '..'),
+  );
+  handle(
+    'tutor:spoken',
+    (input) => {
+      const p = z
+        .object({
+          sessionId: Id,
+          caption: z.string().max(400),
+          word: z.string().max(200),
+        })
+        .parse(input);
+      if (!tutoring || tutoring.service.state.sessionId !== p.sessionId) return;
+      if (p.caption !== captionText) showCaption(p.caption);
+      if (p.word) tutoring.service.spoken(p.sessionId, p.word);
+    },
+    true,
   );
   handle('workspace:get', () => store.snapshot());
   handle('overlay:focus', (input) => {
@@ -440,6 +531,7 @@ else {
     hiddenCheck.unref();
     createWorkspace();
     createCompanion();
+    createCaption();
     overlay = new BrowserWindow({
       width: 200,
       height: 200,

@@ -9,6 +9,8 @@ import { Providers } from '../electron/providers';
 import { TutorService } from '../electron/tutor';
 import { DiagramSchema, SketchSchema, layoutDiagram } from '../shared/drawing';
 import { ToolSchema, type SharedSnapshot } from '../shared/tutor';
+import { matchSpoken } from '../shared/speech-focus';
+import { Captioner, alignedWords, startsNewPhrase } from '../shared/captions';
 
 const vision = {
   explanation: 'ATP is invested first; the payoff comes later.',
@@ -527,4 +529,148 @@ test('live text elements using label retain their teaching labels without overri
     sketch.elements.filter((e) => e.type === 'text').map((e) => e.text),
     ['Depolarization (+30mV)', 'Repolarization'],
   );
+});
+
+async function mappedScreen(f: ReturnType<typeof setup>, t: import('node:test').TestContext) {
+  const s = await f.service.start(null, 'voice');
+  f.service.state.sharing = 'screen';
+  f.service.acceptSnapshot(f.screenStill());
+  f.service.preAnalyze();
+  await Promise.race([
+    f.service.screenMap(0),
+    new Promise((r) => {
+      t.mock.timers.tick(10);
+      setImmediate(r);
+    }),
+  ]);
+  const byLabel = (label: string) => f.service.state.annotations.find((a) => a.label === label)!;
+  assert.ok(byLabel('Investment') && byLabel('Payoff'), 'both regions mapped');
+  return { s, byLabel };
+}
+
+test('Yoyo keeps its talking animation through a pointing gesture', async (t) => {
+  const f = setup();
+  try {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { s, byLabel } = await mappedScreen(f, t);
+    f.service.update({ sessionId: s.id, speaking: true, activity: 'speaking' });
+    await f.service.tool(
+      s.id,
+      ToolSchema.parse({ name: 'draw_on_screen', marks: [{ regionId: byLabel('Payoff').id }] }),
+    );
+    assert.equal(f.service.state.activity, 'pointing');
+    assert.equal(f.service.state.speaking, true, 'the voice flag is untouched by tools');
+    t.mock.timers.tick(6000);
+    assert.equal(f.service.state.activity, 'speaking', 'back to talking, not idle');
+    await f.service.tool(s.id, { name: 'celebrate' });
+    t.mock.timers.tick(2600);
+    assert.equal(f.service.state.activity, 'speaking');
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('Yoyo walks to the part it is talking about, as it says it', async (t) => {
+  const f = setup();
+  try {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+    const { s, byLabel } = await mappedScreen(f, t);
+    const before = f.service.state.focusRevision;
+    for (const w of 'So first the cell spends energy on the investment'.split(' '))
+      f.service.spoken(s.id, w);
+    assert.equal(f.service.state.focusRegion, byLabel('Investment').id);
+    assert.equal(f.service.state.focusSource, 'speech', 'pointed at, not highlighted');
+    assert.equal(f.service.state.focusRevision, before + 1);
+    assert.equal(f.service.state.activity, 'pointing');
+    t.mock.timers.tick(2000);
+    for (const w of 'and later comes the payoff'.split(' ')) f.service.spoken(s.id, w);
+    assert.equal(f.service.state.focusRegion, byLabel('Payoff').id, 'moves on to part B');
+    assert.equal(f.service.state.drawing, null, 'following speech never draws by itself');
+    // While the student holds the talk key, Yoyo does not wander off.
+    f.service.state.input = 'listening';
+    t.mock.timers.tick(2000);
+    for (const w of 'back to the energy investment'.split(' ')) f.service.spoken(s.id, w);
+    assert.equal(f.service.state.focusRegion, byLabel('Payoff').id);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('drawings fade away 20 seconds after their last change', async (t) => {
+  const f = setup();
+  try {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { s, byLabel } = await mappedScreen(f, t);
+    const draw = (label: string) =>
+      f.service.tool(
+        s.id,
+        ToolSchema.parse({
+          name: 'draw_on_screen',
+          marks: [{ regionId: byLabel(label).id }],
+          clear: false,
+        }),
+      );
+    await draw('Investment');
+    t.mock.timers.tick(15000);
+    await draw('Payoff'); // a change restarts the clock
+    t.mock.timers.tick(15000);
+    assert.equal(f.service.state.drawingFading, false);
+    assert.equal(f.service.state.drawing?.marks.length, 2);
+    t.mock.timers.tick(5000);
+    assert.equal(f.service.state.drawingFading, true, 'fading out');
+    assert.ok(f.service.state.drawing, 'still there while it fades');
+    t.mock.timers.tick(900);
+    assert.equal(f.service.state.drawing, null);
+    assert.equal(f.service.state.drawingFading, false);
+    assert.equal(f.service.state.focusRegion, null);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('speech matching names parts by their labels, not by filler words', () => {
+  const parts = [
+    { id: 'a', label: 'Energy investment', evidence: 'Energy investment phase', drawn: false },
+    { id: 'b', label: 'Payoff', evidence: 'Energy payoff phase', drawn: false },
+    { id: 'c', label: 'Cell membrane', evidence: 'the membrane of the cell', drawn: true },
+  ];
+  assert.equal(matchSpoken('the investment of energy comes first'.split(' '), parts), 'a');
+  assert.equal(matchSpoken('then we get the payoff'.split(' '), parts), 'b');
+  assert.equal(matchSpoken('across the cell membranes'.split(' '), parts), 'c');
+  assert.equal(matchSpoken('so this is the part where we look'.split(' '), parts), null);
+  assert.equal(matchSpoken('energy'.split(' '), parts), null, 'one shared word is not enough');
+});
+
+test('subtitles follow the voice timings in short phrases and clear after it stops', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const text = '[warmly] Glucose gets two phosphates, so it is trapped.';
+  const chars = [...text];
+  const words = alignedWords({ chars, char_start_times_ms: chars.map((_, i) => i * 50) });
+  assert.deepEqual(
+    words.map((w) => w.word),
+    ['Glucose', 'gets', 'two', 'phosphates,', 'so', 'it', 'is', 'trapped.'],
+  );
+  assert.equal(words[0].at, 9 * 50, 'timed from its first character');
+  assert.equal(startsNewPhrase(['one', 'two', 'three,']), true);
+  assert.equal(startsNewPhrase(['one,']), false, 'a lone comma does not split');
+  const seen: [string, string][] = [];
+  const c = new Captioner((caption, word) => seen.push([caption, word]));
+  c.chunk({ chars, char_start_times_ms: chars.map((_, i) => i * 50) });
+  t.mock.timers.tick(9 * 50);
+  assert.deepEqual(seen.at(-1), ['Glucose', 'Glucose']);
+  t.mock.timers.tick(10_000);
+  assert.deepEqual(seen.at(-1), ['so it is trapped.', 'trapped.'], 'new phrase after the comma');
+  c.response('ignored once timings arrive');
+  c.finished();
+  t.mock.timers.tick(1400);
+  assert.deepEqual(seen.at(-1), ['', '']);
+  // Without timings, words are paced from the response text instead.
+  const paced: string[] = [];
+  const d = new Captioner((caption) => paced.push(caption), 300);
+  d.response('Hello there student.');
+  t.mock.timers.tick(250);
+  t.mock.timers.tick(600);
+  assert.equal(paced.at(-1), 'Hello there student.');
+  d.stop();
+  assert.equal(paced.at(-1), '');
 });

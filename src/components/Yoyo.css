@@ -95,8 +95,17 @@
   animation-delay: -440ms;
   animation-duration: 510ms;
 }
+.yoyo-v2--speaking .bar-4 {
+  animation-delay: -90ms;
+  animation-duration: 580ms;
+}
+/* Talking is visible from across the screen: the disc nods and the lower arc pulses. */
+.yoyo-v2--speaking .yoyo-v2-disc {
+  animation: yoyo-v2-talk 1.15s ease-in-out infinite;
+}
 .yoyo-v2--speaking .yoyo-v2-signal {
   opacity: 0.9;
+  animation: yoyo-v2-attention 0.9s ease-in-out infinite;
 }
 .yoyo-v2--pointing .yoyo-v2-string-rest,
 .yoyo-v2-gesture--pointing .yoyo-v2-string-rest {
@@ -210,6 +219,18 @@
     transform: scaleY(1.2);
   }
 }
+@keyframes yoyo-v2-talk {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(-2.5px) rotate(-2.5deg);
+  }
+  65% {
+    transform: translateY(0.5px) rotate(1.5deg);
+  }
+}
 @keyframes yoyo-v2-point {
   0% {
     transform: scale(0.35) rotate(24deg);
@@ -269,6 +290,10 @@
   .yoyo-v2--listening .yoyo-v2-signal,
   .yoyo-v2--connecting .yoyo-v2-signal {
     opacity: 1;
+  }
+  /* Without motion, the open mouth bars alone say Yoyo is talking. */
+  .yoyo-v2--speaking .yoyo-v2-voice-bar {
+    transform: scaleY(0.8);
   }
 }
 
