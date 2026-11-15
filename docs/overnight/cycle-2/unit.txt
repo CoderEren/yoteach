@@ -1,0 +1,66 @@
+
+> yoteach@0.1.0 test
+> node --import tsx --test tests/*.test.ts
+
+✔ questions are filed into chats named by subject; a new subject starts a new chat (312.092958ms)
+✔ without the topic model, a chat is named after its first question (88.116708ms)
+✔ lecture walkthroughs get their own chat with slide numbers and logged drawings (76.872708ms)
+✔ v6 data migrates to the current version: one chat per earlier session, titled, with an exact backup (31.890708ms)
+✔ a new question clears the last drawing unless it builds on it (69.349ms)
+✔ diagram layout is deterministic, finite and in bounds for flows, branches and cycles (3.7355ms)
+✔ drawing attaches only to grounded regions and follows the screen it was captured from (84.138541ms)
+✔ pointing at a new mark is a moment: Yoyo goes back to idle on its own (76.709458ms)
+✔ an edge that skips a column arcs above the row instead of through the middle node (0.228792ms)
+✔ the screen map is ready by release, merges with deeper analysis, and sketches validate (73.281625ms)
+✔ every agent tool in docs/agent-tools is registered as a client tool and validated (0.690292ms)
+✔ rich sketches: filled shapes, flowing ions and pulses parse forgivingly (1.301125ms)
+✔ circling words with the cursor while asking becomes a region the tutor is told about (71.036584ms)
+✔ circling a picture with no words still tells the tutor what it shows (56.820584ms)
+✔ circling words with the cursor picks out exactly those words (2.472125ms)
+✔ a loop around one word quotes just that word; a loop round empty space has no quote (1.735792ms)
+✔ moving to a word and resting there is pointing; a still or wandering cursor is nothing (2.070166ms)
+✔ a long trail is read quickly (15.41ms)
+✔ quotes snap to the recognised words, including Greek, hyphens and wrapped lines (3.253458ms)
+✔ labels and panels avoid text; voice tags never reach the reader (0.983167ms)
+✔ quotes resolve on PDF slides from text runs alone (0.388417ms)
+✔ released audio resamples PCM, bounds duration and appends silence for hosted turn completion (4.046ms)
+✔ desktop and letterboxed lecture coordinates place Yoyo beside actual regions on either side (0.183125ms)
+✔ existing settings gain a talk key without losing the mascot home (1.871792ms)
+✔ silent or noise-only holds are not speech; a spoken burst is (7.216833ms)
+✔ stuck detection: a short screen held too long earns one offer; changes and long texts do not (0.433667ms)
+✔ stuck detection ignores wordless screens and waits while the student is idle (0.106084ms)
+✔ media helpers sniff real bytes, allow only fal CDN URLs and keep prompts text-free (2.154084ms)
+✔ fal client queues, polls, downloads verified bytes, and never sends the key to the CDN (33.19475ms)
+✔ fal client ignores foreign queue URLs and refuses unexpected or invalid media (29.198083ms)
+✔ fal failures are explained; cancellation and missing configuration are honest (5.132208ms)
+✔ generated media is saved atomically with lecture and session links and survives restart (196.092333ms)
+✔ failed or cancelled generation saves nothing; v4 data migrates with an exact backup (130.068083ms)
+✔ video requests are bounded and silent for LTX 2.3; unknown models get only the prompt (0.189416ms)
+✔ filler slides are recognised from their text before the slide reader answers (1.075833ms)
+✔ slides are read ahead once, then briefed instantly with marks on the shown slide (137.440333ms)
+✔ courses, nested topics, notes and settings survive reopening (104.027459ms)
+✔ validation rejects invalid input, missing IDs, cross-course nesting and cycles without changing data (125.801791ms)
+✔ PDF ownership, source refs and deletion preserve originals and remove owned copies (91.46375ms)
+✔ topic deletion promotes children; reorder is stable across restarts (122.105791ms)
+✔ a corrupt snapshot is preserved rather than silently reset (23.335875ms)
+✔ Stage 1 migration preserves notes and persists the current version safely (91.747334ms)
+✔ grounding uses actual unique PDF text geometry, rejects invented, ambiguous and low confidence evidence (103.942458ms)
+✔ pause/revoke discards in-flight vision, clears screenshots and rejects stale regions (122.276583ms)
+✔ tools navigate, save actual explanations, record notes; history survives restart and cascading deletion (179.028291ms)
+✔ vision request stays server-side, structured and validated; configuration excludes secrets (38.084334ms)
+✔ signed URL host, missing configuration, foreign PDF and ended session are rejected (51.196042ms)
+✔ cancel during session authentication never creates a late session (18.018ms)
+✔ rotated PDF text uses its visible vertical footprint instead of an unrelated horizontal region (0.987ms)
+✔ topic-free tutoring and lecture progress survive settings updates and restart (70.6045ms)
+✔ Anthropic errors, refusal, truncation and invalid structured data are rejected (18.442583ms)
+✔ version 2 migration preserves every legacy record and backs up exact original bytes (46.991916ms)
+✔ v7 data drops the old built-in lesson and practice answers, keeps media, with an exact backup (32.183ms)
+✔ tools reject sessions that have ended (33.945916ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3939.338416

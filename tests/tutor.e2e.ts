@@ -956,6 +956,25 @@ test('Stage 3 demo: lecture → fal media → saved restart → replay', async (
     await expect(page.getByText(/Slide \d+ · 1\//)).toBeVisible();
     await page.screenshot({ path: '.impeccable/review/lecture-replay.png' });
     await page.getByRole('button', { name: 'Close replay' }).click();
+    await page.screenshot({ path: 'docs/overnight/cycle-2/before.png' });
+    await walk.getByRole('button', { name: /Delete walkthrough/ }).click();
+    const confirmation = page.getByRole('dialog', { name: /Delete walkthrough/ });
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation).toContainText('Your PDF stays in Saved material');
+    await page.screenshot({ path: 'docs/overnight/cycle-2/after.png' });
+    await page.keyboard.press('Escape');
+    await expect(walk).toBeVisible();
+    await walk.getByRole('button', { name: /Delete walkthrough/ }).click();
+    await confirmation.getByRole('button', { name: 'Keep walkthrough' }).click();
+    await expect(walk).toBeVisible();
+    await walk.getByRole('button', { name: /Delete walkthrough/ }).click();
+    await confirmation.getByRole('button', { name: 'Delete walkthrough', exact: true }).click();
+    await expect(walk).toHaveCount(0);
+    const remaining = await page.evaluate(() => window.yoteach.getState());
+    expect(
+      remaining.ok &&
+        remaining.value.documents.some((d) => d.originalName === 'sample-lecture.pdf'),
+    ).toBe(true);
     expect(errors).toEqual([]);
   } finally {
     await app?.close();
