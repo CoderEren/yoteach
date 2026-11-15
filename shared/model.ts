@@ -113,7 +113,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('settings.update'),
     theme: SettingsSchema.shape.theme.optional(),
-    talkKey: SettingsSchema.shape.talkKey.optional(),
+    // Defaults belong to loading old workspaces, never to partial edits.
+    talkKey: SettingsSchema.shape.talkKey.removeDefault().optional(),
     proactiveHelp: z.boolean().optional(),
   }),
 ]);

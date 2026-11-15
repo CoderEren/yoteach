@@ -6,7 +6,7 @@ import {
   type Page,
   type WebSocketRoute,
 } from '@playwright/test';
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 async function launch(dir: string, extra: Record<string, string> = {}) {
@@ -947,6 +947,18 @@ test('Stage 3 demo: lecture → fal media → saved restart → replay', async (
     await expect(saved.getByRole('heading', { name: 'Why ATP is invested' })).toBeVisible();
     await expect(saved.getByRole('button', { name: /^Image · a small glowing orb/ })).toBeVisible();
     await page.screenshot({ path: '.impeccable/review/saved-after-restart.png' });
+    await page.screenshot({ path: 'docs/overnight/cycle-4/after.png' });
+    expect(await saved.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await expect(saved.getByRole('button', { name: 'Unsave', exact: true })).toBeInViewport();
+    expect(
+      await saved.evaluate((el) => {
+        const dialog = el.getBoundingClientRect();
+        return Array.from(el.querySelectorAll('button')).every((button) => {
+          const box = button.getBoundingClientRect();
+          return box.left >= dialog.left && box.right <= dialog.right;
+        });
+      }),
+    ).toBe(true);
     await page.getByRole('button', { name: 'Close dialog' }).click();
     // The walkthrough replays from saved history: slide, what Yoyo said, and its drawings.
     await page.getByRole('button', { name: 'Lectures', exact: true }).click();
@@ -1041,6 +1053,40 @@ test('flow particles stay separated on short paths and respect live reduced-moti
     const stopped = await positions();
     await layer.waitForTimeout(150);
     expect(await positions()).toEqual(stopped);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('recorded live answers render across twelve subjects', async () => {
+  const rows = JSON.parse(readFileSync('docs/overnight/live/after.json', 'utf8'));
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-subjects-'));
+  let app: ElectronApplication | undefined;
+  try {
+    const boot = await launch(dir);
+    app = boot.app;
+    const provider = await fixtures(app, boot.page);
+    await boot.page.evaluate(() =>
+      window.yoteach.tutor.intent({ type: 'start', topicId: null, mode: 'voice' }),
+    );
+    await expect.poll(async () => (await runtime(boot.page)).status).toBe('connected');
+    const layer = app.windows().find((w) => w.url().includes('/overlay'))!;
+    await layer.emulateMedia({ reducedMotion: 'reduce' });
+    for (const row of rows) {
+      await provider.tool('clear_screen');
+      for (const call of row.tools) await provider.tool(call.name, call.parameters);
+      await expect(layer.locator('.sketch-canvas')).toBeVisible();
+      await layer.evaluate(() => document.fonts.ready);
+      await layer.waitForTimeout(400);
+      await layer
+        .locator('.sketch-canvas')
+        .screenshot({ path: `docs/overnight/live/sketch-${row.subject}.png` });
+      await expect(layer.locator('.sketch-canvas svg[role="img"]')).toHaveAttribute(
+        'aria-label',
+        /.+/,
+      );
+    }
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

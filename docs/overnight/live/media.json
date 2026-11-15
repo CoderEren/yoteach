@@ -1,0 +1,44 @@
+[
+  {
+    "kind": "image",
+    "subject": "A Roman stone aqueduct crossing a green valley, clear daylight, no text",
+    "phases": [
+      {
+        "phase": "queued",
+        "atMs": 144
+      },
+      {
+        "phase": "done",
+        "atMs": 5169
+      }
+    ],
+    "error": null,
+    "latencyMs": 4658,
+    "mediaId": "20a972fd-bcf8-4751-9000-bf4df9a8ddac",
+    "label": "AI-generated image · illustrative, not a precise diagram · fal fal-ai/flux/schnell",
+    "persisted": true
+  },
+  {
+    "kind": "video",
+    "subject": "A brass pendulum swinging slowly from left to right against a plain pale background, no text",
+    "phases": [
+      {
+        "phase": "queued",
+        "atMs": 7
+      },
+      {
+        "phase": "running",
+        "atMs": 2011
+      },
+      {
+        "phase": "done",
+        "atMs": 33097
+      }
+    ],
+    "error": null,
+    "latencyMs": 32252,
+    "mediaId": "bed1de31-9fe4-4e8b-868d-f81b57403413",
+    "label": "AI-generated clip · illustrative, not a precise diagram · fal fal-ai/ltx-2.3/text-to-video/fast",
+    "persisted": true
+  }
+]
