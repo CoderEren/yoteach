@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { GeneratedMedia } from '../../shared/media';
 import { api, unwrap } from '../api';
@@ -6,12 +6,15 @@ import { useTutor } from '../tutor';
 
 /** Loads saved bytes over IPC into a blob URL; nothing is fetched by the renderer. */
 export function MediaView({ media }: { media: GeneratedMedia }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [step, setStep] = useState(0);
   const [url, setUrl] = useState(''),
     [error, setError] = useState('');
   useEffect(() => {
     let live = true,
       made = '';
     setUrl('');
+    setStep(0);
     setError('');
     unwrap(api.media.read(media.id))
       .then(({ bytes, contentType }) => {
@@ -42,9 +45,50 @@ export function MediaView({ media }: { media: GeneratedMedia }) {
         ) : media.kind === 'image' ? (
           <img src={url} alt={alt} />
         ) : (
-          <video src={url} controls loop muted playsInline aria-label={alt} />
+          <video
+            ref={video}
+            src={url}
+            controls
+            muted
+            playsInline
+            aria-label={alt}
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget;
+              if (Number.isFinite(v.duration) && v.duration > 0)
+                setStep(Math.min(2, Math.floor((v.currentTime / v.duration) * 3)));
+            }}
+          />
         )}
       </div>
+      {media.kind === 'video' && media.lesson && (
+        <div className="video-lesson">
+          <strong>{media.lesson.objective}</strong>
+          <p className="video-lesson-caption">
+            {step + 1}/3 · {media.lesson.steps[step].caption}
+          </p>
+          <details>
+            <summary>Explanation steps</summary>
+            <ol>
+              {media.lesson.steps.map((beat, i) => (
+                <li key={i}>
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      const v = video.current;
+                      if (v && Number.isFinite(v.duration)) {
+                        v.currentTime = (v.duration * i) / 3;
+                        setStep(i);
+                      }
+                    }}
+                  >
+                    {beat.caption}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </details>
+        </div>
+      )}
       <figcaption>
         <strong>AI-generated {what}</strong> · illustrative, not a precise diagram · fal{' '}
         <code>{media.model}</code>

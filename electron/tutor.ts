@@ -24,7 +24,10 @@ export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): A
     let box = region.box,
       parts: Annotation['parts'],
       precision: Annotation['precision'] = 'vision-estimate';
-    if (snapshot.source.kind === 'pdf' && lines.length) {
+    if (region.kind === 'visual') {
+      // Visual descriptions must never snap to nearby text, even when words overlap.
+      if (region.confidence < 0.75) return [];
+    } else if (snapshot.source.kind === 'pdf' && lines.length) {
       const needle = region.evidence.replace(/\s+/g, ' ').trim();
       const matches = lines.filter((t) => t.text.replace(/\s+/g, ' ').includes(needle));
       // Ambiguous duplicate phrases are not precise anchors.
@@ -38,9 +41,9 @@ export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): A
         box = found.box;
         parts = found.parts.length > 1 ? found.parts.slice(0, 4) : undefined;
         precision = 'screen-text';
-      } else if (lines.some((l) => region.evidence.length > 3 && l.text.includes(region.evidence)))
-        return [];
+      } else return []; // No quote match: do not draw at invented text coordinates.
     }
+    if (region.kind !== 'visual' && !lines.length) return [];
     return [
       {
         id: randomUUID(),
@@ -135,7 +138,12 @@ export class TutorService {
       why: prep.reason,
       summary: prep.summary,
       keyPoints: prep.keyPoints,
-      regions: regions.map((a) => ({ regionId: a.id, label: a.label, evidence: a.evidence })),
+      regions: regions.map((a) => ({
+        regionId: a.id,
+        label: a.label,
+        evidence: a.evidence,
+        target: a.precision === 'vision-estimate' ? 'visual' : 'text',
+      })),
       snapshotId: snapshot.id,
       nextTeachingSlide: nextTeach,
     };
@@ -233,6 +241,10 @@ export class TutorService {
   /** One generation at a time. Resolves when it settles; callers may ignore the promise. */
   generate(raw: GenerateRequest, origin: 'student' | 'tutor') {
     const request = GenerateRequestSchema.parse(raw);
+    if (request.kind === 'video' && !this.fal.status().video)
+      throw new Error(
+        'Video generation is off. Configure FAL_KEY and FAL_VIDEO_MODEL, then restart.',
+      );
     const current = this.state.generation;
     if (current && ['queued', 'running', 'saving'].includes(current.phase))
       throw new Error('An illustration is already being generated. Cancel it or wait.');
@@ -245,7 +257,7 @@ export class TutorService {
       kind: request.kind,
       subject: request.subject,
       origin,
-      phase: 'queued',
+      phase: request.kind === 'video' ? 'running' : 'queued',
       queuePosition: null,
       startedAt: new Date(started).toISOString(),
       error: '',
@@ -256,11 +268,23 @@ export class TutorService {
     const mine = () => this.state.generation?.id === id && this.generating === ctl;
     const settled = (async () => {
       try {
-        const out = await this.fal.generate(request.kind, request.subject, ctl.signal, (p) => {
-          if (!mine()) return;
-          Object.assign(this.state.generation!, p);
-          this.emit();
-        });
+        const lesson =
+          request.kind === 'video'
+            ? await this.providers.planVideo(request.subject, ctl.signal)
+            : undefined;
+        if (!mine()) return;
+        if (ctl.signal.aborted) throw new Error('Generation cancelled.');
+        const out = await this.fal.generate(
+          request.kind,
+          request.subject,
+          ctl.signal,
+          (p) => {
+            if (!mine()) return;
+            Object.assign(this.state.generation!, p);
+            this.emit();
+          },
+          lesson,
+        );
         if (!mine()) return;
         this.state.generation!.phase = 'saving';
         this.emit();
@@ -270,6 +294,7 @@ export class TutorService {
             model: out.model,
             subject: request.subject,
             prompt: out.prompt,
+            ...(lesson ? { lesson } : {}),
             contentType: out.contentType,
             width: out.width,
             height: out.height,
@@ -443,7 +468,12 @@ export class TutorService {
       summary: summary ?? '',
       regions: this.state.annotations
         .filter((a) => a.snapshotId === snapshot.id)
-        .map((a) => ({ regionId: a.id, label: a.label, evidence: a.evidence })),
+        .map((a) => ({
+          regionId: a.id,
+          label: a.label,
+          evidence: a.evidence,
+          target: a.precision === 'vision-estimate' ? 'visual' : 'text',
+        })),
       pointer,
     };
   }
@@ -921,6 +951,7 @@ export class TutorService {
               label: a.label,
               evidence: a.evidence,
               precision: a.precision,
+              target: a.precision === 'vision-estimate' ? 'visual' : 'text',
             })),
             note: 'Teach by drawing: call draw_on_screen with these regionIds (circle, underline, box, arrow, highlight, point, short labels, connections between regions) while you explain. Vision-estimated regions are approximate.',
           };

@@ -327,11 +327,135 @@ test('failed or cancelled generation saves nothing; v4 data migrates with an exa
 test('video requests are bounded and silent for LTX 2.3; unknown models get only the prompt', () => {
   assert.deepEqual(videoInput('fal-ai/ltx-2.3/text-to-video/fast', 'p'), {
     prompt: 'p',
-    duration: 6,
+    duration: 12,
+    fps: 25,
     resolution: '1080p',
     aspect_ratio: '16:9',
     generate_audio: false,
     enable_safety_checker: true,
   });
   assert.deepEqual(videoInput('fal-ai/some/other-video', 'p'), { prompt: 'p' });
+});
+
+test('video planning validates three causal beats and preserves captions after restart', async () => {
+  const lesson = {
+    objective: 'A local signal changes a nearby cell.',
+    steps: [
+      {
+        caption: 'A cell releases signal molecules.',
+        action: 'The blue cell on the left releases a few orange molecules into the gap.',
+      },
+      {
+        caption: 'Molecules diffuse over a short distance.',
+        action:
+          'Orange molecules spread through the extracellular gap toward the green cell on the right.',
+      },
+      {
+        caption: 'Binding to a receptor triggers a response.',
+        action:
+          'An orange molecule binds a matching receptor on the green cell and an internal response appears.',
+      },
+    ],
+  };
+  const providers = new Providers(
+    { elevenKey: '', agentId: '', visionKey: 'fake', model: 'model' },
+    async () =>
+      new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(lesson) }] })),
+  );
+  assert.deepEqual(
+    await providers.planVideo('paracrine signaling', new AbortController().signal),
+    lesson,
+  );
+  assert.throws(() => illustrationPrompt('video', 'paracrine signaling'), /storyboard/);
+  const prompt = illustrationPrompt('video', 'paracrine signaling', lesson);
+  for (const beat of lesson.steps) assert.ok(prompt.includes(beat.action));
+  assert.ok(prompt.length < 2000);
+  const w = workspace(falFake().request);
+  try {
+    const item = w.store.addMedia(
+      {
+        kind: 'video',
+        model: 'fal-ai/ltx-2.3/text-to-video/fast',
+        subject: 'paracrine signaling',
+        prompt,
+        lesson,
+        contentType: 'video/mp4',
+        width: 1920,
+        height: 1080,
+        requestId: 'video-test',
+        origin: 'student',
+        sessionId: null,
+      },
+      MP4,
+    );
+    assert.deepEqual(
+      new Store(w.dir).snapshot().media.find((m) => m.id === item.id)?.lesson,
+      lesson,
+    );
+  } finally {
+    rmSync(w.dir, { recursive: true, force: true });
+  }
+  const invalid = new Providers(
+    { elevenKey: '', agentId: '', visionKey: 'fake', model: 'model' },
+    async () =>
+      new Response(
+        JSON.stringify({
+          content: [
+            { type: 'text', text: JSON.stringify({ ...lesson, steps: lesson.steps.slice(0, 1) }) },
+          ],
+        }),
+      ),
+  );
+  await assert.rejects(invalid.planVideo('paracrine signaling', new AbortController().signal));
+});
+
+test('Kling sends three bounded shots without a competing single prompt', () => {
+  const lesson = {
+    objective: 'A local process causes a response.',
+    scene: 's'.repeat(220),
+    steps: Array.from({ length: 3 }, () => ({ caption: 'c'.repeat(130), action: 'a'.repeat(240) })),
+  };
+  const input = videoInput(
+    'fal-ai/kling-video/v3/pro/text-to-video',
+    illustrationPrompt('video', 'paracrine signaling', lesson),
+    lesson,
+  ) as any;
+  assert.equal(input.prompt, undefined);
+  assert.equal(input.duration, '15');
+  assert.equal(input.generate_audio, false);
+  assert.equal(input.multi_prompt.length, 3);
+  assert.equal(
+    input.multi_prompt.reduce((sum: number, shot: any) => sum + Number(shot.duration), 0),
+    15,
+  );
+  assert.ok(input.multi_prompt.every((shot: any) => shot.prompt.length <= 512));
+  assert.ok(
+    illustrationPrompt('video', 'x'.repeat(600), {
+      ...lesson,
+      scene: undefined,
+      objective: 'o'.repeat(160),
+    }).length <= 2000,
+  );
+});
+
+test('cancelling during storyboard planning never queues or saves a video', async () => {
+  const fake = falFake();
+  const w = workspace(fake.request);
+  try {
+    w.service.fal.config.videoModel = 'fal-ai/kling-video/v3/pro/text-to-video';
+    let finish!: (value: any) => void;
+    w.service.providers.planVideo = () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      });
+    const job = w.service.generate({ kind: 'video', subject: 'Paracrine signaling' }, 'student');
+    w.service.cancelGeneration();
+    finish({ objective: 'Test cancellation', steps: [] });
+    await job.settled;
+    assert.equal(w.service.state.generation?.phase, 'cancelled');
+    assert.equal(fake.calls.length, 0);
+    assert.equal(w.store.snapshot().media.length, 0);
+  } finally {
+    rmSync(w.dir, { recursive: true, force: true });
+  }
 });

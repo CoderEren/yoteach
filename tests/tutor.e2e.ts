@@ -19,7 +19,7 @@ async function launch(dir: string, extra: Record<string, string> = {}) {
     ANTHROPIC_API_KEY: 'test-only-vision',
     FAL_KEY: 'test-only-fal',
     FAL_IMAGE_MODEL: 'fal-ai/flux/schnell',
-    FAL_VIDEO_MODEL: '',
+    FAL_VIDEO_MODEL: extra.FAL_VIDEO_MODEL ?? '',
   } as Record<string, string>;
   delete env.ELECTRON_RUN_AS_NODE;
   if (process.env.YOTEACH_TEST_DEV === '1') env.YOTEACH_DEV_URL = 'http://127.0.0.1:5173';
@@ -31,7 +31,7 @@ async function launch(dir: string, extra: Record<string, string> = {}) {
   return { app, page };
 }
 async function fixtures(app: ElectronApplication, page: Page) {
-  await app.evaluate(({ systemPreferences }) => {
+  await app.evaluate(({ systemPreferences, nativeImage }) => {
     systemPreferences.askForMediaAccess = async () => true;
     globalThis.fetch = async (input) => {
       if (
@@ -77,9 +77,21 @@ async function fixtures(app: ElectronApplication, page: Page) {
         (globalThis as any).__captures = ((globalThis as any).__captures ?? 0) + 1;
         return {
           stdout: JSON.stringify({
-            image: 'data:image/jpeg;base64,/9j/',
+            image:
+              'data:image/jpeg;base64,' +
+              nativeImage
+                .createFromPath(process.cwd() + '/assets/icons/yoyo.png')
+                .resize({ width: 1200, height: 800 })
+                .toJPEG(80)
+                .toString('base64'),
             width: 1200,
             height: 800,
+            textBoxes: [
+              {
+                text: 'Energy investment phase',
+                box: { x: 0.5, y: 0.25, width: 0.2, height: 0.08 },
+              },
+            ],
             words: ((globalThis as any).__captureWords ?? []).map((text: string, i: number) => ({
               text,
               line: 0,
@@ -1097,6 +1109,114 @@ test('recorded live answers render across twelve subjects', async () => {
         /.+/,
       );
     }
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('explanatory videos use timed shots, seekable captions, and persist their lesson', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-video-'));
+  let app: ElectronApplication | undefined;
+  const lesson = {
+    objective: 'A signal acts on a nearby cell.',
+    scene: 'Blue cell on the left, orange cell on the right, with a gap between them.',
+    steps: [
+      {
+        caption: 'The cell releases a signal.',
+        action: 'Yellow dots leave the blue cell and enter the gap.',
+      },
+      {
+        caption: 'The signal diffuses locally.',
+        action: 'Yellow dots move through the gap toward the orange cell.',
+      },
+      {
+        caption: 'Receptors trigger a response.',
+        action: 'Dots bind the orange cell receptors and an internal green patch appears.',
+      },
+    ],
+  };
+  try {
+    const boot = await launch(dir, { FAL_VIDEO_MODEL: 'fal-ai/kling-video/v3/pro/text-to-video' });
+    app = boot.app;
+    const page = boot.page;
+    const provider = await fixtures(app, page);
+    await app.evaluate(
+      (_, { lesson, file }) => {
+        const previous = globalThis.fetch;
+        const json = (data: unknown) => new Response(JSON.stringify(data));
+        globalThis.fetch = async (input, init) => {
+          const url = String(input);
+          if (
+            url.includes('api.anthropic.com') &&
+            String(init?.body).includes('Plan an accurate educational animation')
+          )
+            return json({ content: [{ type: 'text', text: JSON.stringify(lesson) }] });
+          if (url === 'https://queue.fal.run/fal-ai/kling-video/v3/pro/text-to-video') {
+            (globalThis as any).__videoInput = JSON.parse(String(init?.body));
+            return json({ request_id: 'lesson-test' });
+          }
+          if (url.endsWith('/lesson-test/status')) return json({ status: 'COMPLETED' });
+          if (url.endsWith('/requests/lesson-test'))
+            return json({
+              video: { url: 'https://fal.media/lesson-test.mp4', width: 320, height: 180 },
+            });
+          if (url === 'https://fal.media/lesson-test.mp4')
+            return new Response(process.getBuiltinModule('node:fs')!.readFileSync(file));
+          return previous(input, init);
+        };
+      },
+      { lesson, file: resolve('tests/fixtures/lesson.mp4') },
+    );
+    await page.evaluate(() =>
+      window.yoteach.tutor.intent({ type: 'start', topicId: null, mode: 'voice' }),
+    );
+    await expect.poll(async () => (await runtime(page)).status).toBe('connected');
+    await provider.tool('generate_illustration', {
+      subject: 'Explain paracrine signaling',
+      kind: 'video',
+    });
+    const layer = app.windows().find((w) => w.url().includes('/overlay'))!;
+    const video = layer.locator('video');
+    await expect(video).toBeVisible({ timeout: 15000 });
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => Number.isFinite(v.duration)))
+      .toBe(true);
+    await expect(layer.locator('.video-lesson-caption')).toHaveText(
+      '1/3 · The cell releases a signal.',
+    );
+    await video.evaluate((v: HTMLVideoElement) => {
+      v.currentTime = v.duration * 0.8;
+    });
+    await expect(layer.locator('.video-lesson-caption')).toHaveText(
+      '3/3 · Receptors trigger a response.',
+    );
+    await layer.getByText('Explanation steps', { exact: true }).click();
+    await layer.getByRole('button', { name: 'The signal diffuses locally.' }).click();
+    await expect(layer.locator('.video-lesson-caption')).toHaveText(
+      '2/3 · The signal diffuses locally.',
+    );
+    const input = await app.evaluate(() => (globalThis as any).__videoInput);
+    expect(input.duration).toBe('15');
+    expect(input.prompt).toBeUndefined();
+    expect(input.multi_prompt).toHaveLength(3);
+    expect(input.multi_prompt.every((p: any) => p.duration === '5' && p.prompt.length <= 512)).toBe(
+      true,
+    );
+    mkdirSync('.impeccable/review', { recursive: true });
+    await layer
+      .locator('.screen-card')
+      .screenshot({ path: '.impeccable/review/video-captions.png' });
+    const tether = page.locator('.yoyo-v2-tether').first();
+    await expect(tether).toHaveCSS('stroke', 'rgb(0, 0, 0)');
+    await expect(tether).toHaveCSS('stroke-width', '3.4px');
+    await page
+      .locator('.sidebar-companion')
+      .screenshot({ path: '.impeccable/review/yoyo-string.png' });
+    await app.close();
+    app = undefined;
+    const { Store } = await import('../electron/store');
+    expect(new Store(dir).snapshot().media[0].lesson).toEqual(lesson);
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

@@ -417,3 +417,77 @@ test('tools reject sessions that have ended', async () => {
     f.cleanup();
   }
 });
+
+test('paracrine figure stays on cells, never snaps to the definition above it', () => {
+  const f = setup();
+  try {
+    const snapshot: SharedSnapshot = {
+      ...f.snapshot(),
+      source: { kind: 'window', id: 'study', name: 'Study notes' },
+      textBoxes: [
+        {
+          text: 'locally released signalling molecule acts on nearby cells',
+          box: { x: 0.2, y: 0.12, width: 0.5, height: 0.02 },
+        },
+      ],
+      words: [],
+    };
+    const region = {
+      ...answer.regions[0],
+      kind: 'visual' as const,
+      evidence: 'nearby cells release molecule',
+      box: { x: 0.22, y: 0.21, width: 0.48, height: 0.18 },
+    };
+    const grounded = groundRegions(snapshot, { ...answer, regions: [region] });
+    assert.deepEqual(grounded[0].box, region.box);
+    assert.equal(grounded[0].precision, 'vision-estimate');
+    assert.equal(
+      groundRegions(snapshot, { ...answer, regions: [{ ...region, confidence: 0.7 }] }).length,
+      0,
+    );
+    assert.equal(
+      groundRegions(snapshot, { ...answer, regions: [{ ...region, kind: 'text' }] }).length,
+      0,
+    );
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('pixel geometry normalizes with the actual supplied image and rejects off-image boxes', async () => {
+  const { pixelRegions } = await import('../electron/providers');
+  const raw = {
+    explanation: 'Nearby cells',
+    regions: [
+      { ...answer.regions[0], kind: 'visual', box: { x: 240, y: 160, width: 200, height: 150 } },
+    ],
+  };
+  const size = { width: 1000, height: 800 };
+  assert.deepEqual(pixelRegions(raw, size).regions[0].box, {
+    x: 0.24,
+    y: 0.2,
+    width: 0.2,
+    height: 0.1875,
+  });
+  assert.throws(() => pixelRegions(raw, { width: 300, height: 200 }));
+  const f = setup();
+  let body: any;
+  try {
+    const p = new Providers(
+      config,
+      async (_, init) => {
+        body = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(raw) }] }),
+        );
+      },
+      (snapshot) => ({ ...snapshot, ...size }),
+    );
+    const result = await p.analyze(f.snapshot(), 'Locate cells', '', new AbortController().signal);
+    assert.deepEqual(result.regions[0].box, { x: 0.24, y: 0.2, width: 0.2, height: 0.1875 });
+    assert.deepEqual(JSON.parse(body.messages[0].content[0].text).imageSize, size);
+    assert.equal(body.messages[0].content[1].transformations.oversized_image, 'error');
+  } finally {
+    f.cleanup();
+  }
+});
