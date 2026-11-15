@@ -1,0 +1,7 @@
+Cleanup verified 2026-11-15T09:09:53.587092+00:00
+Task Electron processes: 0
+Yoteach native capture/hold helpers: 0
+Task caffeinate PID 99569: stopped
+Orphan test capture helper PID 31058: stopped
+An unrelated pre-existing Antigravity IDE Electron process was identified and left running. No user app was terminated.
+All test launches used temporary YOTEACH_DATA_DIR paths.
