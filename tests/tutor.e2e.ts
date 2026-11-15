@@ -962,3 +962,65 @@ test('Stage 3 demo: lecture → fal media → saved restart → replay', async (
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('flow particles stay separated on short paths and respect live reduced-motion changes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-flow-'));
+  let app: ElectronApplication | undefined;
+  try {
+    const boot = await launch(dir);
+    app = boot.app;
+    const provider = await fixtures(app, boot.page);
+    await boot.page.evaluate(() =>
+      window.yoteach.tutor.intent({ type: 'start', topicId: null, mode: 'voice' }),
+    );
+    await expect.poll(async () => (await runtime(boot.page)).status).toBe('connected');
+    const layer = app.windows().find((w) => w.url().includes('/overlay'))!;
+    await layer.emulateMedia({ reducedMotion: 'reduce' });
+    await provider.tool('sketch_on_screen', {
+      title: 'Sodium crosses the membrane',
+      elements: [
+        { type: 'line', from: [45, 15], to: [45, 55], tone: 'muted' },
+        {
+          type: 'flow',
+          path: [
+            [30, 35],
+            [60, 35],
+          ],
+          symbol: 'Na+',
+          count: 12,
+          seconds: 3,
+          tone: 'blue',
+        },
+        { type: 'text', at: [24, 20], text: 'Outside' },
+        { type: 'text', at: [55, 20], text: 'Inside' },
+      ],
+    });
+    await expect(layer.getByRole('img', { name: 'Sodium crosses the membrane' })).toBeVisible();
+    await layer.evaluate(() => document.fonts.ready);
+    await expect(layer.locator('figcaption span i').first()).toHaveCSS('opacity', '1');
+    await layer.waitForTimeout(1200); // Allow the native transparent window to paint.
+    const phase = process.env.YOTEACH_EVIDENCE_PHASE ?? 'after';
+    await layer.screenshot({ path: `docs/overnight/cycle-1/${phase}.png` });
+    const positions = () =>
+      layer
+        .locator('.flow .particle:visible')
+        .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('transform')));
+    await expect(layer.locator('.flow')).toHaveCSS('opacity', '1');
+    const still = await positions();
+    expect(new Set(still).size).toBe(still.length);
+    expect(still.length).toBeGreaterThan(1);
+    expect(still.length).toBeLessThan(12);
+    await layer.waitForTimeout(150);
+    expect(await positions()).toEqual(still);
+    await layer.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect.poll(positions).not.toEqual(still);
+    await layer.emulateMedia({ reducedMotion: 'reduce' });
+    await layer.waitForTimeout(100);
+    const stopped = await positions();
+    await layer.waitForTimeout(150);
+    expect(await positions()).toEqual(stopped);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

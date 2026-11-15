@@ -1,0 +1,1557 @@
+[
+  {
+    "subject": "biology",
+    "question": "Why does a neuron fire an action potential?",
+    "firstWordsMs": 3106,
+    "speech": [
+      "It all comes down to sodium rushing in. I’ll sketch the membrane to show you exactly how that spark starts. ",
+      "When a neuron receives enough incoming signals, its membrane voltage rises toward a threshold around minus fifty-five millivolts. Once it hits that threshold, voltage-gated sodium channels snap open, allowing positively charged sodium ions to flood rapidly into the cell. This sudden wave of positive charge flips the internal voltage from negative to positive in an all-or-none event, which then propagates down the axon as the electrical impulse. Does that make sense, or would you like to explore what happens during repolarization?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Neuron Action Potential",
+          "elements": [
+            {
+              "type": "box",
+              "at": [
+                50,
+                20
+              ],
+              "w": 80,
+              "h": 8,
+              "label": "Lipid Bilayer",
+              "tone": "muted",
+              "step": 1
+            },
+            {
+              "type": "box",
+              "at": [
+                30,
+                16
+              ],
+              "w": 8,
+              "h": 16,
+              "label": "Na+ Channel",
+              "tone": "blue",
+              "step": 1
+            },
+            {
+              "type": "box",
+              "at": [
+                65,
+                16
+              ],
+              "w": 8,
+              "h": 16,
+              "label": "K+ Channel",
+              "tone": "pink",
+              "step": 1
+            },
+            {
+              "type": "flow",
+              "label": "Na+ influx",
+              "tone": "blue",
+              "step": 2,
+              "path": [
+                [
+                  34,
+                  6
+                ],
+                [
+                  34,
+                  24
+                ],
+                [
+                  34,
+                  40
+                ]
+              ],
+              "count": 6,
+              "symbol": "Na+",
+              "seconds": 2
+            },
+            {
+              "type": "pulse",
+              "label": "Depolarization pulse",
+              "tone": "accent",
+              "step": 3,
+              "path": [
+                [
+                  10,
+                  50
+                ],
+                [
+                  90,
+                  50
+                ]
+              ],
+              "width": 3,
+              "seconds": 2
+            }
+          ],
+          "captions": [
+            "Resting membrane potential with closed voltage-gated channels",
+            "Threshold reached: voltage-gated Na+ channels open and Na+ rushes in",
+            "Depolarization triggers an all-or-none pulse along the axon"
+          ],
+          "size": "large"
+        },
+        "atMs": 3106
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "chemistry",
+    "question": "Why does a catalyst speed up a reaction?",
+    "firstWordsMs": 4470,
+    "speech": [
+      "A catalyst provides a different pathway for the reaction that requires less energy to get started. Let me sketch how that lowers the barrier for you.\n",
+      "In any chemical reaction, reactant molecules must collide with enough kinetic energy to break bonds and reach the transition state. This minimum energy threshold is called the activation energy. \n\nWhen you add a catalyst, it offers an alternative reaction mechanism with a lower activation energy barrier. Because the barrier is lower, a much higher fraction of colliding molecules possess sufficient energy to react at that temperature, which makes the overall reaction proceed much faster without consuming the catalyst itself."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Reaction Energy Profiles",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                55
+              ],
+              "xLabel": "Reaction progress",
+              "yLabel": "Energy",
+              "tone": "ink"
+            },
+            {
+              "type": "line",
+              "from": [
+                15,
+                42
+              ],
+              "to": [
+                30,
+                42
+              ],
+              "label": "Reactants",
+              "tone": "ink",
+              "width": 1.2
+            },
+            {
+              "type": "line",
+              "from": [
+                70,
+                48
+              ],
+              "to": [
+                85,
+                48
+              ],
+              "label": "Products",
+              "tone": "ink",
+              "width": 1.2
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  30,
+                  42
+                ],
+                [
+                  42,
+                  15
+                ],
+                [
+                  58,
+                  15
+                ],
+                [
+                  70,
+                  48
+                ]
+              ],
+              "tone": "pink",
+              "step": 1,
+              "width": 1.5
+            },
+            {
+              "type": "text",
+              "at": [
+                50,
+                11
+              ],
+              "text": "Uncatalyzed (high Ea)",
+              "tone": "pink",
+              "step": 1
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  30,
+                  42
+                ],
+                [
+                  45,
+                  28
+                ],
+                [
+                  55,
+                  28
+                ],
+                [
+                  70,
+                  48
+                ]
+              ],
+              "tone": "blue",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "text",
+              "at": [
+                50,
+                25
+              ],
+              "text": "Catalyzed (lower Ea)",
+              "tone": "blue",
+              "step": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                42
+              ],
+              "to": [
+                50,
+                28
+              ],
+              "tone": "accent",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "Reactants must overcome an energy barrier called activation energy (Ea).",
+            "A catalyst introduces a lower-energy route, increasing the rate of successful collisions."
+          ],
+          "size": "normal"
+        },
+        "atMs": 4470
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "physics",
+    "question": "How does a pendulum exchange energy?",
+    "firstWordsMs": 4269,
+    "speech": [
+      "Let me show you how that energy swaps back and forth.\n",
+      "A pendulum constantly trades gravitational potential energy and kinetic energy.\n\nWhen you pull the bob up to its highest point and release it, it pauses for an instant. At that peak, its speed is zero, so all of its mechanical energy is potential energy stored by gravity.\n\nAs gravity pulls it downward, the bob accelerates. Height drops while speed climbs, converting potential energy directly into kinetic energy. \n\nAt the very bottom of the arc, the bob is at its lowest point and highest speed. Here, potential energy hits minimum and kinetic energy reaches maximum.\n\nMomentum carries it past the bottom and back upward against gravity. It slows down as kinetic energy turns back into potential energy until it stops at the opposite peak, ready to swing back. \n\nIn an ideal system without air resistance or friction, the total mechanical energy remains constant throughout the entire swing. Does that balance make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Pendulum Energy Conservation",
+          "elements": [
+            {
+              "type": "circle",
+              "at": [
+                50,
+                15
+              ],
+              "r": 2,
+              "tone": "ink",
+              "step": 1
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                15
+              ],
+              "to": [
+                50,
+                55
+              ],
+              "dashed": true,
+              "tone": "muted",
+              "step": 1
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                15
+              ],
+              "to": [
+                25,
+                45
+              ],
+              "tone": "ink",
+              "step": 1,
+              "width": 1.5
+            },
+            {
+              "type": "circle",
+              "at": [
+                25,
+                45
+              ],
+              "r": 5,
+              "tone": "pink",
+              "step": 1,
+              "fill": "pink"
+            },
+            {
+              "type": "text",
+              "at": [
+                25,
+                55
+              ],
+              "text": "Max PE (v = 0)",
+              "tone": "pink",
+              "step": 1
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                15
+              ],
+              "to": [
+                50,
+                55
+              ],
+              "tone": "ink",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "circle",
+              "at": [
+                50,
+                55
+              ],
+              "r": 5,
+              "tone": "blue",
+              "step": 2,
+              "fill": "blue"
+            },
+            {
+              "type": "text",
+              "at": [
+                50,
+                65
+              ],
+              "text": "Max KE (h = 0)",
+              "tone": "blue",
+              "step": 2
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  25,
+                  45
+                ],
+                [
+                  35,
+                  53
+                ],
+                [
+                  50,
+                  55
+                ]
+              ],
+              "tone": "accent",
+              "step": 2,
+              "width": 1
+            },
+            {
+              "type": "line",
+              "from": [
+                50,
+                15
+              ],
+              "to": [
+                75,
+                45
+              ],
+              "tone": "ink",
+              "step": 3,
+              "width": 1.5
+            },
+            {
+              "type": "circle",
+              "at": [
+                75,
+                45
+              ],
+              "r": 5,
+              "tone": "pink",
+              "step": 3,
+              "fill": "pink"
+            },
+            {
+              "type": "text",
+              "at": [
+                75,
+                55
+              ],
+              "text": "Max PE (v = 0)",
+              "tone": "pink",
+              "step": 3
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  50,
+                  55
+                ],
+                [
+                  65,
+                  53
+                ],
+                [
+                  75,
+                  45
+                ]
+              ],
+              "tone": "accent",
+              "step": 3,
+              "width": 1
+            }
+          ],
+          "captions": [
+            "At the peak, all energy is stored as gravitational potential energy.",
+            "As it falls, it speeds up, converting potential into kinetic energy at the bottom.",
+            "Swinging back up, kinetic energy turns back into potential energy at the opposite peak."
+          ],
+          "size": "normal"
+        },
+        "atMs": 4269
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "vectors",
+    "question": "How do I add two vectors?",
+    "firstWordsMs": 2943,
+    "speech": [
+      "Let's see exactly how that works by drawing the vectors.\n",
+      "To add two vectors graphically, use the tip-to-tail method. You place the tail of the second vector right at the tip of the first vector, keeping both of their directions and lengths intact. The sum, or resultant vector, goes straight from the tail of the first vector to the tip of the second vector.\n\nIf you are working with coordinate numbers, you simply add their corresponding components together: add the horizontal x-values to get the new x, and add the vertical y-values to get the new y. Does that make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Vector Addition (Tip-to-Tail)",
+          "elements": [
+            {
+              "type": "arrow",
+              "from": [
+                15,
+                50
+              ],
+              "to": [
+                45,
+                35
+              ],
+              "label": "u",
+              "tone": "blue",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                45,
+                35
+              ],
+              "to": [
+                75,
+                15
+              ],
+              "label": "v",
+              "tone": "green",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                15,
+                50
+              ],
+              "to": [
+                75,
+                15
+              ],
+              "label": "u + v",
+              "dashed": true,
+              "tone": "accent",
+              "step": 2,
+              "width": 2.5
+            }
+          ],
+          "captions": [
+            "Place the tail of the second vector at the tip of the first.",
+            "The resultant vector connects the start directly to the final tip."
+          ],
+          "size": "normal"
+        },
+        "atMs": 2943
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "matrices",
+    "question": "What does a rotation matrix do to a grid?",
+    "firstWordsMs": 3609,
+    "speech": [
+      "Let's see that rotation in action by drawing how it moves the grid.\n",
+      "A rotation matrix turns every single point on the grid around the origin by a fixed angle, preserving all lengths and angles between grid lines.\n\nBecause matrix transformations are linear, what happens to the whole grid is entirely determined by where the standard basis vectors land. The unit vector along the x-axis rotates to coordinates given by cosine and sine of the angle, and the unit vector along the y-axis rotates to negative sine and cosine.\n\nEvery grid square pivots together as a rigid sheet, staying square and keeping the exact same area."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Rotation of Basis Vectors",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                50,
+                45
+              ],
+              "xLabel": "x",
+              "yLabel": "y",
+              "tone": "muted",
+              "step": 1
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                45
+              ],
+              "to": [
+                70,
+                45
+              ],
+              "label": "i-hat (1,0)",
+              "tone": "blue",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                45
+              ],
+              "to": [
+                50,
+                25
+              ],
+              "label": "j-hat (0,1)",
+              "tone": "green",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                45
+              ],
+              "to": [
+                64,
+                31
+              ],
+              "label": "[cos θ, sin θ]",
+              "tone": "accent",
+              "step": 2,
+              "width": 2.5
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                45
+              ],
+              "to": [
+                36,
+                31
+              ],
+              "label": "[-sin θ, cos θ]",
+              "tone": "pink",
+              "step": 2,
+              "width": 2.5
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  68,
+                  45
+                ],
+                [
+                  67,
+                  39
+                ],
+                [
+                  64,
+                  31
+                ]
+              ],
+              "dashed": true,
+              "tone": "accent",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "Standard coordinate grid with basis vectors i and j",
+            "Rotating the entire grid rigidly by angle θ around the origin"
+          ],
+          "size": "normal"
+        },
+        "atMs": 3609
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "calculus",
+    "question": "What does a derivative mean?",
+    "firstWordsMs": 2868,
+    "speech": [
+      "It’s basically the rate at which something is changing right now. Let me sketch out what that looks like.\n",
+      "If you are driving a car, your average speed tells you how far you went over a whole hour, but your speedometer tells you your speed at this exact millisecond. That speedometer reading is the derivative.\n\nOn a graph, while average change is the slope between two distant points, the derivative zooms in so close that the curve looks like a straight tangent line at that single spot. Its slope is your derivative. \n\nDoes that distinction between average change and instantaneous change make sense?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Derivative as Instantaneous Rate of Change",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                55
+              ],
+              "xLabel": "x",
+              "yLabel": "y",
+              "tone": "muted"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  15,
+                  50
+                ],
+                [
+                  30,
+                  45
+                ],
+                [
+                  50,
+                  30
+                ],
+                [
+                  75,
+                  12
+                ]
+              ],
+              "tone": "ink",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "dot",
+              "at": [
+                50,
+                30
+              ],
+              "tone": "accent",
+              "step": 2
+            },
+            {
+              "type": "line",
+              "from": [
+                30,
+                44
+              ],
+              "to": [
+                70,
+                16
+              ],
+              "tone": "accent",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "text",
+              "at": [
+                52,
+                24
+              ],
+              "text": "Slope = f'(x)",
+              "tone": "accent",
+              "step": 2
+            }
+          ],
+          "captions": [
+            "A curve showing a function",
+            "The tangent line gives the instantaneous slope at that point"
+          ]
+        },
+        "atMs": 2868
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "economics",
+    "question": "Why does a supply shortage raise prices?",
+    "firstWordsMs": 3170,
+    "speech": [
+      "Let me sketch that market interaction for you.\n",
+      "When supply drops, there are more people wanting the product than there are items available. Because buyers compete with each other to secure the limited supply, sellers can raise prices, and buyers are willing to pay more until demand cools down to match what is available."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Shortage and Price Rise",
+          "elements": [
+            {
+              "type": "axes",
+              "origin": [
+                15,
+                60
+              ],
+              "xLabel": "Quantity",
+              "yLabel": "Price",
+              "tone": "muted",
+              "step": 1
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  25,
+                  15
+                ],
+                [
+                  75,
+                  55
+                ]
+              ],
+              "tone": "blue",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                77,
+                55
+              ],
+              "text": "Demand",
+              "step": 1
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  25,
+                  55
+                ],
+                [
+                  75,
+                  15
+                ]
+              ],
+              "tone": "pink",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "text",
+              "at": [
+                77,
+                15
+              ],
+              "text": "Supply",
+              "step": 1
+            },
+            {
+              "type": "circle",
+              "at": [
+                50,
+                35
+              ],
+              "r": 2,
+              "label": "Equilibrium",
+              "tone": "ink",
+              "step": 1
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                50
+              ],
+              "to": [
+                50,
+                38
+              ],
+              "label": "Shortage",
+              "tone": "accent",
+              "step": 2,
+              "width": 2
+            }
+          ],
+          "captions": [
+            "Demand exceeds supply at the initial price",
+            "Buyers bid price up toward new equilibrium"
+          ],
+          "size": "normal"
+        },
+        "atMs": 3170
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "history",
+    "question": "How did Roman roads help trade?",
+    "firstWordsMs": 2806,
+    "speech": [
+      "Let's look at the map of the Roman Empire and see how those roads acted like a network for goods and money. ",
+      "Roman roads completely transformed trade across the Mediterranean world. Built with multiple layers of stone and gravel, they offered smooth, all-weather surfaces that stayed passable during heavy rains, unlike dirt tracks. \n\nThis made overland transport far faster and more predictable for moving bulky goods, grain, wine, olive oil, and raw metals from the provinces into major cities and ports.\n\nThey were also heavily secured by military posts and fortified waystations, dramatically lowering the risk of banditry and giving merchants safe resting stops along their journeys."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Roman Trade Routes",
+          "elements": [
+            {
+              "type": "ellipse",
+              "at": [
+                50,
+                35
+              ],
+              "tone": "blue",
+              "step": 1,
+              "rx": 35,
+              "ry": 20,
+              "fill": "blue"
+            },
+            {
+              "type": "curve",
+              "points": [
+                [
+                  25,
+                  30
+                ],
+                [
+                  50,
+                  35
+                ],
+                [
+                  75,
+                  32
+                ]
+              ],
+              "tone": "accent",
+              "step": 1,
+              "width": 3
+            },
+            {
+              "type": "circle",
+              "at": [
+                50,
+                35
+              ],
+              "r": 2,
+              "tone": "ink",
+              "step": 1,
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "at": [
+                52,
+                38
+              ],
+              "text": "Rome",
+              "tone": "ink",
+              "step": 1
+            },
+            {
+              "type": "flow",
+              "tone": "yellow",
+              "step": 2,
+              "path": [
+                [
+                  25,
+                  30
+                ],
+                [
+                  50,
+                  35
+                ],
+                [
+                  75,
+                  32
+                ]
+              ],
+              "count": 4,
+              "symbol": "oil",
+              "seconds": 4
+            }
+          ],
+          "captions": [
+            "Straight, paved roads connected Rome to ports and provinces.",
+            "Wagons and messengers moved quickly along secured routes."
+          ],
+          "size": "large"
+        },
+        "atMs": 2806
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "computing",
+    "question": "How do packets travel across a network?",
+    "firstWordsMs": 5470,
+    "speech": [
+      "Let's draw a network and watch some packets flow.\n",
+      "When you send data like a message or video, your computer breaks it down into small chunks called packets. \n\nEach packet gets wrapped with a header containing metadata, such as the source IP address, destination IP address, and a sequence number.\n\nAs packets leave your device, intermediate routers read the destination address in the header. Each router checks its routing table and forwards the packet along the most efficient available link toward the next hop. Because network conditions change constantly, different packets from the same message can take entirely different routes to avoid congestion.\n\nOnce the packets reach the destination host, the receiving device uses the sequence numbers to reassemble them back into the original data stream, requesting retransmission for any packets that were lost along the way."
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Packet Routing Across a Network",
+          "elements": [
+            {
+              "type": "circle",
+              "at": [
+                15,
+                35
+              ],
+              "r": 6,
+              "label": "Sender",
+              "tone": "blue",
+              "step": 1,
+              "fill": "blue"
+            },
+            {
+              "type": "text",
+              "at": [
+                15,
+                48
+              ],
+              "text": "Host A",
+              "step": 1
+            },
+            {
+              "type": "circle",
+              "at": [
+                40,
+                20
+              ],
+              "r": 5,
+              "label": "Router 1",
+              "tone": "ink",
+              "step": 2,
+              "fill": "muted"
+            },
+            {
+              "type": "circle",
+              "at": [
+                40,
+                50
+              ],
+              "r": 5,
+              "label": "Router 2",
+              "tone": "ink",
+              "step": 2,
+              "fill": "muted"
+            },
+            {
+              "type": "circle",
+              "at": [
+                65,
+                35
+              ],
+              "r": 5,
+              "label": "Router 3",
+              "tone": "ink",
+              "step": 2,
+              "fill": "muted"
+            },
+            {
+              "type": "circle",
+              "at": [
+                85,
+                35
+              ],
+              "r": 6,
+              "label": "Receiver",
+              "tone": "green",
+              "step": 2,
+              "fill": "green"
+            },
+            {
+              "type": "text",
+              "at": [
+                85,
+                48
+              ],
+              "text": "Host B",
+              "step": 2
+            },
+            {
+              "type": "line",
+              "from": [
+                21,
+                32
+              ],
+              "to": [
+                35,
+                22
+              ],
+              "tone": "muted",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "line",
+              "from": [
+                21,
+                38
+              ],
+              "to": [
+                35,
+                48
+              ],
+              "tone": "muted",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "line",
+              "from": [
+                45,
+                20
+              ],
+              "to": [
+                60,
+                32
+              ],
+              "tone": "muted",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "line",
+              "from": [
+                45,
+                50
+              ],
+              "to": [
+                60,
+                38
+              ],
+              "tone": "muted",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "line",
+              "from": [
+                71,
+                35
+              ],
+              "to": [
+                79,
+                35
+              ],
+              "tone": "muted",
+              "step": 2,
+              "width": 1.5
+            },
+            {
+              "type": "flow",
+              "tone": "accent",
+              "step": 3,
+              "path": [
+                [
+                  15,
+                  35
+                ],
+                [
+                  40,
+                  20
+                ],
+                [
+                  65,
+                  35
+                ],
+                [
+                  85,
+                  35
+                ]
+              ],
+              "count": 4,
+              "symbol": "PKT",
+              "seconds": 2.5
+            }
+          ],
+          "captions": [
+            "Data is chopped into small packets with header addresses.",
+            "Routers examine headers and forward packets along the fastest path.",
+            "Packets arrive and are reassembled in the correct order."
+          ],
+          "size": "large"
+        },
+        "atMs": 5470
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": false
+  },
+  {
+    "subject": "geography",
+    "question": "Why do tectonic plates cause earthquakes?",
+    "firstWordsMs": 4987,
+    "speech": [
+      "Let me show you exactly how that pressure builds up and releases.\n",
+      "Tectonic plates are massive slabs of rock that slowly move over the hot mantle below. Because their edges are rough and jagged, they cannot slide smoothly past one another. Instead, friction snags them and locks the fault in place while the rest of the plates keep moving. \n\nThis causes the rock around the fault to bend and store energy like a compressed spring. Once the accumulated stress exceeds the friction holding the rocks together, the fault suddenly snaps and slips. That rapid release of stored elastic energy radiates outward through the Earth as seismic waves, which is the shaking we feel as an earthquake. \n\nDoes this elastic rebound mechanism make sense, or would you like to explore the different types of plate boundaries?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Elastic Rebound and Earthquakes",
+          "elements": [
+            {
+              "type": "box",
+              "w": 36,
+              "h": 30,
+              "tone": "ink",
+              "step": 1,
+              "fill": "muted"
+            },
+            {
+              "type": "box",
+              "w": 36,
+              "h": 30,
+              "tone": "ink",
+              "step": 1,
+              "fill": "accent"
+            },
+            {
+              "type": "line",
+              "from": [
+                46,
+                10
+              ],
+              "to": [
+                46,
+                60
+              ],
+              "dashed": true,
+              "tone": "muted",
+              "step": 1,
+              "width": 1.5
+            },
+            {
+              "type": "arrow",
+              "from": [
+                18,
+                14
+              ],
+              "to": [
+                38,
+                14
+              ],
+              "label": "Plate movement",
+              "tone": "blue",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                72,
+                66
+              ],
+              "to": [
+                52,
+                66
+              ],
+              "label": "Plate movement",
+              "tone": "blue",
+              "step": 1,
+              "width": 2
+            },
+            {
+              "type": "dot",
+              "at": [
+                46,
+                35
+              ],
+              "label": "Locked fault",
+              "tone": "pink",
+              "step": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                40,
+                35
+              ],
+              "to": [
+                46,
+                35
+              ],
+              "tone": "pink",
+              "step": 2
+            },
+            {
+              "type": "arrow",
+              "from": [
+                52,
+                35
+              ],
+              "to": [
+                46,
+                35
+              ],
+              "tone": "pink",
+              "step": 2
+            },
+            {
+              "type": "circle",
+              "at": [
+                46,
+                35
+              ],
+              "r": 8,
+              "tone": "yellow",
+              "step": 3
+            },
+            {
+              "type": "circle",
+              "at": [
+                46,
+                35
+              ],
+              "r": 16,
+              "tone": "yellow",
+              "step": 3
+            },
+            {
+              "type": "circle",
+              "at": [
+                46,
+                35
+              ],
+              "r": 24,
+              "tone": "yellow",
+              "step": 3
+            },
+            {
+              "type": "pulse",
+              "label": "Seismic waves",
+              "tone": "yellow",
+              "step": 3,
+              "path": [
+                [
+                  46,
+                  35
+                ],
+                [
+                  20,
+                  20
+                ],
+                [
+                  10,
+                  15
+                ]
+              ],
+              "width": 3,
+              "seconds": 1.5
+            },
+            {
+              "type": "pulse",
+              "tone": "yellow",
+              "step": 3,
+              "path": [
+                [
+                  46,
+                  35
+                ],
+                [
+                  72,
+                  50
+                ],
+                [
+                  85,
+                  55
+                ]
+              ],
+              "width": 3,
+              "seconds": 1.5
+            }
+          ],
+          "captions": [
+            "Tectonic plates constantly push past each other, but friction locks their rough edges together.",
+            "As the plates keep driving forward, elastic strain builds up along the fault line.",
+            "When the strain overcomes friction, the fault slips suddenly, radiating seismic shockwaves."
+          ],
+          "size": "large"
+        },
+        "atMs": 4987
+      }
+    ],
+    "error": "WebSocket connection failed",
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "language",
+    "question": "How does the subject relate to the verb in a sentence?",
+    "firstWordsMs": 4496,
+    "speech": [
+      "Let's look at how they match up.\n",
+      "The subject tells us who or what is performing the action or being described, while the verb expresses that action or state of being. \n\nThey are tied together through agreement, meaning a singular subject pairs with a singular verb, and a plural subject pairs with a plural verb. \n\nDoes that make sense, or would you like to try a quick example together?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Subject-Verb Relationship",
+          "elements": [
+            {
+              "type": "box",
+              "at": [
+                20,
+                25
+              ],
+              "w": 25,
+              "h": 18,
+              "label": "Subject (The cat)",
+              "tone": "blue",
+              "step": 1,
+              "fill": "blue"
+            },
+            {
+              "type": "box",
+              "at": [
+                55,
+                25
+              ],
+              "w": 25,
+              "h": 18,
+              "label": "Verb (runs)",
+              "tone": "accent",
+              "step": 1,
+              "fill": "accent"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                45,
+                34
+              ],
+              "to": [
+                55,
+                34
+              ],
+              "label": "performs",
+              "tone": "ink",
+              "step": 1,
+              "width": 1.5
+            },
+            {
+              "type": "text",
+              "at": [
+                15,
+                55
+              ],
+              "text": "Agreement: Singular subject takes a singular verb.",
+              "tone": "ink",
+              "step": 2
+            },
+            {
+              "type": "curve",
+              "from": [
+                32,
+                43
+              ],
+              "points": [
+                [
+                  32,
+                  48
+                ],
+                [
+                  67,
+                  48
+                ],
+                [
+                  67,
+                  43
+                ]
+              ],
+              "tone": "muted",
+              "step": 2,
+              "width": 1
+            }
+          ],
+          "captions": [
+            "The subject performs the action or embodies the state.",
+            "They must agree in number and person."
+          ],
+          "size": "normal"
+        },
+        "atMs": 4497
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  },
+  {
+    "subject": "literature",
+    "question": "How does dramatic irony work in Romeo and Juliet?",
+    "firstWordsMs": 5067,
+    "speech": [
+      "It's a powerful tool because the audience knows the tragic ending while the characters remain hopeful. I'll sketch out a quick example to show how that tension builds.\n",
+      "Shakespeare gives the audience vital knowledge before the characters have it, turning normal choices into moments of intense suspense. \n\nFrom the very prologue, we are told that star-crossed lovers will take their lives. Because we carry that foreknowledge, every optimistic declaration of love carries an undercurrent of grief. \n\nThe peak happens in the final act: we know Juliet is only under the influence of a sleeping potion, but Romeo genuinely believes she is dead. When he notices her cheeks are still warm and flushed, the audience desperately hopes he will realize the truth before drinking the poison. \n\nThat gap between what we know and what the characters know is what makes the tragedy hit so hard. Does that make sense, or would you like to explore another specific scene?"
+    ],
+    "tools": [
+      {
+        "name": "sketch_on_screen",
+        "parameters": {
+          "title": "Dramatic Irony in Romeo and Juliet",
+          "elements": [
+            {
+              "type": "box",
+              "at": [
+                50,
+                15
+              ],
+              "w": 40,
+              "h": 12,
+              "label": "Audience Knowledge",
+              "step": 1,
+              "fill": "accent"
+            },
+            {
+              "type": "text",
+              "at": [
+                50,
+                21
+              ],
+              "text": "Knows Juliet is only asleep",
+              "tone": "ink"
+            },
+            {
+              "type": "box",
+              "at": [
+                25,
+                45
+              ],
+              "w": 30,
+              "h": 14,
+              "label": "Romeo's View",
+              "step": 2,
+              "fill": "muted"
+            },
+            {
+              "type": "text",
+              "at": [
+                25,
+                52
+              ],
+              "text": "Believes she is dead",
+              "tone": "ink"
+            },
+            {
+              "type": "box",
+              "at": [
+                75,
+                45
+              ],
+              "w": 30,
+              "h": 14,
+              "label": "Juliet's Plan",
+              "step": 2,
+              "fill": "blue"
+            },
+            {
+              "type": "text",
+              "at": [
+                75,
+                52
+              ],
+              "text": "Awaiting awakening",
+              "tone": "ink"
+            },
+            {
+              "type": "arrow",
+              "from": [
+                50,
+                27
+              ],
+              "to": [
+                25,
+                45
+              ],
+              "label": "Gap creates tension",
+              "tone": "pink",
+              "step": 3
+            }
+          ],
+          "captions": [
+            "The Prologue tells us they are star-crossed lovers destined to die.",
+            "Juliet takes a sleeping potion; the audience knows she is alive.",
+            "Romeo believes she is dead, creating unbearable suspense."
+          ],
+          "size": "normal"
+        },
+        "atMs": 5068
+      }
+    ],
+    "error": null,
+    "forbiddenLeadIn": true
+  }
+]
