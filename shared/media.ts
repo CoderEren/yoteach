@@ -24,12 +24,27 @@ export const mediaExtension: Record<MediaType, string> = {
 };
 export const MediaFilename = /^[a-f0-9-]{36}\.(jpg|png|webp|mp4|webm)$/;
 export const Subject = z.string().trim().min(3, 'Describe what to illustrate.').max(600);
+/** Three causal beats, with app-rendered captions rather than model-painted text. */
+export const VideoLessonSchema = z.object({
+  scene: z.string().trim().min(10).max(220).optional(),
+  objective: z.string().trim().min(8).max(160),
+  steps: z
+    .array(
+      z.object({
+        caption: z.string().trim().min(8).max(130),
+        action: z.string().trim().min(15).max(240),
+      }),
+    )
+    .length(3),
+});
+export type VideoLesson = z.infer<typeof VideoLessonSchema>;
 export const GeneratedMediaSchema = z.object({
   id: z.uuid(),
   kind: MediaKind,
   model: FalModelId,
   subject: Subject,
   prompt: z.string().min(1).max(2000),
+  lesson: VideoLessonSchema.optional(),
   filename: z.string().regex(MediaFilename),
   contentType: MediaType,
   bytes: z.number().int().positive(),
@@ -67,12 +82,15 @@ export const mediaLimits = {
 const style = {
   image:
     'Educational illustration for a university student. Clear, scientifically plausible, clean 3D-render or illustration style, soft lighting, uncluttered background, centred subject. Absolutely no text, letters, numbers, labels, formulas or watermarks.',
-  video:
-    'Short educational clip for a university student. Clear, scientifically plausible motion, slow steady camera, clean 3D-render style, soft lighting, uncluttered background. No text, letters, numbers, labels, formulas or watermarks.',
 };
 /** The subject is study data, not instructions; it only fills the scene description. */
-export function illustrationPrompt(kind: MediaKind, subject: string) {
+export function illustrationPrompt(kind: MediaKind, subject: string, lesson?: VideoLesson) {
   const clean = Subject.parse(subject).replace(/\s+/g, ' ');
+  if (kind === 'video') {
+    if (!lesson) throw new Error('A video needs a teaching storyboard before generation.');
+    const plan = VideoLessonSchema.parse(lesson);
+    return `Educational mechanism animation. Fixed wide camera; all participants remain visible. Simple flat colors on a plain background, stable object identities. Show cause then effect, one action at a time. No camera orbit, decorative motion, morphing, cuts, text or watermarks. Learning goal: ${plan.objective}. Scene: ${plan.scene ?? clean}. ${plan.steps.map((step, i) => `${['First third', 'Middle third', 'Final third'][i]}: ${step.action}`).join(' ')} Hold the final result clearly.`;
+  }
   return `${style[kind]} Scene: ${clean}`;
 }
 /** Identify media by its bytes, never by the provider's claimed type alone. */

@@ -47,3 +47,18 @@ Caps: fal 40 images / 4 videos; Anthropic approximately 400 live calls; ElevenLa
 - See REPORT.md for the capture incident. No unexpected screen image or OCR is retained in committed evidence.
 
 Cycle 5 used fixture-only tests and Figma documentation. No additional paid provider calls.
+| 2026-11-15T10:00:02.224Z | Anthropic | 1 attempt | Paracrine repair: inventory of supplied attachment only |
+| 2026-11-15T10:00:59.664Z | Anthropic | 1 attempt | Paracrine repair: inventory of supplied attachment only |
+| 2026-11-15T10:01:11.401Z | Anthropic | 1 attempt | Paracrine repair: targeted localization in supplied attachment only |
+| 2026-11-15T10:01:31.843Z | Anthropic | 1 attempt | Paracrine repair: three-step paracrine storyboard |
+| 2026-11-15T10:04:33.761Z | Anthropic | 1 attempt | Paracrine repair: inventory of supplied attachment only |
+| 2026-11-15T10:04:43.921Z | Anthropic | 1 attempt | Paracrine repair: targeted localization in supplied attachment only |
+| 2026-11-15T10:04:57.971Z | Anthropic | 1 attempt | Paracrine repair: three-step paracrine storyboard |
+| 2026-11-15T10:05:46.825Z | Anthropic | 1 attempt | Paracrine repair: inventory of supplied attachment only |
+| 2026-11-15T10:05:52.721Z | Anthropic | 1 attempt | Paracrine repair: targeted localization in supplied attachment only |
+| 2026-11-15T10:07:07.417Z | Anthropic | 1 attempt | Paracrine repair: three-step paracrine storyboard |
+| 2026-11-15T10:07:12.454Z | fal video | 1 attempt | Paracrine repair: 12-second causal paracrine animation |
+| 2026-11-15T10:10:19.383Z | Anthropic | 1 attempt | Paracrine repair: three-step paracrine storyboard |
+| 2026-11-15T10:10:25.016Z | fal video | 1 attempt | Paracrine repair: causal paracrine animation model comparison |
+| 2026-11-15T10:11:47.353Z | Anthropic | 0 calls | Reused the stored paracrine storyboard |
+| 2026-11-15T10:11:47.356Z | fal video | 1 attempt | Paracrine repair: causal paracrine animation model comparison |

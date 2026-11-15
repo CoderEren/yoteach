@@ -46,7 +46,7 @@ const distance = (a: Box, b: Box) => {
 /**
  * Find the quoted phrase among recognised words (consecutive in reading order, tolerant of
  * punctuation and case). Repeated phrases resolve to the one nearest the model's estimate.
- * Falls back to the best-matching line when at least 60% of the quote's words appear in it.
+ * Falls back only to a complete contiguous quote within a line; descriptions are not quotes.
  */
 export function anchor(
   evidence: string,
@@ -95,17 +95,14 @@ export function anchor(
       : items[0];
   if (hits.length && (hits.length === 1 || estimate)) return { ...nearest(hits), how: 'words' };
   if (hits.length > 1) return null; // ambiguous without a hint
-  const scored = lines
-    .map((l) => {
-      const have = new Set(tokens(l.text));
-      return { l, score: want.filter((w) => have.has(w)).length / want.length };
+  const exact = lines
+    .filter((l) => {
+      const have = tokens(l.text);
+      return have.some((_, i) => want.every((t, j) => have[i + j] === t));
     })
-    .filter((s) => s.score >= 0.6);
-  if (!scored.length) return null;
-  const top = Math.max(...scored.map((s) => s.score));
-  const best = scored.filter((s) => s.score === top).map((s) => ({ box: s.l.box }));
-  if (best.length > 1 && !estimate) return null;
-  const pick = nearest(best).box;
+    .map((l) => ({ box: l.box }));
+  if (!exact.length || (exact.length > 1 && !estimate)) return null;
+  const pick = nearest(exact).box;
   return { box: pick, parts: [pick], how: 'line' };
 }
 /** Compact layout for the model: numbered text lines with rounded positions (percent). */

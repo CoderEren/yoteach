@@ -4215,3 +4215,22 @@ kbd {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.video-lesson {
+  padding: 12px 16px;
+  line-height: 1.5;
+}
+.video-lesson-caption {
+  margin: 8px 0;
+  min-height: 3em;
+}
+.video-lesson summary {
+  cursor: pointer;
+}
+.video-lesson li {
+  margin: 6px 0;
+}
+.video-lesson .text-button {
+  white-space: normal;
+  text-align: left;
+}

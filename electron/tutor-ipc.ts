@@ -36,13 +36,31 @@ export function installTutor(
     path: app.isPackaged ? join(app.getPath('userData'), '.env') : join(root, '.env'),
     quiet: true,
   });
-  const providers = new Providers({
-    elevenKey: process.env.ELEVENLABS_API_KEY ?? '',
-    agentId: process.env.ELEVENLABS_AGENT_ID ?? '',
-    visionKey: process.env.ANTHROPIC_API_KEY ?? '',
-    model: process.env.VISION_MODEL ?? 'claude-sonnet-4-6',
-    quickModel: process.env.QUICK_VISION_MODEL || undefined,
-  });
+  const providers = new Providers(
+    {
+      elevenKey: process.env.ELEVENLABS_API_KEY ?? '',
+      agentId: process.env.ELEVENLABS_AGENT_ID ?? '',
+      visionKey: process.env.ANTHROPIC_API_KEY ?? '',
+      model: process.env.VISION_MODEL ?? 'claude-sonnet-5-5',
+      quickModel: process.env.QUICK_VISION_MODEL || undefined,
+    },
+    undefined,
+    (snapshot) => {
+      // 39 × 39 patches fit the standard vision tier. Keep OCR geometry normalized.
+      const image = nativeImage.createFromDataURL(snapshot.image);
+      const scale = Math.min(1, 1092 / Math.max(snapshot.width, snapshot.height));
+      const width = Math.max(1, Math.round(snapshot.width * scale));
+      const height = Math.max(1, Math.round(snapshot.height * scale));
+      return {
+        ...snapshot,
+        width,
+        height,
+        image:
+          'data:image/jpeg;base64,' +
+          image.resize({ width, height, quality: 'best' }).toJPEG(90).toString('base64'),
+      };
+    },
+  );
   const emit = () => {
     changed();
     for (const w of [main(), pet()])

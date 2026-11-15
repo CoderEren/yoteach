@@ -83,7 +83,7 @@ function setup() {
     width: 1512,
     height: 982,
     capturedAt: new Date().toISOString(),
-    textBoxes: [],
+    textBoxes: vision.regions.map((r) => ({ text: r.evidence, box: r.box })),
   });
   return {
     store,

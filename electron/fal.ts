@@ -6,6 +6,7 @@ import {
   kindOf,
   mediaLimits,
   sniffMedia,
+  type VideoLesson,
   type MediaKind,
   type MediaType,
 } from '../shared/media';
@@ -63,14 +64,30 @@ const wait = (ms: number, signal: AbortSignal) =>
   });
 export class FalError extends Error {}
 /**
- * Known video models get short, silent, bounded clips. Others receive only the prompt, the
+ * Known video models get silent, bounded explanations with time for each step. Others receive the prompt, the
  * one field every fal text-to-video endpoint accepts.
  */
-export function videoInput(model: string, prompt: string) {
+export function videoInput(model: string, prompt: string, lesson?: VideoLesson) {
+  if (/^fal-ai\/kling-video\/v3\/(pro|standard)\/text-to-video$/.test(model) && lesson) {
+    return {
+      multi_prompt: lesson.steps.map((step, i) => ({
+        prompt: `${lesson.scene ?? 'Plain background. Full objects in frame. Stable colors and positions.'} Step ${i + 1}/3: ${step.action} Fixed view. No text.`,
+        duration: '5',
+      })),
+      duration: '15',
+      shot_type: 'customize',
+      aspect_ratio: '16:9',
+      generate_audio: false,
+      enable_safety_checker: true,
+      negative_prompt:
+        'cropped objects, camera motion, morphing, decorative particles, glowing scenery, text, watermarks',
+    };
+  }
   if (model.startsWith('fal-ai/ltx-2.3/'))
     return {
       prompt,
-      duration: 6,
+      duration: model.endsWith('/fast') ? 12 : 10,
+      fps: 25,
       resolution: '1080p',
       aspect_ratio: '16:9',
       generate_audio: false,
@@ -237,6 +254,7 @@ export class FalClient {
     subject: string,
     signal: AbortSignal,
     progress: (p: FalProgress) => void = () => {},
+    lesson?: VideoLesson,
   ): Promise<FalOutput> {
     if (!this.config.key)
       throw new FalError('Add FAL_KEY to .env, then restart yoteach to generate illustrations.');
@@ -247,12 +265,12 @@ export class FalClient {
           ? 'Video generation is off. Set FAL_VIDEO_MODEL in .env to a fal text-to-video model.'
           : 'Set FAL_IMAGE_MODEL in .env to a fal text-to-image model.',
       );
-    const prompt = illustrationPrompt(kind, subject);
+    const prompt = illustrationPrompt(kind, subject, lesson);
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(mediaLimits[kind].timeoutMs)]);
     const input =
       kind === 'image'
         ? { prompt, image_size: 'landscape_4_3', num_images: 1, enable_safety_checker: true }
-        : videoInput(model, prompt);
+        : videoInput(model, prompt, lesson);
     const submitted = Submitted.safeParse(
       await this.call(
         `${QUEUE}/${model}`,

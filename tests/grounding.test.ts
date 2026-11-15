@@ -87,3 +87,15 @@ test('quotes resolve on PDF slides from text runs alone', async () => {
   );
   assert.ok(Math.abs(hit.box.y - 0.4) < 1e-9);
 });
+
+test('visual descriptions and incomplete quotes never snap to loosely related OCR text', () => {
+  const lines = [
+    {
+      text: 'locally released signalling molecule acts on nearby cells',
+      box: { x: 0.2, y: 0.12, width: 0.5, height: 0.02 },
+    },
+  ];
+  assert.equal(anchor('nearby cells release molecule', null, [], lines), null);
+  assert.equal(anchor('molecule acts on distant cells', null, [], lines), null);
+  assert.deepEqual(anchor('acts on nearby cells', null, [], lines)?.box, lines[0].box);
+});
