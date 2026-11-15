@@ -615,6 +615,18 @@ test('Yoyo teaches on the screen: draws on regions, sketches, celebrates, and ca
       clear: true,
     });
     await expect.poll(overlayVisible).toBe(true);
+    // The drawing layer covers the captured display exactly (macOS used to push it below the
+    // menu bar, so every mark landed about 33 pt low).
+    const placed = await app.evaluate(({ BrowserWindow, screen }) => {
+      const w = BrowserWindow.getAllWindows().find((x) =>
+        x.webContents.getURL().includes('/overlay'),
+      )!;
+      const b = w.getBounds(),
+        d = screen.getDisplayMatching(b).bounds;
+      return { window: b, display: d };
+    });
+    expect(placed.window).toEqual(placed.display);
+    await expect(layer.locator('.overlay-stage')).not.toHaveAttribute('style', /translate/);
     await expect(layer.locator('.mark-circle path.ink:not(.leader)')).toHaveCount(1);
     await expect(layer.locator('.ink-label', { hasText: 'ATP is spent here' })).toBeVisible();
     await provider.tool('sketch_diagram', {

@@ -14,8 +14,7 @@ import ImageIO
                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw NSError(domain: "file", code: 1) }
                 let (lines, words) = recognizeText(in: image)
                 let result: [String: Any] = ["width": image.width, "height": image.height, "textBoxes": lines, "words": words]
-                FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: result))
-                return
+                finish(try JSONSerialization.data(withJSONObject: result))
             }
             guard let argument = CommandLine.arguments.dropFirst().first, let id = UInt32(argument) else {
                 throw NSError(domain: "capture", code: 1)
@@ -48,15 +47,27 @@ import ImageIO
                     "textBoxes": lines,
                     "words": words,
                 ]
-                FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: result))
+                finish(try JSONSerialization.data(withJSONObject: result))
             } else {
                 throw NSError(domain: "macOS14Required", code: 1)
             }
         } catch {
-            FileHandle.standardError.write(Data("Screen capture unavailable. Enable Screen Recording for Yoteach in System Settings, then restart. macOS 14 or later is required.\n".utf8))
+            // The first word tells the app which message to show.
+            let domain = (error as NSError).domain
+            let reason = domain == "permission" ? "permission" : domain == "macOS14Required" ? "macos" : "failed"
+            FileHandle.standardError.write(Data("\(reason): \(error)\n".utf8))
             exit(1)
         }
     }
+}
+
+/// Write the result and quit at once. On macOS 26 ScreenCaptureKit and Vision leave work behind
+/// that keeps an async main alive after it returns, so the app waited for a process that never
+/// ended and reported the capture as unavailable.
+func finish(_ data: Data) -> Never {
+    FileHandle.standardOutput.write(data)
+    try? FileHandle.standardOutput.synchronize()
+    exit(0)
 }
 
 /// On-device text recognition with exact positions, so drawings land on the real words.

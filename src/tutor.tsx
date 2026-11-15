@@ -339,7 +339,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
                   (map.pointer
                     ? ` While asking, the student ${map.pointer.kind === 'circle' ? 'circled' : 'pointed at'} something on screen with the cursor (regionId ${map.pointer.regionId}). ${map.pointer.seen ? `It shows: ${map.pointer.seen}` : 'It is a picture or figure without readable text.'}${map.pointer.quote ? ` Text inside: "${map.pointer.quote}".` : ''} "This", "these", "here" or "that" mean it: answer about it, and draw on that regionId. Never say you cannot see what they mean.`
                     : '') +
-                  ' Answer immediately and naturally (never open with "Let\'s look at", "This slide", or "I\'ll draw"; never announce a drawing, just make it). If your answer concerns anything shown on this screen, annotate it in place with draw_on_screen, quoting its exact words (arrows along a mechanism, circle the key term, connect steps with labelled arrows); sketch only what is not on screen. Call analyze_current_screen only for detail this map lacks.'
+                  ' Answer immediately and naturally (never open with "Let\'s look at", "This slide", or "I\'ll draw"; never announce a drawing, just make it). Point at the parts of this screen you talk about with draw_on_screen, quoting their exact words, and show the real thing behind them moving with sketch_on_screen (near: that regionId): the molecules, forces, flows or objects the screen only summarises. Circles and labels alone are not an explanation. Call analyze_current_screen only for detail this map lacks.'
               : 'No screen map is ready. If the question is about the screen, call analyze_current_screen with it; otherwise just answer.',
           );
         }

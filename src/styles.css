@@ -4283,3 +4283,10 @@ kbd {
     transition: none;
   }
 }
+
+/* The overlay's content box: exactly the captured display, shifted back if macOS moved the window. */
+.overlay-stage {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}

@@ -41,7 +41,7 @@ export function installTutor(
       elevenKey: process.env.ELEVENLABS_API_KEY ?? '',
       agentId: process.env.ELEVENLABS_AGENT_ID ?? '',
       visionKey: process.env.ANTHROPIC_API_KEY ?? '',
-      model: process.env.VISION_MODEL ?? 'claude-sonnet-5-5',
+      model: process.env.VISION_MODEL || 'claude-opus-5-5',
       quickModel: process.env.QUICK_VISION_MODEL || undefined,
     },
     undefined,
@@ -113,7 +113,22 @@ export function installTutor(
       timeout: 15000,
       maxBuffer: 16_000_000,
       signal,
-    }).then(({ stdout }) => JSON.parse(stdout));
+    }).then(
+      ({ stdout }) => JSON.parse(stdout),
+      (error: { stdout?: string; stderr?: string; killed?: boolean; message?: string }) => {
+        // A helper that wrote its whole result but did not quit still captured the screen.
+        if (!signal?.aborted && error.stdout?.trim().endsWith('}'))
+          try {
+            return JSON.parse(error.stdout);
+          } catch {
+            /* incomplete output: report the failure below */
+          }
+        console.warn(
+          `[capture] failed${error.killed ? ' (timed out)' : ''}: ${(error.stderr || error.message || '').slice(0, 300)}`,
+        );
+        throw error;
+      },
+    );
   }
   const privateName =
     /(incognito|inprivate|private browsing|private window|password|1password|bitwarden|keychain|safari|chrome|chromium|firefox|microsoft edge|brave|opera|arc browser)/i;
@@ -331,8 +346,12 @@ export function installTutor(
         service.preAnalyze();
       } catch (error) {
         if (ctl.signal.aborted || service.state.sessionId !== id) return;
-        service.state.error =
-          'Screen capture is unavailable. Enable Screen Recording for Yoteach in System Settings and restart. You can still ask a question without the screen.';
+        const why = String((error as { stderr?: string })?.stderr ?? '');
+        service.state.error = why.startsWith('permission')
+          ? 'Screen capture is unavailable. Enable Screen Recording for Yoteach in System Settings and restart. You can still ask a question without the screen.'
+          : why.startsWith('macos')
+            ? 'Seeing your screen needs macOS 14 or later. You can still ask a question without the screen.'
+            : 'I couldn’t see your screen just now. Ask again, or ask without the screen.';
         service.emit();
         throw new Error(service.state.error);
       }

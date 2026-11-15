@@ -141,6 +141,8 @@ export interface DesktopApi {
     interactive(on: boolean): Promise<Result<void>>;
     /** Ask Yoyo to fly beside a box on the overlay (normalized). */
     focus(box: { x: number; y: number; width: number; height: number }): Promise<Result<void>>;
+    /** How far the layer sits from where it was asked to be (macOS can move windows). */
+    onOffset(fn: (offset: { x: number; y: number }) => void): () => void;
     /** Cursor ink while the talk key is held (display-normalised points, t in ms). */
     onTrail(
       fn: (

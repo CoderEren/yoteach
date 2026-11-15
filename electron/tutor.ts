@@ -17,8 +17,21 @@ import type { ScreenDrawing } from '../shared/drawing';
 import { anchor, wordsOf } from '../shared/grounding';
 import { readGesture, type TrailPoint } from '../shared/gesture';
 import { matchSpoken } from '../shared/speech-focus';
-/** Drawings leave the screen by themselves this long after they last changed. */
-export const DRAWING_LIFETIME_MS = 20_000;
+/**
+ * How much may be on screen at once, so annotations and a sketch do not pile up and overlap.
+ * Each call adds a few marks; older ones make way for newer ones.
+ */
+export const SCREEN_LIMITS = {
+  marksPerCall: 3,
+  connectionsPerCall: 2,
+  marks: 5,
+  connections: 3,
+  /** Particles moving along paths (ions, money, data) and travelling signals, per sketch. */
+  flowsPerSketch: 2,
+  pulsesPerSketch: 1,
+} as const;
+/** Drawings leave the screen by themselves this long after Yoyo finishes talking. */
+export const DRAWING_LIFETIME_MS = 15_000;
 const DRAWING_FADE_MS = 900;
 export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): Annotation[] {
   const lines = snapshot.textBoxes,
@@ -139,15 +152,18 @@ export class TutorService {
   }
   private fadeTimer?: ReturnType<typeof setTimeout>;
   private drawingKey = '';
-  /** Every change to the drawing restarts its lifetime; when it ends the drawing fades away. */
+  /**
+   * A drawing stays while Yoyo is explaining it. The countdown starts once the voice has
+   * finished; talking again, or a new drawing, stops it. Then the drawing fades away.
+   */
   private watchDrawing() {
     const d = this.state.drawing;
-    const key = d ? `${d.id}:${d.revision}` : '';
+    const key = d ? `${d.id}:${d.revision}:${this.state.speaking ? 'talking' : 'quiet'}` : '';
     if (key === this.drawingKey) return;
     this.drawingKey = key;
     clearTimeout(this.fadeTimer);
     this.state.drawingFading = false;
-    if (!d) return;
+    if (!d || this.state.speaking) return;
     this.fadeTimer = setTimeout(() => {
       if (this.drawingKey !== key) return;
       this.state.drawingFading = true;
@@ -879,7 +895,8 @@ export class TutorService {
           this.state.annotations = [...this.state.annotations, made].slice(-60);
           return made;
         };
-        const marks = tool.marks.flatMap((m) => {
+        const asked = { marks: tool.marks.length, connections: tool.connections.length };
+        const marks = tool.marks.slice(0, SCREEN_LIMITS.marksPerCall).flatMap((m) => {
           const r = resolve(m.regionId ?? m.quote!);
           return r
             ? [
@@ -894,13 +911,15 @@ export class TutorService {
               ]
             : [];
         });
-        const connections = tool.connections.flatMap((c) => {
-          const a = resolve(c.from),
-            b = resolve(c.to);
-          return a && b
-            ? [{ id: randomUUID(), from: a.box, to: b.box, label: c.label ?? null }]
-            : [];
-        });
+        const connections = tool.connections
+          .slice(0, SCREEN_LIMITS.connectionsPerCall)
+          .flatMap((c) => {
+            const a = resolve(c.from),
+              b = resolve(c.to);
+            return a && b
+              ? [{ id: randomUUID(), from: a.box, to: b.box, label: c.label ?? null }]
+              : [];
+          });
         if (!marks.length && !connections.length)
           throw new Error(
             `Could not find ${missed.map((m) => `"${m}"`).join(', ')} on screen. Quote a few exact words that are visible, or sketch it instead, and keep talking.`,
@@ -910,8 +929,10 @@ export class TutorService {
         const drawing: ScreenDrawing = {
           id: randomUUID(),
           snapshotId: snapshot.id,
-          marks: [...(previous?.marks ?? []), ...marks],
-          connections: [...(previous?.connections ?? []), ...connections],
+          marks: [...(previous?.marks ?? []), ...marks].slice(-SCREEN_LIMITS.marks),
+          connections: [...(previous?.connections ?? []), ...connections].slice(
+            -SCREEN_LIMITS.connections,
+          ),
           diagram: this.state.drawing?.diagram ?? null,
           sketch: this.state.drawing?.sketch ?? null,
           revision: (this.state.drawing?.revision ?? 0) + 1,
@@ -935,9 +956,20 @@ export class TutorService {
           drawn: drawing.marks.length + drawing.connections.length,
           where:
             snapshot.source.kind === 'pdf' ? 'on the lecture slide' : 'on the student’s screen',
-          note: missed.length
-            ? `Drawn, except ${missed.map((m) => `"${m}"`).join(', ')} which is not visible as written.`
-            : 'Drawn with a short animation. Refer to it naturally while you explain.',
+          note: [
+            missed.length
+              ? `Drawn, except ${missed.map((m) => `"${m}"`).join(', ')} which is not visible as written.`
+              : 'Drawn with a short animation.',
+            asked.marks > SCREEN_LIMITS.marksPerCall ||
+            asked.connections > SCREEN_LIMITS.connectionsPerCall
+              ? `Only the first ${SCREEN_LIMITS.marksPerCall} marks and ${SCREEN_LIMITS.connectionsPerCall} connections were drawn, to keep the screen readable: mark the next part when you reach it.`
+              : '',
+            this.state.drawing?.sketch || this.state.drawing?.diagram
+              ? 'Refer to it naturally while you explain.'
+              : 'These marks only point. If the idea has a mechanism behind it, show that moving with one sketch_on_screen (near: one of these regionIds).',
+          ]
+            .filter(Boolean)
+            .join(' '),
         };
       }
       case 'sketch_diagram': {
@@ -971,7 +1003,16 @@ export class TutorService {
           diagram: null,
           sketch: {
             title: tool.title,
-            elements: tool.elements,
+            // A couple of moving parts read as a mechanism; more turns into noise.
+            elements: tool.elements.filter((e, i, all) => {
+              const limit =
+                e.type === 'flow'
+                  ? SCREEN_LIMITS.flowsPerSketch
+                  : e.type === 'pulse'
+                    ? SCREEN_LIMITS.pulsesPerSketch
+                    : Infinity;
+              return all.slice(0, i + 1).filter((x) => x.type === e.type).length <= limit;
+            }),
             captions: tool.captions,
             size: tool.size,
             near: near?.box ?? null,

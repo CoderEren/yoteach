@@ -154,6 +154,10 @@ export function installDesktop(options: {
       layer.setBounds(want);
     }
     if (!layer.isVisible()) layer.showInactive();
+    // If macOS still moved the layer, the drawings shift back by the difference so they stay on
+    // the words and pictures they mark.
+    const got = layer.getBounds();
+    layer.webContents.send('overlay:offset', { x: want.x - got.x, y: want.y - got.y });
   }
   let tour: ReturnType<typeof setTimeout>[] = [];
   const stopTour = () => {
