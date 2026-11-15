@@ -1,0 +1,43 @@
+
+Running 1 test using 1 worker
+
+(node:5954) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/tutor.e2e.ts:895:1 › Stage 3 demo: lecture → fal media → saved restart → replay (12.1s)
+
+
+  1) tests/tutor.e2e.ts:895:1 › Stage 3 demo: lecture → fal media → saved restart → replay ─────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('dialog', { name: /Delete walkthrough/ })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('dialog', { name: /Delete walkthrough/ }) with timeout 5000ms
+      - waiting for getByRole('dialog', { name: /Delete walkthrough/ })
+
+
+      960 |     await walk.getByRole('button', { name: /Delete walkthrough/ }).click();
+      961 |     const confirmation = page.getByRole('dialog', { name: /Delete walkthrough/ });
+    > 962 |     await expect(confirmation).toBeVisible();
+          |                                ^
+      963 |     await expect(confirmation).toContainText('Your PDF stays in Saved material');
+      964 |     await page.screenshot({ path: 'docs/overnight/cycle-2/after.png' });
+      965 |     await page.keyboard.press('Escape');
+        at /Users/eersin937/Desktop/YoTeach/tests/tutor.e2e.ts:962:32
+
+    Error Context: test-results/tutor.e2e.ts-Stage-3-demo--206d8-ia-→-saved-restart-→-replay/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tutor.e2e.ts-Stage-3-demo--206d8-ia-→-saved-restart-→-replay/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tutor.e2e.ts-Stage-3-demo--206d8-ia-→-saved-restart-→-replay/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/tutor.e2e.ts:895:1 › Stage 3 demo: lecture → fal media → saved restart → replay ──────────

@@ -4,6 +4,7 @@ import type { AppState } from '../../shared/model';
 import type { Chat } from '../../shared/tutor';
 import { api, unwrap } from '../api';
 import { useTutor } from '../tutor';
+import { Modal } from './Modal';
 import { LectureReplay } from './LectureReplay';
 
 /** Lectures Yoyo has walked through, with replay; plus starting a new walkthrough. */
@@ -20,7 +21,9 @@ export function Lectures({
 }) {
   const { runtime: r, act } = useTutor();
   const [replay, setReplay] = useState<Chat | null>(null),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [remove, setRemove] = useState<Chat | null>(null),
+    [deleting, setDeleting] = useState(false);
   // Start failures (microphone permission, connection) used to vanish; show them here.
   useEffect(() => {
     const fn = (e: Event) => setError((e as CustomEvent<string>).detail);
@@ -114,9 +117,7 @@ export function Lectures({
                 <button
                   className="icon-button small danger-subtle"
                   aria-label={`Delete walkthrough of ${doc.originalName}`}
-                  onClick={() =>
-                    void unwrap(api.tutor.deleteChat(c.id)).catch((e) => setError(String(e)))
-                  }
+                  onClick={() => setRemove(c)}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -126,6 +127,42 @@ export function Lectures({
         </ul>
       ) : (
         <p className="walkthroughs-empty">Lectures you run through appear here to replay.</p>
+      )}
+      {remove && (
+        <Modal
+          title={`Delete walkthrough of “${data.documents.find((d) => d.id === remove.documentId)?.originalName}”?`}
+          onClose={() => {
+            if (!deleting) setRemove(null);
+          }}
+        >
+          <p>
+            This removes its narration and drawings from this Mac. Your PDF stays in Saved material.
+            Provider-side records are not affected.
+          </p>
+          <div className="form-actions">
+            <button className="button" disabled={deleting} onClick={() => setRemove(null)}>
+              Keep walkthrough
+            </button>
+            <button
+              className="button danger"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  await unwrap(api.tutor.deleteChat(remove.id));
+                  setRemove(null);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e));
+                  setRemove(null);
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? 'Deleting…' : 'Delete walkthrough'}
+            </button>
+          </div>
+        </Modal>
       )}
     </section>
   );
