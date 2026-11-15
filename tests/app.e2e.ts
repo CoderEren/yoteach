@@ -62,13 +62,25 @@ test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion
     await page.getByRole('button', { name: 'Close dialog' }).click();
     await page.screenshot({ path: '.impeccable/review/lecture-library.png' });
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    for (const theme of ['Light', 'System', 'Dark']) {
+      await page.getByRole('radio', { name: theme, exact: true }).click();
+      await expect(page.getByRole('radio', { name: theme, exact: true })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    }
     await page.getByRole('radio', { name: 'Dark', exact: true }).click();
     await expect(page.getByRole('radio', { name: 'Dark', exact: true })).toHaveAttribute(
       'aria-checked',
       'true',
     );
     await page.screenshot({ path: '.impeccable/review/settings.png' });
-    await page.getByLabel('Global talk key').selectOption('f8');
+    for (const key of ['control', 'right-control', 'fn', 'right-option', 'f8']) {
+      await page.getByLabel('Global talk key').selectOption(key);
+      await expect(page.getByLabel('Global talk key')).toHaveValue(key);
+    }
+    await page.getByRole('switch', { name: 'Offer help' }).check();
+    await page.getByRole('switch', { name: 'Offer help' }).uncheck();
     await page.getByRole('button', { name: 'Close dialog' }).click();
     await page.screenshot({ path: '.impeccable/review/lecture-dark.png' });
     const pet = app.windows().find((w) => w.url().includes('/companion'))!;
@@ -105,6 +117,35 @@ test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion
       await window.yoteach.drag({ phase: 'move', x: 300, y: 240 });
       await window.yoteach.drag({ phase: 'end', x: 300, y: 240 });
     });
+    for (const [x, y] of [
+      [-10000, -10000],
+      [10000, -10000],
+      [10000, 10000],
+      [-10000, 10000],
+    ]) {
+      await pet.evaluate(
+        async ({ x, y }) => {
+          await window.yoteach.drag({ phase: 'start', x: 100, y: 100 });
+          await window.yoteach.drag({ phase: 'move', x, y });
+          await window.yoteach.drag({ phase: 'end', x, y });
+        },
+        { x, y },
+      );
+      expect(
+        await app.evaluate(({ BrowserWindow, screen }) => {
+          const b = BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('/companion'))!
+            .getBounds();
+          const a = screen.getDisplayMatching(b).workArea;
+          return (
+            b.x >= a.x &&
+            b.y >= a.y &&
+            b.x + b.width <= a.x + a.width &&
+            b.y + b.height <= a.y + a.height
+          );
+        }),
+      ).toBe(true);
+    }
     const position = await page.evaluate(() => window.yoteach.getState());
     expect(position.ok && position.value.settings.mascotPosition).toBeTruthy();
     await pet.screenshot({ path: '.impeccable/review/yoyo-idle.png', animations: 'disabled' });
@@ -133,6 +174,8 @@ test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion
     ).toBeVisible();
     const restored = await page.evaluate(() => window.yoteach.getState());
     expect(restored.ok && restored.value.settings.talkKey).toBe('f8');
+    expect(restored.ok && restored.value.settings.theme).toBe('dark');
+    expect(restored.ok && restored.value.settings.proactiveHelp).toBe(false);
     expect(restored.ok && restored.value.settings.mascotPosition).toEqual(
       position.ok && position.value.settings.mascotPosition,
     );

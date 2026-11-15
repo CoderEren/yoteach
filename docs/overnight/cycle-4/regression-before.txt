@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+(node:22259) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 tests/tutor.e2e.ts:898:1 › Stage 3 demo: lecture → fal media → saved restart → replay (8.6s)
+
+  1 passed (9.0s)

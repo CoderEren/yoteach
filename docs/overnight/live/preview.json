@@ -1,0 +1,7 @@
+{
+  "source": "public/sample-lecture.pdf in Preview",
+  "gate": "/var/folders/7w/5602n7210vvbjzzwjqggszj00000gn/T/yoteach-approved-screen-ybxaMm/ready",
+  "realCapture": true,
+  "realVision": false,
+  "error": "Error: Local sample-only validation rejected the captured display; no Anthropic upload."
+}

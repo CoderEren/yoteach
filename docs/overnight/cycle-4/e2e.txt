@@ -1,0 +1,19 @@
+
+Running 11 tests using 1 worker
+
+(node:30699) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore (6.1s)
+  -   2 tests/app.e2e.ts:189:1 › packaged Yoteach starts with its own identity and isolated data
+  ✓   3 tests/tutor.e2e.ts:179:1 › full-screen lecture teaches, grounds six tools, accepts questions and preserves history (6.2s)
+  ✓   4 tests/tutor.e2e.ts:287:1 › held microphone streams only while held, captures screen, cancels drag and stops on pause (20.0s)
+  ✓   5 tests/tutor.e2e.ts:417:1 › proactive help: a screen held too long gets one on-device "Stuck?" offer (6.2s)
+  ✓   6 tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect (6.4s)
+  ✓   7 tests/tutor.e2e.ts:515:1 › Yoyo teaches on the screen: draws on regions, sketches, celebrates, and captures each held question (11.6s)
+  ✓   8 tests/tutor.e2e.ts:752:1 › images Yoyo makes with fal show progress, explain failure and survive restart (10.4s)
+  ✓   9 tests/tutor.e2e.ts:898:1 › Stage 3 demo: lecture → fal media → saved restart → replay (9.1s)
+  ✓  10 tests/tutor.e2e.ts:1000:1 › flow particles stay separated on short paths and respect live reduced-motion changes (3.8s)
+  ✓  11 tests/tutor.e2e.ts:1062:1 › recorded live answers render across twelve subjects (9.9s)
+
+  1 skipped
+  10 passed (1.5m)

@@ -1,0 +1,27 @@
+
+> yoteach@0.1.0 prebuild
+> node scripts/assets.mjs
+
+
+> yoteach@0.1.0 build
+> tsc --noEmit && vite build && node scripts/build-electron.mjs
+
+vite v8.3.8 building client environment for production...
+transforming...
+✓ 1744 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              0.35 kB │ gzip:   0.26 kB
+dist/assets/pdf.worker.min-CIqJB0yW.mjs  1,271.91 kB
+dist/assets/index-BRWjxibM.css              61.68 kB │ gzip:  13.34 kB
+dist/assets/PdfViewer-BI2cppbp.js            5.55 kB │ gzip:   2.36 kB
+dist/assets/web-DaKDFj7N.js                 34.60 kB │ gzip:  10.22 kB
+dist/assets/pdf-BzdYyuh9.js                444.97 kB │ gzip: 134.17 kB
+dist/assets/index-D2PR2bk6.js            1,047.72 kB │ gzip: 304.19 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 353ms

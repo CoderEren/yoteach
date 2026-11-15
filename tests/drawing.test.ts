@@ -513,3 +513,18 @@ test('circling a picture with no words still tells the tutor what it shows', asy
     f.cleanup();
   }
 });
+
+test('live text elements using label retain their teaching labels without overriding explicit text', () => {
+  const sketch = SketchSchema.parse({
+    title: 'Voltage',
+    elements: [
+      { type: 'text', at: [50, 11], label: 'Depolarization (+30mV)' },
+      { type: 'text', at: [60, 57], label: 'Wrong fallback', text: 'Repolarization' },
+      { type: 'text', at: [20, 20], label: 123 },
+    ],
+  });
+  assert.deepEqual(
+    sketch.elements.filter((e) => e.type === 'text').map((e) => e.text),
+    ['Depolarization (+30mV)', 'Repolarization'],
+  );
+});

@@ -1,0 +1,56 @@
+
+Running 11 tests using 1 worker
+
+(node:23269) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/app.e2e.ts:21:1 › Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion and restore (4.8s)
+  -   2 tests/app.e2e.ts:146:1 › packaged Yoteach starts with its own identity and isolated data
+  ✓   3 tests/tutor.e2e.ts:179:1 › full-screen lecture teaches, grounds six tools, accepts questions and preserves history (5.5s)
+  ✓   4 tests/tutor.e2e.ts:287:1 › held microphone streams only while held, captures screen, cancels drag and stops on pause (19.1s)
+  ✓   5 tests/tutor.e2e.ts:417:1 › proactive help: a screen held too long gets one on-device "Stuck?" offer (5.5s)
+  ✓   6 tests/tutor.e2e.ts:466:1 › failed voice startup releases listening and the next hold can connect (5.8s)
+  ✓   7 tests/tutor.e2e.ts:515:1 › Yoyo teaches on the screen: draws on regions, sketches, celebrates, and captures each held question (10.4s)
+  ✓   8 tests/tutor.e2e.ts:752:1 › images Yoyo makes with fal show progress, explain failure and survive restart (8.8s)
+  ✓   9 tests/tutor.e2e.ts:898:1 › Stage 3 demo: lecture → fal media → saved restart → replay (7.7s)
+  ✓  10 tests/tutor.e2e.ts:991:1 › flow particles stay separated on short paths and respect live reduced-motion changes (3.2s)
+  ✘  11 tests/tutor.e2e.ts:1053:1 › recorded live answers render across twelve subjects (2.0s)
+
+
+  1) tests/tutor.e2e.ts:1053:1 › recorded live answers render across twelve subjects ───────────────
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('.sketch-canvas svg')
+    Expected pattern: /.+/
+    Error: strict mode violation: locator('.sketch-canvas svg') resolved to 2 elements:
+        1) <svg width="15" height="15" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" xmlns="http://www.w3.org/2000/svg">…</svg> aka getByRole('button', { name: 'Clear Yoyo’s drawing' })
+        2) <svg role="img" width="560" height="400" viewBox="-2 -2 104 74" aria-label="Neuron Action Potential">…</svg> aka getByRole('img', { name: 'Neuron Action Potential' })
+
+    Call log:
+      - Expect "toHaveAttribute" locator('.sketch-canvas svg') with timeout 5000ms
+      - waiting for locator('.sketch-canvas svg')
+
+
+      1074 |         .locator('.sketch-canvas')
+      1075 |         .screenshot({ path: `docs/overnight/live/sketch-${row.subject}.png` });
+    > 1076 |       await expect(layer.locator('.sketch-canvas svg')).toHaveAttribute('aria-label', /.+/);
+           |                                                         ^
+      1077 |     }
+      1078 |   } finally {
+      1079 |     await app?.close();
+        at /Users/eersin937/Desktop/YoTeach/tests/tutor.e2e.ts:1076:57
+
+    Error Context: test-results/tutor.e2e.ts-recorded-live-42809-nder-across-twelve-subjects/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tutor.e2e.ts-recorded-live-42809-nder-across-twelve-subjects/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tutor.e2e.ts-recorded-live-42809-nder-across-twelve-subjects/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/tutor.e2e.ts:1053:1 › recorded live answers render across twelve subjects ────────────────
+  1 skipped
+  9 passed (1.2m)

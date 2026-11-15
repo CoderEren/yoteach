@@ -13,6 +13,21 @@ function setup() {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
+test('partial settings changes preserve a chosen talk key across restart', () => {
+  const { dir, store, cleanup } = setup();
+  try {
+    store.command({ type: 'settings.update', talkKey: 'f8' });
+    store.command({ type: 'settings.update', proactiveHelp: false });
+    assert.equal(store.snapshot().settings.talkKey, 'f8');
+    store.command({ type: 'settings.update', theme: 'dark' });
+    const settings = new Store(dir).snapshot().settings;
+    assert.equal(settings.talkKey, 'f8');
+    assert.equal(settings.proactiveHelp, false);
+    assert.equal(settings.theme, 'dark');
+  } finally {
+    cleanup();
+  }
+});
 test('courses, nested topics, notes and settings survive reopening', () => {
   const { dir, store, cleanup } = setup();
   try {

@@ -30,3 +30,18 @@ Caps: fal 40 images / 4 videos; Anthropic approximately 400 live calls; ElevenLa
 | 2026-11-15T02:36:05.542Z | ElevenLabs | 1 conversation attempt | after: language |
 | 2026-11-15T02:36:18.107Z | ElevenLabs | 1 conversation attempt | after: literature |
 | 2026-11-15T08:34:07.718Z | fal | 1 image attempt | Live Electron result and restart check |
+| 2026-11-15T08:36:04.801Z | fal | 1 image attempt | Live Electron result and restart check |
+| 2026-11-15T08:36:19.808Z | fal | 1 image attempt | Live Electron result and restart check |
+| 2026-11-15T08:36:25.346Z | fal | 1 video attempt | Live Electron result and restart check |
+| 2026-11-15T08:50:24.365Z | Anthropic | 2 call attempts | Approved sample Preview inventory and analysis |
+| 2026-11-15T08:52:30.438Z | Anthropic | 2 call attempts | Approved sample Preview inventory and analysis |
+| 2026-11-15T09:02:35.319Z | Anthropic | 2 call attempts | Approved sample Preview inventory and analysis |
+
+## Final accounting
+
+- ElevenLabs: **25 conversation attempts / 80**, comprising 24 completed text conversations plus one DNS failure before connection. No additional voice conversations.
+- fal images: **3 logged attempts / 40**, but only **1 provider generation**; two harness failures occurred before the request.
+- fal videos: **1 generation / 4**.
+- Direct Anthropic: **6 reserved call attempts / approximately 400**, with **2 actual requests** (inventory + analysis) on the unexpected desktop capture. First screen harness failed before capture; the guarded retry rejected locally before network.
+- No actual currency total is claimed: provider billing was not queried. Counts stay below every cap. Agent sync/auth requests are configuration operations, not conversations.
+- See REPORT.md for the capture incident. No unexpected screen image or OCR is retained in committed evidence.

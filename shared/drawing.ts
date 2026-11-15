@@ -360,7 +360,19 @@ export const SketchSchema = z.object({
     .transform((items) =>
       items
         .flatMap((item) => {
-          const r = SketchElementSchema.safeParse(item);
+          // Hosted agents sometimes use the common label field for a text element.
+          // Preserve that text rather than silently dropping the whole element.
+          const candidate =
+            item &&
+            typeof item === 'object' &&
+            'type' in item &&
+            item.type === 'text' &&
+            !('text' in item) &&
+            'label' in item &&
+            typeof item.label === 'string'
+              ? { ...item, text: item.label }
+              : item;
+          const r = SketchElementSchema.safeParse(candidate);
           return r.success ? [r.data] : [];
         })
         .slice(0, 40),
