@@ -62,6 +62,8 @@ export function installDesktop(options: {
     startedAt: number;
     points: TrailPoint[];
     shown: boolean;
+    moved: boolean;
+    ticks: number;
     timer: ReturnType<typeof setInterval>;
   } | null = null;
   let trailShown: Electron.Rectangle | null = null,
@@ -77,6 +79,8 @@ export function installDesktop(options: {
       startedAt,
       points: [],
       shown: false,
+      moved: false,
+      ticks: 0,
       timer: setInterval(() => {
         const c = screen.getCursorScreenPoint();
         const p = {
@@ -99,8 +103,19 @@ export function installDesktop(options: {
           overlay()?.webContents.send('overlay:trail', { type: 'start', points: t.points });
           return;
         }
-        if (!prev || prev.x !== p.x || prev.y !== p.y)
+        if (!prev || prev.x !== p.x || prev.y !== p.y) {
           overlay()?.webContents.send('overlay:trail', { type: 'add', point: p });
+          t.moved = true;
+        }
+        // Share the path as it grows, so a circled picture is understood before release.
+        if (t.moved && ++t.ticks % 25 === 0) {
+          t.moved = false;
+          options.trail?.({
+            startedAt,
+            points: t.points.slice(),
+            aspect: bounds.width / bounds.height,
+          });
+        }
       }, 16),
     };
     trailing = t;

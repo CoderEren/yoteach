@@ -51,6 +51,12 @@ function setup() {
       async (url, init) => {
         if (String(url).includes('elevenlabs'))
           return new Response(JSON.stringify({ signed_url: 'wss://api.elevenlabs.io/x' }));
+        if (String(init?.body).includes('part of their screen with the cursor'))
+          return new Response(
+            JSON.stringify({
+              content: [{ type: 'text', text: 'A receptor protein spanning the cell membrane.' }],
+            }),
+          );
         // The quick screen map and the question-specific analysis have different shapes.
         const map = String(init?.body).includes('You map a screenshot');
         const body = map ? { summary: vision.explanation, regions: vision.regions } : vision;
@@ -486,6 +492,27 @@ test('circling words with the cursor while asking becomes a region the tutor is 
     f.service.setTrail({ startedAt: Date.now() + 60_000, points: ring, aspect: 1.5 });
     f.service.acceptSnapshot(f.screenStill());
     assert.equal(await f.service.screenMap(10), null);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('circling a picture with no words still tells the tutor what it shows', async () => {
+  const f = setup();
+  try {
+    await f.service.start(null, 'voice');
+    f.service.state.sharing = 'screen';
+    // A hand-drawn loop that does not quite close (about 85% of a full turn).
+    const ring = Array.from({ length: 50 }, (_, k) => {
+      const a = (k / 50) * 1.7 * Math.PI + 0.3;
+      return { x: 0.6 + 0.06 * Math.cos(a), y: 0.5 + 0.07 * Math.sin(a), t: k * 16 };
+    });
+    f.service.setTrail({ startedAt: Date.now() - 50, points: ring, aspect: 1.5 });
+    f.service.acceptSnapshot(f.screenStill());
+    const map = await f.service.screenMap(500);
+    assert.equal(map?.pointer?.kind, 'circle');
+    assert.equal(map!.pointer!.quote, '');
+    assert.equal(map!.pointer!.seen, 'A receptor protein spanning the cell membrane.');
   } finally {
     f.cleanup();
   }
