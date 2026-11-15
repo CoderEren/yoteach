@@ -205,8 +205,11 @@ export function installTutor(
       if (action.type === 'hold-cancel') service.state.activity = 'idle';
       if (action.type === 'hold-cancel') {
         earlyCapture = null;
-        if (action.reason === 'silent') {
-          service.state.notice = 'I didn’t hear anything. Hold and speak.';
+        if (action.reason) {
+          service.state.notice =
+            action.reason === 'silent'
+              ? 'I didn’t hear anything. Hold and speak.'
+              : 'Sorry, I lost that one. Please ask again.';
           setTimeout(() => {
             service.state.notice = null;
             service.emit();
@@ -237,6 +240,20 @@ export function installTutor(
   }
   handle('tutor:intent', intent);
   handle('tutor:screen-map', () => service.screenMap(), true);
+  handle('tutor:prepare-slide', (input) => service.prepareSlide(input), true);
+  handle(
+    'tutor:slide-briefing',
+    (input) =>
+      service.slideBriefing(
+        z
+          .number()
+          .int()
+          .min(0)
+          .max(30000)
+          .parse(input ?? 2500),
+      ),
+    true,
+  );
   handle(
     'tutor:capture-screen',
     async () => {

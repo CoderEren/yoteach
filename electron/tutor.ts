@@ -11,7 +11,7 @@ import {
   type TutorTool,
 } from '../shared/tutor';
 import { Store } from './store';
-import { Providers, type VisionAnswer } from './providers';
+import { Providers, type SlidePrep, type VisionAnswer } from './providers';
 import { FalClient } from './fal';
 import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
 import type { ScreenDrawing } from '../shared/drawing';
@@ -74,6 +74,72 @@ export class TutorService {
   private connecting?: AbortController;
   private generating?: AbortController;
   private celebrating?: ReturnType<typeof setTimeout>;
+  /** Slides read ahead in the background, per document and page. */
+  private slides = new Map<string, { done: Promise<void>; prep: SlidePrep | null }>();
+  /** Start reading a lecture slide ahead of time (fast model). Repeated calls are free. */
+  prepareSlide(raw: unknown) {
+    const snapshot = SnapshotSchema.parse(raw);
+    if (snapshot.source.kind !== 'pdf') throw new Error('Only lecture slides are prepared.');
+    const source = snapshot.source;
+    const doc = this.store.snapshot().documents.find((d) => d.id === source.documentId);
+    if (!doc || source.page > doc.pageCount) throw new Error('That slide is unavailable.');
+    const key = `${doc.id}:${source.page}`;
+    if (this.slides.has(key)) return { queued: false };
+    const entry = { prep: null as SlidePrep | null, done: Promise.resolve() };
+    entry.done = this.providers
+      .slidePrep(
+        snapshot,
+        { name: doc.originalName, page: source.page, total: doc.pageCount },
+        AbortSignal.timeout(40000),
+      )
+      .then((prep) => {
+        entry.prep = prep;
+      })
+      .catch(() => {
+        this.slides.delete(key); // allow a retry
+      });
+    this.slides.set(key, entry);
+    if (this.slides.size > 600) this.slides.delete(this.slides.keys().next().value!);
+    return { queued: true };
+  }
+  /**
+   * What the tutor needs for the slide on screen: its weight (teach / brief / skip), a summary,
+   * key points, regions pinned to this slide's words, and the next slide worth teaching.
+   */
+  async slideBriefing(waitMs = 2500) {
+    const snapshot = this.state.snapshot,
+      lecture = this.state.lecture;
+    if (!snapshot || snapshot.source.kind !== 'pdf' || !lecture) return null;
+    const source = snapshot.source;
+    const entry = this.slides.get(`${source.documentId}:${source.page}`);
+    if (!entry) return null;
+    await Promise.race([entry.done, new Promise((r) => setTimeout(r, waitMs))]);
+    const prep = entry.prep;
+    if (!prep || this.state.snapshot?.id !== snapshot.id) return null;
+    const regions = groundRegions(snapshot, { explanation: prep.summary, regions: prep.regions });
+    this.state.annotations = [...this.state.annotations, ...regions].slice(-40);
+    this.emit();
+    let nextTeach: number | null = null;
+    for (let p = source.page + 1; p <= lecture.total; p++) {
+      const k = this.slides.get(`${source.documentId}:${p}`)?.prep?.kind;
+      if (!k) break; // not read yet: unknown
+      if (k !== 'skip') {
+        nextTeach = p;
+        break;
+      }
+    }
+    return {
+      slide: source.page,
+      total: lecture.total,
+      kind: prep.kind,
+      why: prep.reason,
+      summary: prep.summary,
+      keyPoints: prep.keyPoints,
+      regions: regions.map((a) => ({ regionId: a.id, label: a.label, evidence: a.evidence })),
+      snapshotId: snapshot.id,
+      nextTeachingSlide: nextTeach,
+    };
+  }
   private inventory?: {
     snapshotId: string;
     done: Promise<void>;
@@ -810,7 +876,12 @@ export class TutorService {
           marks: current?.marks ?? [],
           connections: current?.connections ?? [],
           diagram: null,
-          sketch: { title: tool.title, elements: tool.elements, near: near?.box ?? null },
+          sketch: {
+            title: tool.title,
+            elements: tool.elements,
+            captions: tool.captions,
+            near: near?.box ?? null,
+          },
           revision: (current?.revision ?? 0) + 1,
         };
         if (near) {

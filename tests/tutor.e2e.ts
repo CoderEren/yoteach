@@ -202,7 +202,9 @@ test('full-screen lecture teaches, grounds six tools, accepts questions and pres
     await expect
       .poll(() =>
         provider.messages.some(
-          (m) => m.type === 'user_message' && m.text.includes('Run me through'),
+          (m) =>
+            m.type === 'user_message' &&
+            /Teach this slide now|no teachable content|only introduces/.test(m.text),
         ),
       )
       .toBe(true);
@@ -295,12 +297,9 @@ test('held microphone streams only while held, captures screen, cancels drag and
     await page.mouse.down();
     await expect.poll(async () => (await runtime(page)).input).toBe('listening');
     await expect.poll(async () => (await runtime(page)).snapshot?.source.kind).toBe('screen');
-    // The question streams live while held, flagged as the student still speaking, so
-    // little is left to send on release.
+    // The question streams live while held, so little is left to send on release. No
+    // user_activity: it postponed the server's end-of-turn check and lost questions.
     await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
-    await expect
-      .poll(() => provider.messages.filter((m) => m.type === 'user_activity').length)
-      .toBeGreaterThan(0);
     const pet = app.windows().find((w) => w.url().includes('/companion'))!;
     await expect(pet.locator('.input-listening')).toBeVisible();
     await page.waitForTimeout(500);
@@ -308,6 +307,7 @@ test('held microphone streams only while held, captures screen, cancels drag and
     await page.mouse.up();
     await expect.poll(() => provider.chunks()).toBeGreaterThan(held);
     await expect.poll(async () => (await runtime(page)).input).toBe('idle');
+    expect(provider.messages.filter((m) => m.type === 'user_activity')).toHaveLength(0);
     // Nothing more leaves once the hold is over.
     const after = provider.chunks();
     await page.waitForTimeout(600);

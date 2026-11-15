@@ -175,9 +175,22 @@ export function layoutDiagram(d: Diagram): LaidOut {
 
 // Free-form sketch on a 100 × 70 canvas (y grows downward). The tutor draws what a diagram
 // cannot: vectors, graphs, geometry, annotated shapes.
-const Pt = z.tuple([z.number().min(0).max(100), z.number().min(0).max(70)]);
-const Tone = z.enum(['ink', 'accent', 'muted']).optional();
-const Short = z.string().trim().min(1).max(40);
+// Lenient by design: a slightly-off coordinate or long label is fixed up, never a failed drawing.
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const Pt = z
+  .tuple([z.number(), z.number()])
+  .transform(([x, y]) => [clamp(x, 0, 100), clamp(y, 0, 70)] as [number, number]);
+const Tone = z.enum(['ink', 'accent', 'muted']).optional().catch(undefined);
+const Short = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((t) => t.slice(0, 40));
+/** Animation: which build step an element appears in, and where it slides afterwards. */
+const Motion = {
+  step: z.number().int().min(1).max(8).optional().catch(undefined),
+  moveTo: Pt.optional().catch(undefined),
+};
 export const SketchElementSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('arrow'),
@@ -186,6 +199,7 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     label: Short.optional(),
     dashed: z.boolean().optional(),
     tone: Tone,
+    ...Motion,
   }),
   z.object({
     type: z.literal('line'),
@@ -194,41 +208,86 @@ export const SketchElementSchema = z.discriminatedUnion('type', [
     label: Short.optional(),
     dashed: z.boolean().optional(),
     tone: Tone,
+    ...Motion,
   }),
   z.object({
     type: z.literal('curve'),
-    points: z.array(Pt).min(2).max(24),
+    points: z
+      .array(Pt)
+      .min(2)
+      .transform((p) => p.slice(0, 40)),
     label: Short.optional(),
     dashed: z.boolean().optional(),
     tone: Tone,
+    ...Motion,
   }),
   z.object({
     type: z.literal('circle'),
     at: Pt,
-    r: z.number().min(1).max(35),
+    r: z.number().transform((r) => clamp(r, 1, 35)),
     label: Short.optional(),
     tone: Tone,
+    ...Motion,
   }),
   z.object({
     type: z.literal('box'),
     at: Pt,
-    w: z.number().min(2).max(100),
-    h: z.number().min(2).max(70),
+    w: z.number().transform((w) => clamp(w, 2, 100)),
+    h: z.number().transform((h) => clamp(h, 2, 70)),
     label: Short.optional(),
     tone: Tone,
+    ...Motion,
   }),
-  z.object({ type: z.literal('dot'), at: Pt, label: Short.optional(), tone: Tone }),
-  z.object({ type: z.literal('text'), at: Pt, text: z.string().trim().min(1).max(60), tone: Tone }),
+  z.object({ type: z.literal('dot'), at: Pt, label: Short.optional(), tone: Tone, ...Motion }),
+  z.object({
+    type: z.literal('text'),
+    at: Pt,
+    text: z
+      .string()
+      .trim()
+      .min(1)
+      .transform((t) => t.slice(0, 60)),
+    tone: Tone,
+    ...Motion,
+  }),
   z.object({
     type: z.literal('axes'),
     origin: Pt,
     xLabel: Short.optional(),
     yLabel: Short.optional(),
+    ...Motion,
   }),
 ]);
 export type SketchElement = z.infer<typeof SketchElementSchema>;
 export const SketchSchema = z.object({
-  title: z.string().trim().min(1).max(60),
-  elements: z.array(SketchElementSchema).min(1).max(30),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .transform((t) => t.slice(0, 60)),
+  // Keep every element that parses; drop the odd malformed one instead of failing the sketch.
+  elements: z
+    .array(z.unknown())
+    .min(1)
+    .transform((items) =>
+      items
+        .flatMap((item) => {
+          const r = SketchElementSchema.safeParse(item);
+          return r.success ? [r.data] : [];
+        })
+        .slice(0, 40),
+    )
+    .refine((items) => items.length > 0, 'No drawable elements.'),
+  /** One caption per build step, shown under the sketch as it plays. */
+  captions: z
+    .array(
+      z
+        .string()
+        .trim()
+        .transform((t) => t.slice(0, 120)),
+    )
+    .max(8)
+    .optional()
+    .catch(undefined),
 });
 export type Sketch = z.infer<typeof SketchSchema>;

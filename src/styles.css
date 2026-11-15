@@ -4488,3 +4488,24 @@ kbd {
     display: none;
   }
 }
+/* Sketch scenes: one consistent frame with a caption bar per build step. */
+.sketch-canvas figcaption span i {
+  font-style: normal;
+  display: inline-block;
+}
+.sketch-caption {
+  margin: 8px 2px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(106, 69, 216, 0.08);
+  color: #2b2350;
+  font-size: 14px;
+  line-height: 1.45;
+  animation: caption-in 0.3s ease-out;
+}
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}

@@ -26,7 +26,11 @@ export class HoldAudio {
   private sent = 0;
   private pump?: ReturnType<typeof setInterval>;
   private pumping = false;
-  private lastActivity = 0;
+  private heard = false;
+  /** The server has transcribed the released question; trailing silence can stop. */
+  heardUser() {
+    this.heard = true;
+  }
   /** Start sending held audio live. Returns false when the connection cannot take it yet. */
   streamLive(valid: () => boolean) {
     const connection = this.connection;
@@ -57,11 +61,8 @@ export class HoldAudio {
           if (backlog) await wait(12);
         }
       }
-      // Tell the agent the student is still talking, so a pause mid-question is not a turn end.
-      if (Date.now() - this.lastActivity > 700) {
-        connection.sendMessage({ type: 'user_activity' });
-        this.lastActivity = Date.now();
-      }
+      // No user_activity here: it postpones the server's end-of-turn check, and if the silence
+      // after release falls inside that window the turn never closes (no transcript, no reply).
     } finally {
       this.pumping = false;
     }
@@ -210,7 +211,10 @@ export class HoldAudio {
         toPcm16(recording.frames.slice(recording.sent ?? 0), recording.sampleRate, rate),
         rate,
       );
-      const silence = pcmBytesChunks(new Int16Array(Math.round(rate * 0.7)), rate);
+      // Like an open microphone after speech: real-time silence until the server has heard the
+      // question (at least 0.8 s, at most 3 s), so its end-of-turn detection always closes.
+      const quiet = pcmBytesChunks(new Int16Array(Math.round(rate * 0.025)), rate)[0];
+      this.heard = false;
       this.output?.interrupt(0);
       this.output?.setVolume(1);
       for (const chunk of tail) {
@@ -218,9 +222,9 @@ export class HoldAudio {
         connection.sendMessage({ user_audio_chunk: b64(chunk) });
         await wait(8);
       }
-      for (const chunk of silence) {
+      for (let i = 0; i < 120 && (i < 32 || !this.heard); i++) {
         if (!valid() || connection !== this.connection) return false;
-        connection.sendMessage({ user_audio_chunk: b64(chunk) });
+        connection.sendMessage({ user_audio_chunk: b64(quiet) });
         await wait(25);
       }
       return true;

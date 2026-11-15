@@ -339,12 +339,28 @@ test('the screen map is ready by release, merges with deeper analysis, and sketc
       f.service.tool(s.id, { ...sketch, near: randomUUID() } as never),
       /regionId from the latest screen map/,
     );
+    // Forgiving: off-canvas points are clamped, unknown pieces dropped, the rest still drawn.
+    const lenient = ToolSchema.parse({
+      name: 'sketch_on_screen',
+      title: 'x',
+      elements: [
+        {
+          type: 'arrow',
+          from: [10, 10],
+          to: [500, 10],
+          label: 'a very long label that goes on and on and on',
+        },
+        { type: 'hexagon', at: [1, 2] },
+        { type: 'dot', at: [50, 30], step: 2, moveTo: [80, 30] },
+      ],
+      captions: ['First A', 'Then B'],
+    }) as any;
+    assert.equal(lenient.elements.length, 2);
+    assert.deepEqual(lenient.elements[0].to, [100, 10]);
+    assert.equal(lenient.elements[0].label.length, 40);
+    assert.deepEqual(lenient.elements[1].moveTo, [80, 30]);
     assert.throws(() =>
-      ToolSchema.parse({
-        name: 'sketch_on_screen',
-        title: 'x',
-        elements: [{ type: 'arrow', from: [10, 10], to: [500, 10] }],
-      }),
+      ToolSchema.parse({ name: 'sketch_on_screen', title: 'x', elements: [{ type: 'hexagon' }] }),
     );
     // A new capture drops grounded marks and the sketch's anchor, but keeps the sketch.
     f.service.stopSharing();

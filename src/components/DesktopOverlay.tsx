@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import gsap from 'gsap';
 import { ArrowLeft, ArrowRight, ClipboardCheck, Volume2, X } from 'lucide-react';
 import type { AppState } from '../../shared/model';
 import type { TutorRuntime } from '../../shared/tutor';
@@ -284,8 +285,8 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
             />
           )}
           {label(
-            (x1 + x2) / 2 - Math.sin(angle) * 3.2,
-            (y1 + y2) / 2 + Math.cos(angle) * 3.2 * -1 + 1,
+            (x1 + x2) / 2 + Math.sin(angle) * 4.6,
+            (y1 + y2) / 2 - Math.cos(angle) * 4.6 + 1,
             e.label,
           )}
         </g>
@@ -366,19 +367,54 @@ function SketchItem({ e, i }: { e: SketchElement; i: number }) {
     }
   }
 }
-/** Yoyo's free-form drawing: vectors, graphs, geometry. Drawn element by element. */
+/** Where an element starts, for working out how far it should glide. */
+function anchorOf(e: SketchElement): [number, number] {
+  switch (e.type) {
+    case 'arrow':
+    case 'line':
+      return e.from;
+    case 'curve':
+      return e.points[0];
+    case 'axes':
+      return e.origin;
+    default:
+      return e.at;
+  }
+}
+/**
+ * Yoyo's free-form drawing: vectors, graphs, geometry, processes. Plays like a short
+ * HyperFrames scene in one consistent frame: the title writes in, elements draw by hand in
+ * steps with a caption for each, and anything told to move glides into place.
+ */
 export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: () => void }) {
-  const ref = useRef<SVGSVGElement>(null);
+  const ref = useRef<SVGSVGElement>(null),
+    title = useRef<HTMLSpanElement>(null);
+  const [step, setStep] = useState(1);
+  const caption = sketch.captions?.[Math.min(step, sketch.captions.length) - 1];
   useEffect(() => {
-    if (ref.current)
-      return drawOn(ref.current, {
-        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    if (!ref.current) return;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (title.current && !reduced)
+      gsap.from(title.current.querySelectorAll('i'), {
+        y: 10,
+        opacity: 0,
+        duration: 0.35,
+        stagger: 0.06,
+        ease: 'power2.out',
       });
-  }, [sketch]);
+    return drawOn(ref.current, { reduced, onStep: setStep, delay: 0.25 });
+    // Replay only when the sketch itself changes, not on every runtime update.
+  }, [JSON.stringify(sketch)]);
   return (
     <figure className="diagram-sketch sketch-canvas">
       <figcaption>
-        <span>{sketch.title}</span>
+        <span ref={title}>
+          {sketch.title.split(' ').map((w, i) => (
+            <i key={i} style={{ marginRight: '0.28em' }}>
+              {w}
+            </i>
+          ))}
+        </span>
         {onClose && (
           <button className="icon-button small" aria-label="Clear Yoyo’s drawing" onClick={onClose}>
             <X size={15} />
@@ -393,10 +429,21 @@ export function SketchCanvas({ sketch, onClose }: { sketch: Sketch; onClose?: ()
         role="img"
         aria-label={sketch.title}
       >
-        {sketch.elements.map((e, i) => (
-          <SketchItem key={i} e={e} i={i} />
-        ))}
+        {sketch.elements.map((e, i) => {
+          const [ax, ay] = anchorOf(e);
+          const move = e.moveTo ? { 'data-mx': e.moveTo[0] - ax, 'data-my': e.moveTo[1] - ay } : {};
+          return (
+            <g key={i} className="sk-el" data-step={e.step ?? 1} {...move}>
+              <SketchItem e={e} i={i} />
+            </g>
+          );
+        })}
       </svg>
+      {caption && (
+        <p className="sketch-caption" key={step} aria-live="polite">
+          {caption}
+        </p>
+      )}
     </figure>
   );
 }
@@ -409,7 +456,7 @@ export function DiagramSketch({ diagram, onClose }: { diagram: Diagram; onClose?
       return drawOn(ref.current, {
         reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
-  }, [diagram]);
+  }, [JSON.stringify(diagram)]);
   return (
     <figure className="diagram-sketch">
       <figcaption>

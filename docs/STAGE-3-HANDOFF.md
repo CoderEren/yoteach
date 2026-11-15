@@ -102,6 +102,18 @@ From the user's 14 Nov review: lecture start did nothing; drawings missed their 
 - **Violet Yoyo.** Single-hue violet glass with a simplified face (two capsule eyes and a small smile); Dock, menu-bar and accent colour updated.
 - Agent synced (backup `work/agent-visual-1794698089677`). Tests: 47 unit tests and 8 Electron journeys (the hold test now asserts streaming only while held).
 
+## Chunk 8 — lost questions, slide latency and weighting, animated scenes
+
+From the user's 15 Nov report: questions (matrix in a coordinate system, cholesterol, "Can you hear me?") got no response and did not appear in chats; slides took ages; title and lecturer slides got equal weight; visuals too limited.
+
+- **Root cause of lost questions:** the `user_activity` messages sent every 0.7 s while held postponed the server's end-of-turn check. After release only 0.7 s of silence was sent, then nothing, so on longer questions the turn never closed: no transcript, no reply, stuck "thinking". Reproduced with a live harness (`work/voice/live-voice.mjs`: synthesized speech through the real hold path and the real agent, with a recreated slide in place of the screen). Fix: no `user_activity`. After release, real-time silence continues until the server reports the transcript (`HoldAudio.heardUser`), between 0.8 and 3 s. Live after the fix, 4 of 4 turns answered: transcript 0.5–0.6 s and reply 1.6–4.8 s after release. A 12 s watchdog shows "Sorry, I lost that one" and resets if nothing comes back.
+- **Lectures.** Every slide is read ahead (`Providers.slidePrep`, fast model, current slide first, then the deck, two at a time) and cached (`TutorService.prepareSlide`, `slideBriefing`). Each slide gets a kind (teach / brief / skip), summary, key points, regions pinned to the slide's words, and `nextTeachingSlide`. `teachSlide` starts speaking at once from the slide text (with `guessSlideKind` if the read isn't ready) and sends the regions when they arrive. Live: first sentence 2.9–4.5 s after start or a slide change (previously ~11 s+). On a synthetic deck (`work/test-deck.pdf`: cover, agenda, two content slides, divider, thanks), filler got one line or none and the content slides got 54 and 70 words. Messages that continue onto the next slide take that slide's number.
+- **Animated scenes.** `sketch_on_screen` now takes build `step`s with per-step `captions` (lower-third bar) and `moveTo` motion (GSAP), with a kinetic handwritten title: HyperFrames-style scenes in one frame. Parsing is forgiving (clamps coordinates, trims labels, drops unknown elements); vision region shapes fall back to highlight. Verified frames: `work/voice/scene-*.png` (a matrix acting on basis vectors).
+- **Prompt:** never go silent (start talking, draw a simpler version, or say in one sentence what you can't do); animate with steps and motion; images and clips for real-world pictures and motion; lecture weighting.
+- Fixed a scene restart on unrelated state updates, missing title spaces, dropped captions, and closing voice tags (`[/slow]`).
+- iCloud Desktop sync created conflict copies in `dist/` ("index 2.html") during rapid rebuilds, which broke test launches. `rm -rf dist` before building resolves it; consider moving the repo out of the iCloud-synced Desktop.
+- Agent synced (backup `work/agent-visual-1794700815830`). Tests: 49 unit tests (new `tests/slides.test.ts`) and 8 Electron journeys.
+
 ## Remaining
 
 - Live spoken practice through the hosted agent (the tools are synced; not exercised with a microphone).

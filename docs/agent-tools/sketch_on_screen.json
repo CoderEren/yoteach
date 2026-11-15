@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "sketch_on_screen",
-  "description": "Draw freely on the student's screen: vectors, graphs, geometry, forces, a worked construction. Elements draw in order like handwriting. Optionally place it beside a region (near). Use it when the screen has nothing to point at, or to add the missing step beside their figure.",
+  "description": "Draw and animate on the student's screen in one framed scene: vectors, graphs, geometry, forces, processes, transformations. Elements draw by hand in build steps (step 1, 2, 3...) with an optional caption per step, and any element can glide to a new position (moveTo) after it is drawn, e.g. a vector sliding tip-to-tail, a point moving along a curve, a basis vector being transformed. Optionally sit beside a screen region (near). Out-of-range values are clamped, so always try.",
   "expects_response": true,
   "response_timeout_secs": 10,
   "parameters": {
@@ -116,6 +116,18 @@
                 "muted"
               ],
               "description": "ink default, accent to highlight, muted for guides."
+            },
+            "step": {
+              "type": "integer",
+              "description": "Build step 1-8 this element appears in; the scene pauses between steps. Omit for step 1."
+            },
+            "moveTo": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "description": "x then y."
+              },
+              "description": "Optional [x,y]: after drawing, glide the element so its start point lands here (animation)."
             }
           },
           "required": [
@@ -126,6 +138,14 @@
       "near": {
         "type": "string",
         "description": "Optional regionId from the screen map to sit beside."
+      },
+      "captions": {
+        "type": "array",
+        "description": "Optional caption per step, shown under the scene as it plays (up to 120 characters each).",
+        "items": {
+          "type": "string",
+          "description": "Caption for that step."
+        }
       }
     },
     "required": [

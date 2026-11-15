@@ -231,7 +231,10 @@ export const IntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('inform'), text: z.string().min(1).max(6000) }),
   z.object({ type: z.literal('hold-start') }),
   z.object({ type: z.literal('hold-end') }),
-  z.object({ type: z.literal('hold-cancel'), reason: z.enum(['silent']).optional() }),
+  z.object({
+    type: z.literal('hold-cancel'),
+    reason: z.enum(['silent', 'timeout']).optional(),
+  }),
   z.object({
     type: z.literal('start'),
     topicId: Uuid.nullable().default(null),
@@ -280,6 +283,20 @@ export interface TutorApi {
   ): Promise<import('./model').Result<void>>;
   tool(sessionId: string, tool: TutorTool): Promise<import('./model').Result<unknown>>;
   captureScreen(): Promise<import('./model').Result<void>>;
+  prepareSlide(snapshot: SharedSnapshot): Promise<import('./model').Result<{ queued: boolean }>>;
+  slideBriefing(waitMs?: number): Promise<
+    import('./model').Result<{
+      slide: number;
+      total: number;
+      kind: 'teach' | 'brief' | 'skip';
+      why: string;
+      summary: string;
+      keyPoints: string[];
+      regions: { regionId: string; label: string; evidence: string }[];
+      snapshotId: string;
+      nextTeachingSlide: number | null;
+    } | null>
+  >;
   screenMap(): Promise<
     import('./model').Result<{
       snapshotId: string;
@@ -307,7 +324,7 @@ export interface TutorApi {
  */
 export function cleanSpeech(text: string) {
   return text
-    .replace(/\[(?:[a-z][a-z' -]{0,30})\]\s*/gi, '')
+    .replace(/\[\/?(?:[a-z][a-z' -]{0,30})\]\s*/gi, '')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\s+([,.!?;:])/g, '$1')
     .trim();

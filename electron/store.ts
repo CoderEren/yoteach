@@ -567,6 +567,8 @@ export class Store {
       eventId && n.messages.find((m) => m.sessionId === sessionId && m.eventId === eventId);
     if (existing) {
       existing.text = text;
+      // A reply can carry on onto the next slide; keep it with the slide it ended on.
+      if (place.page) existing.page = place.page;
       this.save(n);
       return existing;
     }

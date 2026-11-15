@@ -110,7 +110,12 @@ function penEase(path: SVGGeometryElement) {
  */
 export function drawOn(
   root: SVGSVGElement | HTMLElement,
-  opts: { reduced?: boolean; delay?: number } = {},
+  opts: {
+    reduced?: boolean;
+    delay?: number;
+    onStep?: (step: number) => void;
+    stepGap?: number;
+  } = {},
 ) {
   const items = Array.from(
     root.querySelectorAll<SVGGeometryElement | HTMLElement>('.ink, .ink-label'),
@@ -122,12 +127,28 @@ export function drawOn(
   // Hide everything first, so nothing shows before its turn (e.g. while Yoyo flies over).
   items.forEach((el) => gsap.set(el, { opacity: 0 }));
   const tl = gsap.timeline({ delay: opts.delay ?? 0 });
-  let at = 0;
+  let at = 0,
+    step = 0;
+  const ends = new Map<Element, number>();
+  const groupOf = (el: Element) => el.closest('[data-step]');
   for (const el of items) {
+    // Steps build the drawing up like a whiteboard animation, with a pause between them.
+    const s = Number(groupOf(el)?.getAttribute('data-step') ?? 0);
+    if (s > step) {
+      if (step > 0) at += opts.stepGap ?? 1.1;
+      step = s;
+      if (opts.onStep) tl.call(opts.onStep, [s], at);
+    }
     if (el.classList.contains('ink-label') || el.classList.contains('dashed')) {
       gsap.set(el, { opacity: 0, scale: 0.86, transformOrigin: '50% 60%' });
-      tl.to(el, { opacity: 1, scale: 1, duration: 0.28, ease: 'back.out(2.2)' }, at - 0.08);
+      tl.to(
+        el,
+        { opacity: 1, scale: 1, duration: 0.28, ease: 'back.out(2.2)' },
+        Math.max(0, at - 0.08),
+      );
       at += 0.06;
+      const g = el.closest('[data-mx]');
+      if (g) ends.set(g, at);
       continue;
     }
     const path = el as SVGGeometryElement;
@@ -138,18 +159,27 @@ export function drawOn(
     tl.set(path, { opacity: 1 }, at);
     tl.to(path, { strokeDashoffset: 0, duration: dur, ease: penEase(path) }, at);
     at += dur * 0.85;
+    const g = path.closest('[data-mx]');
+    if (g) ends.set(g, at + dur * 0.15);
   }
+  // Motion: once drawn, an element glides to where it was told to go.
+  for (const [g, end] of ends) {
+    const x = Number(g.getAttribute('data-mx')),
+      y = Number(g.getAttribute('data-my'));
+    tl.to(g, { x, y, duration: 1.1, ease: 'power2.inOut' }, end + 0.35);
+  }
+  if (opts.onStep && step === 0) opts.onStep(1);
   // Boil: re-pose the ink every few frames by a pixel or so (HyperFrames hwBoil "calm").
   const groups = Array.from(root.querySelectorAll<SVGGElement>('.boil'));
-  let step = 0;
+  let tick = 0;
   const boil = groups.length
     ? setInterval(() => {
-        step++;
+        tick++;
         groups.forEach((g, i) =>
           gsap.set(g, {
-            x: hash(step * 3 + i * 97, 3) * 0.9,
-            y: hash(step * 3 + 1 + i * 97, 3) * 0.9,
-            rotation: hash(step * 3 + 2 + i * 97, 3) * 0.25,
+            x: hash(tick * 3 + i * 97, 3) * 0.9,
+            y: hash(tick * 3 + 1 + i * 97, 3) * 0.9,
+            rotation: hash(tick * 3 + 2 + i * 97, 3) * 0.25,
             transformOrigin: '50% 50%',
           }),
         );

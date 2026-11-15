@@ -60,4 +60,5 @@ test('labels and panels avoid text; voice tags never reach the reader', () => {
     'Cholesterol synthesis starts by putting small two-carbon blocks together!',
   );
   assert.equal(cleanSpeech('Use [1, 2] as indices.'), 'Use [1, 2] as indices.');
+  assert.equal(cleanSpeech('the drug [/slow] by opening its ring'), 'the drug by opening its ring');
 });
