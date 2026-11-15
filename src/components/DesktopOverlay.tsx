@@ -253,24 +253,44 @@ function Flow({ e }: { e: Extract<SketchElement, { type: 'flow' }> }) {
   useEffect(() => {
     const p = path.current,
       g = group.current;
-    if (!p || !g || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!p || !g) return;
+    const preference = matchMedia('(prefers-reduced-motion: reduce)');
     const L = p.getTotalLength();
     const dots = Array.from(g.querySelectorAll<SVGGElement>('.particle'));
-    const tweens = dots.map((dot, k) => {
-      const state = { t: k / dots.length };
-      return gsap.to(state, {
-        t: state.t + 1,
-        duration: e.seconds,
-        ease: 'none',
-        repeat: -1,
-        onUpdate: () => {
-          const pt = p.getPointAtLength((state.t % 1) * L);
+    // A symbol needs its diameter plus breathing room, even on very short paths.
+    const count = Math.max(1, Math.min(dots.length, Math.floor(L / (e.symbol ? 6 : 3))));
+    let tweens: gsap.core.Tween[] = [];
+    const sync = () => {
+      tweens.forEach((t) => t.kill());
+      tweens = [];
+      dots.forEach((dot, k) => {
+        dot.style.display = k < count ? '' : 'none';
+        if (k >= count) return;
+        const place = (t: number) => {
+          const pt = p.getPointAtLength((t % 1) * L);
           dot.setAttribute('transform', `translate(${pt.x} ${pt.y})`);
-        },
+        };
+        const state = { t: (k + 0.5) / count };
+        place(state.t);
+        if (!preference.matches)
+          tweens.push(
+            gsap.to(state, {
+              t: state.t + 1,
+              duration: e.seconds,
+              ease: 'none',
+              repeat: -1,
+              onUpdate: () => place(state.t),
+            }),
+          );
       });
-    });
-    return () => tweens.forEach((t) => t.kill());
-  }, [d, e.count, e.seconds]);
+    };
+    sync();
+    preference.addEventListener('change', sync);
+    return () => {
+      preference.removeEventListener('change', sync);
+      tweens.forEach((t) => t.kill());
+    };
+  }, [d, e.count, e.seconds, e.symbol]);
   return (
     <g className={`flow ${tone(e.tone)} ink-label`} ref={group}>
       <path ref={path} className="flow-track" d={d} />

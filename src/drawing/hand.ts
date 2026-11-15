@@ -121,7 +121,16 @@ export function drawOn(
     root.querySelectorAll<SVGGeometryElement | HTMLElement>('.ink, .ink-label'),
   );
   if (opts.reduced) {
-    gsap.set(items, { clearProps: 'all', opacity: 1 });
+    // clearProps runs after other properties in a tween; keep visibility in a separate set.
+    gsap.set(items, { clearProps: 'all' });
+    gsap.set(items, { opacity: 1 });
+    for (const g of root.querySelectorAll('[data-mx]')) {
+      gsap.set(g, { x: Number(g.getAttribute('data-mx')), y: Number(g.getAttribute('data-my')) });
+    }
+    const steps = Array.from(root.querySelectorAll('[data-step]'), (el) =>
+      Number(el.getAttribute('data-step')),
+    );
+    opts.onStep?.(Math.max(1, ...steps));
     return () => {};
   }
   // Hide everything first, so nothing shows before its turn (e.g. while Yoyo flies over).

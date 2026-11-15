@@ -1,0 +1,36 @@
+
+Running 1 test using 1 worker
+
+(node:2684) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 tests/tutor.e2e.ts:966:1 › flow particles stay separated on short paths and respect live reduced-motion changes (2.0s)
+
+
+  1) tests/tutor.e2e.ts:966:1 › flow particles stay separated on short paths and respect live reduced-motion changes 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 12
+    Received: 1
+
+      987 |     const positions = () => layer.locator('.flow .particle').evaluateAll(nodes => nodes.map(n => n.getAttribute('transform')));
+      988 |     const still = await positions();
+    > 989 |     expect(new Set(still).size).toBe(still.length);
+          |                                 ^
+      990 |     expect(still.length).toBeGreaterThan(1);
+      991 |     expect(still.length).toBeLessThan(12);
+      992 |     await layer.waitForTimeout(150);
+        at /Users/eersin937/Desktop/YoTeach/tests/tutor.e2e.ts:989:33
+
+    Error Context: test-results/tutor.e2e.ts-flow-particle-6eefa-live-reduced-motion-changes/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/tutor.e2e.ts-flow-particle-6eefa-live-reduced-motion-changes/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/tutor.e2e.ts-flow-particle-6eefa-live-reduced-motion-changes/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/tutor.e2e.ts:966:1 › flow particles stay separated on short paths and respect live reduced-motion changes 
