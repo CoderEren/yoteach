@@ -60,7 +60,7 @@ export function Chats({ data }: { data: AppState }) {
   const status =
     r?.input === 'listening'
       ? 'Listening…'
-      : r?.activity === 'speaking'
+      : r?.speaking || r?.activity === 'speaking'
         ? 'Yoyo is speaking'
         : r?.activity === 'thinking' || r?.input === 'sending'
           ? 'Thinking…'

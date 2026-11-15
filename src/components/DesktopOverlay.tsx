@@ -835,12 +835,15 @@ function ScreenLayer({ data, r }: { data: AppState; r: TutorRuntime }) {
     ? { left: `${spot.x * 100}%`, top: `${spot.y * 100}%`, maxWidth: `${panel!.width * 100}%` }
     : undefined;
   return (
-    <main className="desktop-overlay">
+    <main className={`desktop-overlay ${r.drawingFading ? 'drawings-fading' : ''}`}>
       <AnnotationLayer
         annotations={
           onScreen
             ? r.annotations.filter(
-                (a) => a.id === r.focusRegion && !r.drawing?.marks.some((m) => m.regionId === a.id),
+                (a) =>
+                  a.id === r.focusRegion &&
+                  r.focusSource === 'draw' &&
+                  !r.drawing?.marks.some((m) => m.regionId === a.id),
               )
             : []
         }

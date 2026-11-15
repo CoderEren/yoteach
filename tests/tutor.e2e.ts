@@ -415,7 +415,40 @@ test('held microphone streams only while held, captures screen, cancels drag and
       audio_event: { audio_base_64: Buffer.alloc(32000).toString('base64'), event_id: 100 },
     });
     await expect(pet.locator('.yoyo--speaking')).toBeVisible();
+    // Subtitles: words appear beside Yoyo as the matching audio plays, a few at a time.
+    const words = 'ATP activates glucose first.';
+    provider.send({
+      type: 'audio',
+      audio_event: {
+        audio_base_64: Buffer.alloc(64000).toString('base64'),
+        event_id: 100,
+        alignment: {
+          chars: [...words],
+          char_start_times_ms: [...words].map((_, i) => i * 30),
+          char_durations_ms: [...words].map(() => 30),
+        },
+      },
+    });
+    await expect.poll(() => app!.windows().some((w) => w.url().includes('/caption'))).toBe(true);
+    const subtitles = app.windows().find((w) => w.url().includes('/caption'))!;
+    await expect(subtitles.locator('.yoyo-subtitles p.on')).toHaveText(words, { timeout: 8000 });
+    expect(
+      await app.evaluate(({ BrowserWindow }) => {
+        const find = (part: string) =>
+          BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes(part))!;
+        const c = find('/caption'),
+          p = find('/companion').getBounds(),
+          b = c.getBounds();
+        return {
+          visible: c.isVisible(),
+          centred: Math.abs(b.x + b.width / 2 - (p.x + p.width / 2)) <= 1 || b.x <= p.x,
+          near: b.y + b.height >= p.y && b.y <= p.y + p.height,
+        };
+      }),
+    ).toEqual({ visible: true, centred: true, near: true });
+    await expect(pet.locator('.yoyo--speaking')).toBeVisible();
     provider.send({ type: 'interruption', interruption_event: { event_id: 101 } });
+    await expect(subtitles.locator('.yoyo-subtitles p.on')).toHaveCount(0);
     await expect(pet.locator('.yoyo--idle')).toBeVisible();
     await page.evaluate(() => window.yoteach.tutor.intent({ type: 'pause' }));
     expect((await runtime(page)).snapshot).toBeNull();

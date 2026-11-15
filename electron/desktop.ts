@@ -165,7 +165,12 @@ export function installDesktop(options: {
     if (r.lecture) return false;
     const onScreen = r.snapshot?.source.kind === 'screen';
     const marks =
-      onScreen && !!(r.focusRegion || r.drawing?.marks.length || r.drawing?.connections.length);
+      onScreen &&
+      !!(
+        (r.focusRegion && r.focusSource === 'draw') ||
+        r.drawing?.marks.length ||
+        r.drawing?.connections.length
+      );
     const media = !!r.generation && r.generation.origin === 'tutor';
     return marks || media || !!r.drawing?.diagram || !!r.drawing?.sketch;
   }
@@ -201,8 +206,12 @@ export function installDesktop(options: {
         : (stage ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).bounds);
     showStage(want);
   }
+  /** Yoyo heads home a moment after it stops talking, not between two sentences. */
+  let restTimer: ReturnType<typeof setTimeout> | undefined;
   function returnHome() {
     clearTimeout(returnTimer);
+    clearTimeout(restTimer);
+    restTimer = undefined;
     stopTour();
     pet()?.webContents.send('companion:pose', { direction: null });
     if (!dragging && pointed && home) {
@@ -285,11 +294,21 @@ export function installDesktop(options: {
       focusKey = '';
       return;
     }
-    if (!r.sessionId || r.sharing === 'off' || (pointed && r.activity === 'idle')) {
+    if (!r.sessionId || r.sharing === 'off') {
       focusKey = '';
       returnHome();
       return;
     }
+    const resting = !r.speaking && ['idle', 'error'].includes(r.activity);
+    if (!resting) {
+      clearTimeout(restTimer);
+      restTimer = undefined;
+    } else if (pointed && !restTimer)
+      restTimer = setTimeout(() => {
+        restTimer = undefined;
+        focusKey = '';
+        returnHome();
+      }, 3000);
     const region = r.annotations.find((a) => a.id === r.focusRegion),
       snapshot = r.snapshot;
     if (!region || !snapshot || dragging || !store.snapshot().settings.mascotVisible) {
@@ -326,27 +345,15 @@ export function installDesktop(options: {
     pet()?.showInactive();
     pet()?.webContents.send('companion:pose', { direction: target.direction });
     animate(target.x, target.y);
-    // Visit every mark of the drawing in order, like a teacher walking along the board.
+    // Yoyo follows what it says (each named part moves it on), so there is no timed tour.
+    // It stays while it keeps talking about this part, and heads home once it goes quiet.
     stopTour();
-    const stops = (r.drawing?.snapshotId === snapshot.id ? r.drawing.marks : [])
-      .filter((m) => m.regionId !== region.id)
-      .slice(0, 7);
-    const surface = area;
-    stops.forEach((m, i) => {
-      tour.push(
-        setTimeout(
-          () => {
-            if (dragging) return;
-            const next = pointBeside(m.box, surface);
-            pet()?.webContents.send('companion:pose', { direction: next.direction });
-            animate(next.x, next.y);
-          },
-          1700 * (i + 1),
-        ),
-      );
-    });
     clearTimeout(returnTimer);
-    returnTimer = setTimeout(returnHome, 9000 + stops.length * 1700);
+    returnTimer = setTimeout(() => {
+      if (last?.speaking) return; // still explaining here; the rest timer takes it home later
+      focusKey = '';
+      returnHome();
+    }, 15000);
   }
   function drag(action: { phase: 'start' | 'move' | 'end'; x: number; y: number }) {
     const win = pet();

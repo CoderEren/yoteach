@@ -5,6 +5,7 @@ import { api, unwrap } from './api';
 import { HoldAudio } from './audio/hold-audio';
 import { hasSpeech } from '../shared/hold-audio';
 import { guessSlideKind, slideInstruction } from '../shared/slides';
+import { Captioner } from '../shared/captions';
 const Context = createContext<{
   runtime: TutorRuntime | null;
   act: (action: TutorIntent) => Promise<void>;
@@ -28,6 +29,13 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   const lastActive = useRef(Date.now());
   const answered = useRef(true);
   const heldAudio = useRef(new HoldAudio());
+  // Subtitles near Yoyo, and the words that walk Yoyo to what it is talking about.
+  const captions = useRef(
+    new Captioner((caption, word) => {
+      const id = sessionId.current;
+      if (id) void api.tutor.spoken(id, caption, word);
+    }),
+  );
   const hold = useRef<{
     held: boolean;
     cancelled: boolean;
@@ -51,6 +59,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   }
   async function disconnect() {
     cancelHold();
+    captions.current.reset();
     generation.current++;
     audioTracks.current.forEach((t) => t.stop());
     audioTracks.current.clear();
@@ -243,6 +252,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
     if (action.type === 'hold-start') {
       lastActive.current = Date.now();
       if (hold.current) return;
+      captions.current.stop();
       if (live.current?.mode === 'text' && sessionId.current) await disconnect();
       const turn = {
         held: true,
@@ -405,6 +415,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
         }
         sessionId.current = id;
         pendingTexts.current = [];
+        captions.current.reset();
         const { Conversation } = await import('@elevenlabs/client');
         heldAudio.current.install();
         if (token !== generation.current) {
@@ -456,12 +467,19 @@ export function TutorProvider({ children }: { children: ReactNode }) {
                 error: '',
               });
           },
+          onAudioAlignmentPlayback: ({ alignment }) => {
+            if (sessionId.current === started.id && !hold.current?.held)
+              captions.current.chunk(alignment);
+          },
+          onInterruption: () => captions.current.stop(),
           onModeChange: ({ mode }) => {
             agentMode.current = mode;
             if (mode === 'speaking') answered.current = true;
+            else captions.current.finished();
             if (sessionId.current === started.id)
               void api.tutor.update({
                 sessionId: started.id,
+                speaking: mode === 'speaking',
                 activity: hold.current?.held
                   ? 'listening'
                   : mode === 'speaking'
@@ -475,6 +493,8 @@ export function TutorProvider({ children }: { children: ReactNode }) {
             if (sessionId.current !== started.id || !m.message.trim()) return;
             if (m.role === 'user') heldAudio.current.heardUser();
             if (m.role === 'agent') answered.current = true;
+            if (m.role === 'agent' && action.mode === 'voice' && !hold.current?.held)
+              captions.current.response(m.message);
             if (m.role === 'user') {
               const at = pendingTexts.current.indexOf(m.message);
               if (at >= 0) {

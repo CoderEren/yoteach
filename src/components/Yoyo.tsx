@@ -7,10 +7,13 @@ export function Yoyo({
   state = 'idle',
   className = '',
   direction = null,
+  gestureKey = 0,
 }: {
   state?: MascotState;
   className?: string;
   direction?: 'left' | 'right' | null;
+  /** Changes whenever Yoyo points at a new spot, to replay the throw. */
+  gestureKey?: number;
 }) {
   const id = useId().replace(/:/g, '');
   const root = useRef<SVGSVGElement>(null);
@@ -88,7 +91,7 @@ export function Yoyo({
                 className="yoyo-v2-string-rest"
                 d="M141 159 C172 179 184 183 188 168 C194 145 209 150 202 133 C198 123 195 116 201 107"
               />
-              <g className="yoyo-v2-string-point" key={direction ?? state}>
+              <g className="yoyo-v2-string-point" key={`${direction ?? state}-${gestureKey}`}>
                 <path
                   pathLength="1"
                   d="M139 158 C169 184 191 178 191 154 C191 130 207 120 225 117"
@@ -97,7 +100,7 @@ export function Yoyo({
               </g>
             </g>
           </g>
-          <g className="yoyo-v2-disc" key={direction ?? state}>
+          <g className="yoyo-v2-disc" key={`${direction ?? state}-${gestureKey}`}>
             <ellipse
               cx="126"
               cy="122"
@@ -173,9 +176,13 @@ export function Yoyo({
                 strokeWidth="2"
                 strokeLinecap="round"
               />
-              <g className="yoyo-v2-voice" strokeWidth="2.7" strokeLinecap="round">
-                {[104, 111, 118, 125].map((x, i) => (
-                  <path key={x} className={`yoyo-v2-voice-bar bar-${i}`} d={`M${x} 134 v9`} />
+              <g className="yoyo-v2-voice" strokeWidth="3.2" strokeLinecap="round">
+                {[100, 107, 114, 121, 128].map((x, i) => (
+                  <path
+                    key={x}
+                    className={`yoyo-v2-voice-bar bar-${i}`}
+                    d={`M${x} ${i % 4 === 0 ? 134 : 131} v${i % 4 === 0 ? 8 : 14}`}
+                  />
                 ))}
               </g>
               <path

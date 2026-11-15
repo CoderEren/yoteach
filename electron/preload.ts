@@ -23,6 +23,8 @@ const api: DesktopApi = {
     transcript: (sessionId, role, text, eventId) =>
       ipcRenderer.invoke('tutor:transcript', { sessionId, role, text, eventId }),
     tool: (sessionId, tool) => ipcRenderer.invoke('tutor:tool', { sessionId, tool }),
+    spoken: (sessionId, caption, word) =>
+      ipcRenderer.invoke('tutor:spoken', { sessionId, caption, word }),
     captureScreen: () => ipcRenderer.invoke('tutor:capture-screen'),
     screenMap: () => ipcRenderer.invoke('tutor:screen-map'),
     prepareSlide: (snapshot) => ipcRenderer.invoke('tutor:prepare-slide', snapshot),
@@ -65,6 +67,7 @@ const api: DesktopApi = {
   drag: (action) => ipcRenderer.invoke('companion:drag', action),
   lectureFullScreen: (show) => ipcRenderer.invoke('lecture:fullscreen', show),
   onPose: (fn) => listen('companion:pose', fn),
+  onCaption: (fn) => listen('caption:text', fn),
   onState: (callback) => {
     const listener = (_event: unknown, state: Parameters<typeof callback>[0]) => callback(state);
     ipcRenderer.on('workspace:changed', listener);

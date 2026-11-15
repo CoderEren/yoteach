@@ -18,7 +18,7 @@ export function LectureStage({ media }: { media: GeneratedMedia[] }) {
   const snapshot = r.snapshot?.source.kind === 'pdf' ? r.snapshot : null;
   return (
     <main className="lecture-stage">
-      <div className="lecture-slide">
+      <div className={`lecture-slide ${r.drawingFading ? 'drawings-fading' : ''}`}>
         {snapshot ? (
           <div
             className="lecture-slide-image"
@@ -30,7 +30,10 @@ export function LectureStage({ media }: { media: GeneratedMedia[] }) {
             <img src={snapshot.image} alt={`Lecture slide ${r.lecture.page}`} />
             <AnnotationLayer
               annotations={r.annotations.filter(
-                (a) => a.id === r.focusRegion && !r.drawing?.marks.some((m) => m.regionId === a.id),
+                (a) =>
+                  a.id === r.focusRegion &&
+                  r.focusSource === 'draw' &&
+                  !r.drawing?.marks.some((m) => m.regionId === a.id),
               )}
             />
             <DrawingLayer

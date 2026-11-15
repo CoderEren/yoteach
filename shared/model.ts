@@ -163,6 +163,10 @@ export interface DesktopApi {
   drag(action: { phase: 'start' | 'move' | 'end'; x: number; y: number }): Promise<Result<void>>;
   lectureFullScreen(show: boolean): Promise<Result<void>>;
   onPose(callback: (pose: { direction: 'left' | 'right' | null }) => void): () => void;
+  /** Only the subtitle window uses this: the phrase Yoyo is saying and where Yoyo is. */
+  onCaption(
+    callback: (caption: { text: string; placement: 'above' | 'below' }) => void,
+  ): () => void;
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({

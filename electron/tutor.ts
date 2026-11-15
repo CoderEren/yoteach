@@ -16,6 +16,10 @@ import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
 import type { ScreenDrawing } from '../shared/drawing';
 import { anchor, wordsOf } from '../shared/grounding';
 import { readGesture, type TrailPoint } from '../shared/gesture';
+import { matchSpoken } from '../shared/speech-focus';
+/** Drawings leave the screen by themselves this long after they last changed. */
+export const DRAWING_LIFETIME_MS = 20_000;
+const DRAWING_FADE_MS = 900;
 export function groundRegions(snapshot: SharedSnapshot, answer: VisionAnswer): Annotation[] {
   const lines = snapshot.textBoxes,
     words = snapshot.words ?? [];
@@ -64,6 +68,10 @@ export class TutorService {
   private connecting?: AbortController;
   private generating?: AbortController;
   private pointTimer?: ReturnType<typeof setTimeout>;
+  /** What Yoyo shows when a brief gesture ends: still talking, listening, or at rest. */
+  private settled(): TutorRuntime['activity'] {
+    return this.state.mic ? 'listening' : this.state.speaking ? 'speaking' : 'idle';
+  }
   /** Yoyo points at a new mark briefly; pointing is a moment, not a state that lasts. */
   private point() {
     this.state.activity = 'pointing';
@@ -71,10 +79,88 @@ export class TutorService {
     clearTimeout(this.pointTimer);
     this.pointTimer = setTimeout(() => {
       if (this.state.activity !== 'pointing') return;
-      this.state.activity = this.state.mic ? 'listening' : 'idle';
+      this.state.activity = this.settled();
       this.emit();
     }, 6000);
     this.pointTimer.unref?.();
+  }
+  /** A short happy bounce; Yoyo returns to what it was doing by itself. */
+  private celebrate() {
+    this.state.activity = 'success';
+    this.emit();
+    clearTimeout(this.celebrating);
+    this.celebrating = setTimeout(() => {
+      if (this.state.activity === 'success') {
+        this.state.activity = this.settled();
+        this.emit();
+      }
+    }, 2600);
+    this.celebrating.unref?.();
+  }
+  /** The last words Yoyo spoke, for following the explanation around the screen. */
+  private heard: string[] = [];
+  private speechFocusAt = -Infinity;
+  /**
+   * Yoyo says a word (as the audio plays). When the recent words name a part of the slide or
+   * screen, Yoyo walks there and points at it, so it moves while it explains, not afterwards.
+   */
+  spoken(sessionId: string, word: string) {
+    this.require(sessionId);
+    const words = word.split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+    this.heard = [...this.heard, ...words].slice(-12);
+    const snapshot = this.state.snapshot;
+    if (!snapshot || this.state.sharing === 'off' || this.state.input !== 'idle') return;
+    const marks = this.state.drawing?.snapshotId === snapshot.id ? this.state.drawing.marks : [];
+    const candidates = this.state.annotations
+      .filter((a) => a.snapshotId === snapshot.id)
+      .map((a) => {
+        const drawn = marks.filter((m) => m.regionId === a.id);
+        return {
+          id: a.id,
+          label: [a.label, ...drawn.map((m) => m.label ?? '')].join(' '),
+          evidence: a.evidence,
+          drawn: drawn.length > 0,
+        };
+      });
+    const best = matchSpoken(this.heard, candidates);
+    if (!best) return;
+    this.heard = [];
+    const now = Date.now();
+    // Mentioning the same part again keeps Yoyo there; it only re-points after a pause.
+    if (best === this.state.focusRegion && now - this.speechFocusAt < 6000) return;
+    if (best !== this.state.focusRegion && now - this.speechFocusAt < 1200) return;
+    this.speechFocusAt = now;
+    // A drawn mark keeps its own focus style; anything else is pointed at, not highlighted.
+    this.state.focusSource = marks.some((m) => m.regionId === best) ? 'draw' : 'speech';
+    this.state.focusRegion = best;
+    this.state.focusRevision++;
+    this.point();
+  }
+  private fadeTimer?: ReturnType<typeof setTimeout>;
+  private drawingKey = '';
+  /** Every change to the drawing restarts its lifetime; when it ends the drawing fades away. */
+  private watchDrawing() {
+    const d = this.state.drawing;
+    const key = d ? `${d.id}:${d.revision}` : '';
+    if (key === this.drawingKey) return;
+    this.drawingKey = key;
+    clearTimeout(this.fadeTimer);
+    this.state.drawingFading = false;
+    if (!d) return;
+    this.fadeTimer = setTimeout(() => {
+      if (this.drawingKey !== key) return;
+      this.state.drawingFading = true;
+      this.changed();
+      this.fadeTimer = setTimeout(() => {
+        if (this.drawingKey !== key) return;
+        this.state.drawing = null;
+        if (this.state.focusSource === 'draw') this.state.focusRegion = null;
+        this.emit();
+      }, DRAWING_FADE_MS);
+      this.fadeTimer.unref?.();
+    }, DRAWING_LIFETIME_MS);
+    this.fadeTimer.unref?.();
   }
   private celebrating?: ReturnType<typeof setTimeout>;
   /** Slides read ahead in the background, per document and page. */
@@ -193,10 +279,13 @@ export class TutorService {
       status: 'idle',
       mode: 'text',
       activity: 'idle',
+      speaking: false,
       mic: false,
       input: 'idle',
       hotkeyError: '',
       focusRevision: 0,
+      focusSource: 'draw',
+      drawingFading: false,
       sharing: 'off',
       sourceName: '',
       epoch: 0,
@@ -215,6 +304,7 @@ export class TutorService {
     return structuredClone(this.state);
   }
   emit() {
+    this.watchDrawing();
     this.changed();
   }
   context(topicId?: string | null, documentId?: string, page = 1) {
@@ -557,7 +647,9 @@ export class TutorService {
       input: 'idle',
       mic: false,
       activity: 'idle',
+      speaking: false,
     });
+    this.heard = [];
     this.emit();
   }
   update(raw: unknown) {
@@ -679,7 +771,7 @@ export class TutorService {
           }
         : null;
     if (['thinking', 'pointing'].includes(this.state.activity))
-      this.state.activity = this.state.mic ? 'listening' : 'idle';
+      this.state.activity = this.settled();
     Object.assign(this.state, {
       sharing: 'off',
       sourceName: '',
@@ -831,7 +923,12 @@ export class TutorService {
             snapshot.source.page,
             drawing.marks.map((m) => ({ shape: m.shape, label: m.label, box: m.box })),
           );
-        this.state.focusRegion = marks[0]?.regionId ?? null;
+        // Stay on the part Yoyo is already talking about if it is among the new marks.
+        const keep =
+          Date.now() - this.speechFocusAt < 4000 &&
+          marks.some((m) => m.regionId === this.state.focusRegion);
+        this.state.focusRegion = keep ? this.state.focusRegion : (marks[0]?.regionId ?? null);
+        this.state.focusSource = 'draw';
         this.state.focusRevision++;
         this.point();
         return {
@@ -883,6 +980,7 @@ export class TutorService {
         };
         if (near) {
           this.state.focusRegion = near.id;
+          this.state.focusSource = 'draw';
           this.state.focusRevision++;
         }
         this.emit();
@@ -893,16 +991,7 @@ export class TutorService {
         };
       }
       case 'celebrate': {
-        // A short happy bounce; the companion returns to idle by itself.
-        this.state.activity = 'success';
-        this.emit();
-        clearTimeout(this.celebrating);
-        this.celebrating = setTimeout(() => {
-          if (this.state.activity === 'success') {
-            this.state.activity = 'idle';
-            this.emit();
-          }
-        }, 2600);
+        this.celebrate();
         return { celebrated: true };
       }
       case 'clear_screen':
@@ -941,7 +1030,11 @@ export class TutorService {
           this.state.annotations = [...this.state.annotations, ...fresh].slice(-40);
           this.state.analysis = answer.explanation;
           this.state.latencyMs = Date.now() - started;
-          this.state.activity = this.state.mic ? 'listening' : 'thinking';
+          this.state.activity = this.state.mic
+            ? 'listening'
+            : this.state.speaking
+              ? 'speaking'
+              : 'thinking';
           this.emit();
           return {
             explanation: answer.explanation,
@@ -973,6 +1066,7 @@ export class TutorService {
           throw new Error('Choose a grounded region returned by analyze_current_screen.');
         region.shape = tool.name === 'highlight_screen_region' ? 'highlight' : tool.shape;
         this.state.focusRegion = region.id;
+        this.state.focusSource = 'draw';
         this.state.focusRevision++;
         this.point();
         return { shown: region.label };
@@ -1011,8 +1105,7 @@ export class TutorService {
           cleanSpeech(answer) || answer,
           source?.kind === 'pdf' ? { documentId: source.documentId, page: source.page } : null,
         );
-        this.state.activity = 'success';
-        this.emit();
+        this.celebrate();
         return { saved: true, id: e.id };
       }
       case 'record_learning_interaction':
