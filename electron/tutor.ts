@@ -16,6 +16,7 @@ import { FalClient } from './fal';
 import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
 import type { ScreenDrawing } from '../shared/drawing';
 import { anchor, wordsOf } from '../shared/grounding';
+import { readGesture, type TrailPoint } from '../shared/gesture';
 import {
   AnswerSchema,
   QuestionId,
@@ -140,6 +141,13 @@ export class TutorService {
       nextTeachingSlide: nextTeach,
     };
   }
+  /** The cursor trail from the latest held question, and what it meant on that screen. */
+  private trail: {
+    startedAt: number;
+    points: TrailPoint[];
+    aspect: number;
+    read: { snapshotId: string; kind: 'circle' | 'point'; quote: string; regionId: string } | null;
+  } | null = null;
   private inventory?: {
     snapshotId: string;
     done: Promise<void>;
@@ -457,19 +465,63 @@ export class TutorService {
     })();
     this.inventory = entry;
   }
+  /** The cursor path of a held question (display-normalised), read once its screen is in. */
+  setTrail(trail: { startedAt: number; points: TrailPoint[]; aspect: number } | null) {
+    this.trail = trail && { ...trail, read: null };
+    this.readTrail();
+  }
+  /** A circle or point on the captured screen becomes a region the tutor can draw on. */
+  private readTrail() {
+    const trail = this.trail,
+      snapshot = this.state.snapshot;
+    if (!trail || trail.read || !snapshot || snapshot.source.kind !== 'screen') return;
+    // Only the screen captured for this hold, never an older one.
+    if (Date.parse(snapshot.capturedAt) < trail.startedAt) return;
+    const gesture = readGesture(trail.points, wordsOf(snapshot), trail.aspect);
+    if (!gesture) return;
+    const region = {
+      id: randomUUID(),
+      snapshotId: snapshot.id,
+      shape: gesture.kind === 'circle' ? ('circle' as const) : ('point' as const),
+      box: gesture.box,
+      label: gesture.kind === 'circle' ? 'circled by the student' : 'pointed at by the student',
+      evidence: gesture.quote.slice(0, 500),
+      precision: 'screen-text' as const,
+    };
+    this.state.annotations = [...this.state.annotations, region].slice(-40);
+    trail.read = {
+      snapshotId: snapshot.id,
+      kind: gesture.kind,
+      quote: gesture.quote,
+      regionId: region.id,
+    };
+  }
   /** What the tutor needs to answer and draw at once: summary plus grounded region IDs. */
   async screenMap(timeoutMs = 3500) {
     const entry = this.inventory,
       snapshot = this.state.snapshot;
-    if (!entry || !snapshot || entry.snapshotId !== snapshot.id) return null;
-    await Promise.race([entry.done, new Promise((r) => setTimeout(r, timeoutMs))]);
-    if (this.state.snapshot?.id !== entry.snapshotId || !entry.summary) return null;
+    if (!snapshot) return null;
+    this.readTrail();
+    const pointer =
+      this.trail?.read && this.trail.read.snapshotId === snapshot.id
+        ? {
+            kind: this.trail.read.kind,
+            quote: this.trail.read.quote,
+            regionId: this.trail.read.regionId,
+          }
+        : null;
+    if (entry && entry.snapshotId === snapshot.id)
+      await Promise.race([entry.done, new Promise((r) => setTimeout(r, timeoutMs))]);
+    if (this.state.snapshot?.id !== snapshot.id) return null;
+    const summary = entry?.snapshotId === snapshot.id ? entry.summary : null;
+    if (!summary && !pointer) return null;
     return {
       snapshotId: snapshot.id,
-      summary: entry.summary,
+      summary: summary ?? '',
       regions: this.state.annotations
         .filter((a) => a.snapshotId === snapshot.id)
         .map((a) => ({ regionId: a.id, label: a.label, evidence: a.evidence })),
+      pointer,
     };
   }
   async start(topicId: string | null, mode: 'voice' | 'text', documentId?: string, page = 1) {
@@ -732,6 +784,7 @@ export class TutorService {
       analysis: '',
       latencyMs: null,
     });
+    this.readTrail();
     this.emit();
   }
   async tool(sessionId: string, input: TutorTool) {
@@ -919,6 +972,7 @@ export class TutorService {
             title: tool.title,
             elements: tool.elements,
             captions: tool.captions,
+            size: tool.size,
             near: near?.box ?? null,
           },
           revision: (current?.revision ?? 0) + 1,
@@ -931,7 +985,7 @@ export class TutorService {
         return {
           shown: true,
           where: near ? 'beside the region on screen' : 'in free space on the screen',
-          note: 'It draws itself element by element. Talk through it in the same order.',
+          note: 'It draws itself element by element; flows and pulses keep moving. Talk through it in the same order, without announcing it.',
         };
       }
       case 'celebrate': {

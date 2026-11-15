@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "draw_on_screen",
-  "description": "Draw directly on the student's screen or lecture slide, on what is already there: circle a term, underline a phrase, highlight a definition, box a structure, arrow to a step, and connect parts with labelled arrows. Target each mark by quoting the exact visible words (quote), or by a regionId from the screen map. Animated like handwriting; Yoyo flies to the first mark. Build an explanation with several calls (clear:false) as you speak. If the content is on screen, annotate it here instead of redrawing it in a sketch.",
+  "description": "Draw directly on the student's screen or lecture slide, on what is already there: circle a term, underline a phrase, highlight a definition, box a structure, arrow to a step, and connect parts with labelled arrows. Target each mark by quoting the exact visible words (quote), or by a regionId from the screen map. Animated like handwriting; Yoyo flies to the first mark. Build an explanation with several calls (clear:false) as you speak. If the content is on screen, annotate it here instead of redrawing it in a sketch. Never announce it (no \"Let me draw\", \"I'll sketch\", \"Let's look at\"); talk about the subject while it appears.",
   "expects_response": true,
   "response_timeout_secs": 10,
   "parameters": {
@@ -78,5 +78,6 @@
       "connections",
       "clear"
     ]
-  }
+  },
+  "pre_tool_speech": "off"
 }

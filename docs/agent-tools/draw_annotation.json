@@ -32,5 +32,6 @@
       "regionId",
       "shape"
     ]
-  }
+  },
+  "pre_tool_speech": "off"
 }

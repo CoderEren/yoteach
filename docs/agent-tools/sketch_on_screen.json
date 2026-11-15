@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "sketch_on_screen",
-  "description": "Draw and animate on the student's screen in one framed scene: vectors, graphs, geometry, forces, processes, transformations. Elements draw by hand in build steps (step 1, 2, 3...) with an optional caption per step, and any element can glide to a new position (moveTo) after it is drawn, e.g. a vector sliding tip-to-tail, a point moving along a curve, a basis vector being transformed. Optionally sit beside a screen region (near). Out-of-range values are clamped, so always try.",
+  "description": "Draw and animate a real picture on the student's screen in one framed scene, not just a diagram: cells, neurons, organs, molecules binding, circuits, forces, graphs, geometry, vectors, processes. Build it like a whiteboard artist: soft filled shapes for the objects (shape, ellipse with fill), thick curves for fibres and vessels (width), then make it live: 'flow' sends labelled particles along a path forever (Na+ ions rushing in, K+ out, blood, electrons, molecules diffusing), 'pulse' runs a travelling glow along a path (an action potential down an axon, a signal, current), and any element can glide to a new place after it is drawn (moveTo). Elements draw by hand in build steps (step 1, 2, 3...) with one caption per step. size 'large' for a rich scene. Optionally sit beside a screen region (near). Out-of-range values are clamped, so always try. Never announce it (no \"Let me draw\", \"I'll sketch\", \"Let's look at\"); talk about the subject while it appears.",
   "expects_response": true,
   "response_timeout_secs": 10,
   "parameters": {
@@ -28,9 +28,13 @@
                 "box",
                 "dot",
                 "text",
-                "axes"
+                "axes",
+                "shape",
+                "ellipse",
+                "flow",
+                "pulse"
               ],
-              "description": "Element kind."
+              "description": "Element kind. shape: closed smooth outline through points (cell body, organ, membrane patch). ellipse: at + rx/ry. flow: particles moving along path forever. pulse: travelling glow along path."
             },
             "from": {
               "type": "array",
@@ -58,7 +62,7 @@
                 },
                 "description": "[x,y]"
               },
-              "description": "curve points, 2-24."
+              "description": "curve points 2-24, or shape outline points (3+, it closes itself)."
             },
             "at": {
               "type": "array",
@@ -113,9 +117,13 @@
               "enum": [
                 "ink",
                 "accent",
-                "muted"
+                "muted",
+                "blue",
+                "green",
+                "pink",
+                "yellow"
               ],
-              "description": "ink default, accent to highlight, muted for guides."
+              "description": "Stroke colour."
             },
             "step": {
               "type": "integer",
@@ -128,6 +136,55 @@
                 "description": "x then y."
               },
               "description": "Optional [x,y]: after drawing, glide the element so its start point lands here (animation)."
+            },
+            "path": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "description": "x then y."
+                },
+                "description": "[x,y]"
+              },
+              "description": "flow/pulse route, 2-40 points [x,y]; particles or the glow travel from first to last."
+            },
+            "rx": {
+              "type": "number",
+              "description": "ellipse horizontal radius."
+            },
+            "ry": {
+              "type": "number",
+              "description": "ellipse vertical radius."
+            },
+            "fill": {
+              "type": "string",
+              "enum": [
+                "ink",
+                "accent",
+                "muted",
+                "blue",
+                "green",
+                "pink",
+                "yellow"
+              ],
+              "description": "Soft fill for shape, ellipse, circle or box."
+            },
+            "width": {
+              "type": "number",
+              "description": "Stroke width 0.3-6 (default 0.7); 2-4 for an axon, vessel or wire."
+            },
+            "count": {
+              "type": "number",
+              "description": "flow: number of particles 1-12 (default 5)."
+            },
+            "symbol": {
+              "type": "string",
+              "description": "flow: text inside each particle, up to 4 characters, e.g. Na+, K+, e-, O2."
+            },
+            "seconds": {
+              "type": "number",
+              "description": "flow: seconds for one trip (default 3). pulse: seconds per sweep (default 2)."
             }
           },
           "required": [
@@ -146,11 +203,20 @@
           "type": "string",
           "description": "Caption for that step."
         }
+      },
+      "size": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "large"
+        ],
+        "description": "large for a detailed scene (neuron, heart, cell); default normal."
       }
     },
     "required": [
       "title",
       "elements"
     ]
-  }
+  },
+  "pre_tool_speech": "off"
 }

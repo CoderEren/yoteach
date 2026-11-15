@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "sketch_diagram",
-  "description": "Sketch a small concept diagram on the student's screen in free space: a left-to-right flow or a cycle of 2\u20137 short nodes with labelled arrows. The app lays it out and draws it in. Use for processes, causes and comparisons that are not visible on screen.",
+  "description": "Sketch a small concept diagram on the student's screen in free space: a left-to-right flow or a cycle of 2\u20137 short nodes with labelled arrows. The app lays it out and draws it in. Use for processes, causes and comparisons that are not visible on screen. Never announce it (no \"Let me draw\", \"I'll sketch\", \"Let's look at\"); talk about the subject while it appears.",
   "expects_response": true,
   "response_timeout_secs": 10,
   "parameters": {
@@ -81,5 +81,6 @@
     "required": [
       "diagram"
     ]
-  }
+  },
+  "pre_tool_speech": "off"
 }

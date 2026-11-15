@@ -71,9 +71,9 @@ export const mediaLimits = {
 } as const;
 const style = {
   image:
-    'Educational visual analogy for a university student. Clean conceptual illustration, soft lavender and icy-blue palette, plain light background, centred composition. Absolutely no text, letters, numbers, labels, formulas or watermarks.',
+    'Educational illustration for a university student. Clear, scientifically plausible, clean 3D-render or illustration style, soft lighting, uncluttered background, centred subject. Absolutely no text, letters, numbers, labels, formulas or watermarks.',
   video:
-    'Short educational visual-analogy clip for a university student. Slow, steady camera, simple shapes, soft lavender and icy-blue palette, plain light background. No text, letters, numbers, labels, formulas or watermarks.',
+    'Short educational clip for a university student. Clear, scientifically plausible motion, slow steady camera, clean 3D-render style, soft lighting, uncluttered background. No text, letters, numbers, labels, formulas or watermarks.',
 };
 /** The subject is study data, not instructions; it only fills the scene description. */
 export function illustrationPrompt(kind: MediaKind, subject: string) {

@@ -149,6 +149,15 @@ export interface DesktopApi {
     interactive(on: boolean): Promise<Result<void>>;
     /** Ask Yoyo to fly beside a box on the overlay (normalized). */
     focus(box: { x: number; y: number; width: number; height: number }): Promise<Result<void>>;
+    /** Cursor ink while the talk key is held (display-normalised points, t in ms). */
+    onTrail(
+      fn: (
+        e:
+          | { type: 'start'; points: { x: number; y: number; t: number }[] }
+          | { type: 'add'; point: { x: number; y: number; t: number } }
+          | { type: 'end' },
+      ) => void,
+    ): () => void;
   };
   tutor: TutorApi;
   media: MediaApi;
