@@ -45,6 +45,34 @@ test('a loop around one word quotes just that word; a loop round empty space has
   assert.equal(empty!.quote, '');
 });
 
+test('circling a wrapped sentence preserves reading order and excludes nearby text', () => {
+  const wrapped = [
+    word('system', 0.42, 0.34, 1),
+    word('Energy', 0.3, 0.3, 0),
+    word('unrelated', 0.7, 0.3, 0),
+    word('this', 0.36, 0.34, 1),
+    word('flows', 0.36, 0.3, 0),
+    word('through', 0.3, 0.34, 1),
+  ];
+  const g = readGesture(loop(0.395, 0.33, 0.13, 0.065), wrapped);
+  assert.equal(g?.kind, 'circle');
+  assert.equal(g?.quote, 'Energy flows through this system');
+});
+
+test('an imperfect loop with an open gap still selects its word', () => {
+  const trail = Array.from({ length: 70 }, (_, k) => {
+    const a = (k / 69) * Math.PI * 1.8;
+    return {
+      x: 0.245 + 0.04 * Math.cos(a) * (1 + 0.08 * Math.sin(5 * a)),
+      y: 0.21 + 0.035 * Math.sin(a),
+      t: k * 16,
+    };
+  });
+  const g = readGesture(trail, words);
+  assert.equal(g?.kind, 'circle');
+  assert.equal(g?.quote, 'glycolysis');
+});
+
 test('moving to a word and resting there is pointing; a still or wandering cursor is nothing', () => {
   const pts: TrailPoint[] = [];
   let t = 0;

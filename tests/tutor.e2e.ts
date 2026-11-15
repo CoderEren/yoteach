@@ -304,7 +304,17 @@ test('held microphone streams only while held, captures screen, cancels drag and
     await expect.poll(() => provider.chunks()).toBeGreaterThan(0);
     const pet = app.windows().find((w) => w.url().includes('/companion'))!;
     await expect(pet.locator('.input-listening')).toBeVisible();
-    await page.waitForTimeout(500);
+    // Wait for actual fixture audio, not wall time: a busy AudioContext can
+    // deliver less than the speech detector's minimum during a fixed sleep.
+    await expect
+      .poll(() =>
+        provider.messages.reduce(
+          (bytes, m) =>
+            bytes + (m.user_audio_chunk ? Buffer.from(m.user_audio_chunk, 'base64').length : 0),
+          0,
+        ),
+      )
+      .toBeGreaterThanOrEqual(16000 * 0.4 * 2);
     const held = provider.chunks();
     await page.mouse.up();
     await expect.poll(() => provider.chunks()).toBeGreaterThan(held);

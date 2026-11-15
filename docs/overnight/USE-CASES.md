@@ -38,9 +38,9 @@ Each row: send the exact question to the real hosted agent before/after the prom
 | G06 | OCR distance measurement | Compare mark box with native OCR target box | Zero anchor mismatch; eye-check visible ink | not testable | No valid real-slide target in capture. Synthetic exact-box anchoring passes unit tests, but does not establish real-screen pixel error. |
 | G07 | New topic clears drawing | Render answer; send unrelated then related questions | Unrelated clears; related retains | pass | `tests/chats.test.ts`, new-question regression. |
 | G08 | Circle a word | Feed generated loop round glycolysis; ask this | Exact selected word and region | pass | `tests/gesture.test.ts` and drawing service tests; synthetic trail only. |
-| G09 | Circle sentence across two lines | Supply wrapped OCR and enclosing gesture | Both lines selected in reading order | not testable | Wrapped quote grounding tested separately, but the complete multiline gesture scenario was not exercised. |
+| G09 | Circle sentence across two lines | Supply shuffled wrapped OCR and enclosing loop | Both lines selected in reading order; unrelated word excluded | pass | Cycle 5 gesture regression selects “Energy flows through this system”. Synthetic trace; no physical gesture claim. |
 | G10 | Circle picture without text | Feed empty-text loop plus describeSpot fixture | Visual description sent to tutor | pass | `tests/drawing.test.ts`, picture-circle test. Live recognition still unverified. |
-| G11 | Sloppy unclosed hand-made circle | Draw incomplete loop physically | Circle accepted within thresholds | not testable | Algorithm handles imperfect loops, but no real hand-made trace was obtained. |
+| G11 | Sloppy unclosed circle | Feed a wobbly loop with a 36° open gap | Circle accepted and correct word selected | pass | Cycle 5 synthetic regression selects glycolysis. Actual hand-made traces remain not testable in this run (G15). |
 | G12 | Point at word | Move then dwell near target | Point region and correct quote | pass | Synthetic trail detector test. |
 | G13 | Stray wiggle/swipe | Feed moving, stationary and straight swipe traces | No false circle/point | pass | `tests/gesture.test.ts`; not a broad human-trace dataset. |
 | G14 | Cursor ink visible while holding | Send overlay trail events; clear on release | Visible trail, no stale ink | pass | On-screen Electron journey; [cursor evidence](screens/cursor-ink.png). Events are synthetic, not physical pointer validation. |
@@ -78,10 +78,10 @@ Each row: send the exact question to the real hosted agent before/after the prom
 | P02 | Yoteach foreground | Check native focus gating | No proactive offer while app focused | not testable | Source guard exists; current e2e hides workspace before checking. Native foreground behavior remains unverified. |
 | P03 | Wordless screen | Empty OCR through repeated ticks | No offer and no network | pass | Proactive e2e records zero requests; unit test. |
 | P04 | Works after Yoyo draws | Finish drawing and wait | Offer can appear after pointing settles | not testable | Pointing returns idle (unit/e2e), and busy guard permits idle, but full native post-drawing sequence not exercised. |
-| S01 | Light/dark/system | Select each in Settings | Selected state follows choice | pass | Final desktop e2e iterates all three; actual macOS appearance transition not changed. |
-| S02 | Talk-key choices | Select all five options | Value accepted; F8 survives restart | pass | Final desktop e2e. Physical activation of every modifier not tested. |
-| S03 | Yoyo visibility switch | Inspect Settings; hide/show via supported API | User-facing visibility control and persistence | fail | Settings has no visibility switch; sidebar offers Show Yoyo. API hide/show works. Adding a switch remains a P2 proposal. |
-| S04 | Proactive switch | Check then uncheck; restart | Off persists | pass | Final desktop e2e. |
+| S01 | Light/dark/system | Select each in Settings | Selected state follows choice | pass | Desktop e2e iterates all three; actual macOS appearance transition not changed. |
+| S02 | Talk-key choices | Select all five options | Value accepted; F8 survives restart | pass | Desktop e2e. Physical activation of every modifier not tested. |
+| S03 | Yoyo visibility switch | Use Space on Show Yoyo in Settings; restart off and on | Native companion visibility and saved switch agree | pass | Cycle 5 e2e verifies both directions and sidebar hidden status. Uses the existing stored setting. |
+| S04 | Proactive switch | Check then uncheck; restart | Off persists | pass | Desktop e2e. |
 | S05 | Theme persistence | Set Dark; restart | Dark retained | pass | Desktop e2e and store tests. |
 
 ## Yoyo, failures and accessibility
@@ -89,7 +89,7 @@ Each row: send the exact question to the real hosted agent before/after the prom
 | ID | Scenario | Steps | Expected result | Status | Evidence / reason |
 |---|---|---|---|---|---|
 | Y01 | Idle/listening/thinking/speaking/pointing/success | Drive runtime fixture states; inspect component variants | Expressive original Violet states | pass | Source states, hold/drawing e2e, canonical editable Figma variants. Static Figma variants do not demonstrate animation timing. |
-| Y02 | All four edges | Drag via IPC to extreme corners | Whole companion window inside work area | pass | Final desktop e2e checks every corner's bounds. Physical mouse feel not measured. |
+| Y02 | All four edges | Drag via IPC to extreme corners | Whole companion window inside work area | pass | Desktop e2e checks every corner's bounds. Physical mouse feel not measured. |
 | Y03 | Fly and return | Draw grounded arrow from saved home | Point beside target then return to exact home | pass | Hold e2e checks moved bounds, point state and restored bounds. |
 | Y04 | Reduced motion | Enable reduced motion; draw; toggle live | Visible final scene, no moving particles, animations stop | pass | Cycle 1 e2e and CSS animation assertion. |
 | F01 | Missing keys | Launch blank provider env | Setup status; no unexplained dead CTA | pass | Cycle 3 regression; reads PDFs without provider config. |
@@ -101,7 +101,7 @@ Each row: send the exact question to the real hosted agent before/after the prom
 | F07 | Hold cancelled by drag | Begin hold then drag companion | Recording ends; no extra audio sent | pass | Hold e2e checks chunk count and idle state. |
 | F08 | Dismiss error | Cause shared runtime error; Dismiss | Error clears and later errors remain possible | pass | Cycle 3 e2e regression. |
 | A01 | Keyboard dismissal | Open confirmation; Escape | Dialog closes without deletion | pass | Cycle 2 regression. |
-| A02 | Full keyboard traversal | Tab through every surface/control | Logical focus order, no trap | not testable | Native dialogs and labeled controls inspected, but exhaustive keyboard traversal not completed. |
+| A02 | Keyboard traversal | Tab through every Settings control; Shift+Tab at first; Escape | All controls reachable; modal contains focus and returns it to trigger | pass | Cycle 5 e2e. Other surfaces use the same Modal; exhaustive traversal of every non-modal app screen is still not established. |
 | A03 | Focus rings | Inspect focus-visible styles | Visible ring on interactive controls | pass | CSS source review; no exhaustive screenshot/contrast certification. |
 | A04 | Contrast | Review Violet foreground/background tokens | Readable body text in both themes | pass | Design audit/token review and light/dark screenshots; no WCAG certification or full translucency background matrix. |
 | A05 | Screen-reader labels | Query app/card/drawing controls by accessible role/name | Meaningful accessible labels | pass | E2e role queries and sketch aria-label assertion; VoiceOver reading order remains not tested. |
