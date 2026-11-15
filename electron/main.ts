@@ -535,6 +535,9 @@ else {
     overlay = new BrowserWindow({
       width: 200,
       height: 200,
+      // Without this macOS pushes the layer below the menu bar, and every drawing landed one
+      // menu-bar height (about 33 pt) below what it marks.
+      enableLargerThanScreen: true,
       frame: false,
       type: 'panel',
       focusable: false,

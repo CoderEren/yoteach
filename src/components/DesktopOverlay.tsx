@@ -687,11 +687,18 @@ function Interactive({
 /** Yoyo's drawing surface over the user's own screen. Clicks pass through except on cards. */
 export function DesktopOverlay({ data }: { data: AppState }) {
   const { runtime: r } = useTutor();
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  useEffect(() => api.overlay?.onOffset?.(setOffset), []);
   return (
-    <>
+    <div
+      className="overlay-stage"
+      style={
+        offset.x || offset.y ? { transform: `translate(${offset.x}px, ${offset.y}px)` } : undefined
+      }
+    >
       {!r || r.lecture ? <main className="desktop-overlay" /> : <ScreenLayer data={data} r={r} />}
       <CursorInk />
-    </>
+    </div>
   );
 }
 /**

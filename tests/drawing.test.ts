@@ -596,11 +596,12 @@ test('Yoyo walks to the part it is talking about, as it says it', async (t) => {
   }
 });
 
-test('drawings fade away 20 seconds after their last change', async (t) => {
+test('drawings fade away 15 seconds after Yoyo finishes talking, not while it explains', async (t) => {
   const f = setup();
   try {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const { s, byLabel } = await mappedScreen(f, t);
+    const talking = (speaking: boolean) => f.service.update({ sessionId: s.id, speaking });
     const draw = (label: string) =>
       f.service.tool(
         s.id,
@@ -610,13 +611,20 @@ test('drawings fade away 20 seconds after their last change', async (t) => {
           clear: false,
         }),
       );
+    talking(true);
     await draw('Investment');
-    t.mock.timers.tick(15000);
-    await draw('Payoff'); // a change restarts the clock
-    t.mock.timers.tick(15000);
-    assert.equal(f.service.state.drawingFading, false);
-    assert.equal(f.service.state.drawing?.marks.length, 2);
+    t.mock.timers.tick(60_000);
+    assert.ok(f.service.state.drawing, 'stays as long as Yoyo is still explaining');
+    talking(false); // a short pause between sentences
     t.mock.timers.tick(5000);
+    talking(true);
+    await draw('Payoff');
+    t.mock.timers.tick(30_000);
+    assert.equal(f.service.state.drawing?.marks.length, 2, 'the pause did not count');
+    talking(false); // the answer is over: the countdown starts now
+    t.mock.timers.tick(14_000);
+    assert.equal(f.service.state.drawingFading, false);
+    t.mock.timers.tick(1000);
     assert.equal(f.service.state.drawingFading, true, 'fading out');
     assert.ok(f.service.state.drawing, 'still there while it fades');
     t.mock.timers.tick(900);
@@ -667,10 +675,130 @@ test('subtitles follow the voice timings in short phrases and clear after it sto
   // Without timings, words are paced from the response text instead.
   const paced: string[] = [];
   const d = new Captioner((caption) => paced.push(caption), 300);
-  d.response('Hello there student.');
-  t.mock.timers.tick(250);
+  d.response('Hello there student .');
+  t.mock.timers.tick(900);
   t.mock.timers.tick(600);
-  assert.equal(paced.at(-1), 'Hello there student.');
+  assert.equal(paced.at(-1), 'Hello there student.', 'no space before punctuation');
   d.stop();
   assert.equal(paced.at(-1), '');
+});
+
+/** Split text into audio chunks at the given character offsets, 40 ms per character. */
+function chunksOf(text: string, cuts: number[]) {
+  const edges = [0, ...cuts, text.length];
+  return edges.slice(1).map((end, i) => {
+    const chars = [...text.slice(edges[i], end)];
+    return { chars, char_start_times_ms: chars.map((_, j) => j * 40) };
+  });
+}
+function play(
+  t: import('node:test').TestContext,
+  text: string,
+  cuts: number[],
+  opts: { gap?: number } = {},
+) {
+  const shown: string[] = [];
+  const c = new Captioner((caption) => shown.push(caption));
+  for (const chunk of chunksOf(text, cuts)) {
+    c.chunk(chunk);
+    t.mock.timers.tick(chunk.chars.length * 40 + (opts.gap ?? 0));
+  }
+  c.finished();
+  return { c, shown };
+}
+
+test('subtitles never cut a word that spans two audio chunks', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const text = 'ATP activates glucose, then the payoff begins.';
+  // Cut inside "glucose" and inside "payoff", and once exactly between words.
+  const { shown } = play(t, text, [
+    text.indexOf('cose'),
+    text.indexOf(' then'),
+    text.indexOf('off'),
+  ]);
+  const all = shown.filter(Boolean);
+  for (const caption of all)
+    for (const word of caption.split(' '))
+      assert.ok(
+        text.split(' ').includes(word) ||
+          text.split(' ').some((w) => w.replace(/[.,]$/, '') === word),
+        `"${word}" in "${caption}" is a whole word`,
+      );
+  assert.ok(all.includes('ATP activates glucose,'), 'the split word appears whole');
+  assert.equal(all.at(-1), 'then the payoff begins.');
+  // A split word whose continuation arrives late is still shown, never lost.
+  const late = play(t, 'Glycolysis splits sugar', [13], { gap: 600 });
+  assert.ok(late.shown.includes('Glycolysis splits sugar'));
+  assert.ok(!late.shown.some((s) => / (sp|lits)( |$)/.test(s)));
+});
+
+test('subtitle words keep spoken order, voice tags vanish across chunks, no stray spaces', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const text = 'So [cheer fully] here it is , right ?';
+  const { shown } = play(t, text, [8, 16]);
+  assert.ok(shown.includes('So here it is,'), 'comma glued to its word');
+  assert.equal(shown.filter(Boolean).at(-1), 'right?');
+  assert.ok(!shown.some((s) => /\[|\]|ful|  /.test(s)));
+  // Paced words from the text are dropped when real timings turn up, never mixed in.
+  const mixed: string[] = [];
+  const c = new Captioner((caption) => mixed.push(caption), 100);
+  c.response('one two three four');
+  t.mock.timers.tick(900);
+  t.mock.timers.tick(100);
+  c.chunk({
+    chars: [...'alpha beta'],
+    char_start_times_ms: [...'alpha beta'].map((_, i) => i * 40),
+  });
+  t.mock.timers.tick(1000);
+  assert.equal(mixed.filter(Boolean).at(-1), 'alpha beta');
+});
+
+test('the screen stays calm: a few marks per call, a few on screen, few moving parts per sketch', async (t) => {
+  const f = setup();
+  try {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { s, byLabel } = await mappedScreen(f, t);
+    const both = [{ regionId: byLabel('Investment').id }, { regionId: byLabel('Payoff').id }];
+    const result = (await f.service.tool(
+      s.id,
+      ToolSchema.parse({
+        name: 'draw_on_screen',
+        marks: [...both, ...both, ...both],
+        connections: [1, 2, 3, 4].map(() => ({
+          from: byLabel('Investment').id,
+          to: byLabel('Payoff').id,
+        })),
+      }),
+    )) as { note: string };
+    assert.equal(f.service.state.drawing?.marks.length, 3, 'three marks per call');
+    assert.equal(f.service.state.drawing?.connections.length, 2, 'two connections per call');
+    assert.match(result.note, /mark the next part when you reach it/);
+    for (let i = 0; i < 3; i++)
+      await f.service.tool(
+        s.id,
+        ToolSchema.parse({ name: 'draw_on_screen', marks: both, connections: [], clear: false }),
+      );
+    assert.equal(f.service.state.drawing?.marks.length, 5, 'older marks make way');
+    await f.service.tool(
+      s.id,
+      ToolSchema.parse({
+        name: 'sketch_on_screen',
+        title: 'Ions',
+        elements: [
+          { type: 'circle', at: [50, 35], r: 10 },
+          ...[10, 20, 30, 40].map((y) => ({
+            type: 'flow',
+            path: [
+              [0, y],
+              [100, y],
+            ],
+          })),
+        ],
+      }),
+    );
+    const kinds = f.service.state.drawing?.sketch?.elements.map((e) => e.type);
+    assert.deepEqual(kinds, ['circle', 'flow', 'flow']);
+  } finally {
+    f.cleanup();
+  }
 });

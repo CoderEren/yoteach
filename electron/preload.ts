@@ -12,6 +12,7 @@ const api: DesktopApi = {
     interactive: (on) => ipcRenderer.invoke('overlay:interactive', on),
     focus: (box) => ipcRenderer.invoke('overlay:focus', box),
     onTrail: (fn) => listen('overlay:trail', fn),
+    onOffset: (fn) => listen('overlay:offset', fn),
   },
   tutor: {
     get: () => ipcRenderer.invoke('tutor:get'),

@@ -18,5 +18,5 @@ export function slideInstruction(kind: SlideKind, next: number | null) {
     return `This slide has no teachable content (title, names, agenda, divider or thanks). Say at most one short sentence, or nothing, then call ${onward} straight away.`;
   if (kind === 'brief')
     return `This slide only introduces, recaps or states one simple point. Cover it in one or two sentences, then call ${onward}.`;
-  return 'Teach this slide now from the supplied content: the central idea, how its parts relate, and an example if useful. Start with the idea itself, not with "This slide". Mark the slide as you speak by quoting its words in draw_on_screen; do not announce it. Then invite a question or offer the next slide.';
+  return 'Teach this slide now from the supplied content: the central idea, how its parts relate, and an example if useful. Start with the idea itself, not with "This slide". Mark the slide as you speak by quoting its words in draw_on_screen, and show the process or mechanism behind it moving with sketch_on_screen; do not announce either. Then invite a question or offer the next slide.';
 }
