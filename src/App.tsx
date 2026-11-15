@@ -17,8 +17,6 @@ import { Chats } from './components/Chats';
 import { Lectures } from './components/Lectures';
 import { Modal } from './components/Modal';
 import { MediaView } from './components/GeneratedMedia';
-import { ReviewList } from './components/Practice';
-import { reviewSuggestions } from '../shared/practice';
 import { cleanSpeech } from '../shared/tutor';
 
 /** Split a spoken explanation into readable paragraphs of two or three sentences. */
@@ -42,8 +40,6 @@ function paragraphs(text: string) {
 import { Yoyo } from './components/Yoyo';
 import { useTutor } from './tutor';
 import { LectureStage } from './components/LectureStage';
-import { VisualLesson } from './components/VisualLesson';
-import { lessonDefinition } from '../shared/lessons';
 import { DesktopOverlay } from './components/DesktopOverlay';
 const PdfViewer = lazy(() =>
   import('./components/PdfViewer').then((m) => ({ default: m.PdfViewer })),
@@ -128,12 +124,7 @@ export default function App() {
     );
   if (companion) return <Companion data={data} />;
   if (overlay) return <DesktopOverlay data={data} />;
-  const lesson = data.lessons.find((l) => l.id === r?.activeLessonId);
   const media = data.media.find((m) => m.id === mediaId);
-  if (lesson && r?.lessonSurface !== 'screen')
-    return (
-      <VisualLesson key={lesson.id} saved={lesson} media={data.media} attempts={data.attempts} />
-    );
   if (r?.lecture) return <LectureStage media={data.media} />;
   const doc = data.documents.find((d) => d.id === viewer?.id);
   return (
@@ -326,40 +317,6 @@ export default function App() {
       {saved && (
         <Modal title="Saved material" onClose={() => setSaved(false)}>
           <div className="saved-material">
-            {data.lessons.map((l) => (
-              <button
-                className="button"
-                key={l.id}
-                onClick={() => {
-                  setSaved(false);
-                  void act({ type: 'lesson-open', lesson: l.key, savedId: l.id });
-                }}
-              >
-                <BookOpen size={16} />
-                {lessonDefinition(l.key).title} · Step {l.step}
-              </button>
-            ))}
-            {data.attempts.length > 0 && (
-              <article className="saved-practice">
-                <h3>Practice & review</h3>
-                <p>
-                  {data.attempts.length} saved {data.attempts.length === 1 ? 'answer' : 'answers'} ·
-                  review is based only on your latest answer to each question.
-                </p>
-                <ReviewList items={reviewSuggestions(data.attempts)} />
-                <button
-                  className="button small"
-                  onClick={() => {
-                    setSaved(false);
-                    void act({ type: 'lesson-open', lesson: 'glucose-phosphorylation' }).then(() =>
-                      act({ type: 'practice-open' }),
-                    );
-                  }}
-                >
-                  Open practice
-                </button>
-              </article>
-            )}
             {[...data.media].reverse().map((m) => (
               <button
                 className="button"
@@ -370,9 +327,7 @@ export default function App() {
                 }}
               >
                 <Sparkles size={16} />
-                {m.kind === 'video' ? 'Clip' : 'Visual analogy'} ·{' '}
-                {m.lessonStep ? `Lesson step ${m.lessonStep} · ` : ''}
-                {m.subject.slice(0, 70)}
+                {m.kind === 'video' ? 'Clip' : 'Image'} · {m.subject.slice(0, 70)}
                 {m.subject.length > 70 ? '…' : ''}
               </button>
             ))}
@@ -429,14 +384,12 @@ export default function App() {
                   <small>Preserved note from your previous workspace</small>
                 </article>
               ))}
-            {!data.lessons.length &&
-              !data.media.length &&
-              !data.attempts.length &&
+            {!data.media.length &&
               !data.documents.length &&
               !data.explanations.length &&
               !data.topics.some((t) => t.overview) && (
                 <p>
-                  Your PDFs, lessons, generated visuals, saved explanations and preserved notes will
+                  Your PDFs, generated images and clips, saved explanations and preserved notes will
                   appear here.
                 </p>
               )}
@@ -452,7 +405,6 @@ export default function App() {
             <small>
               Generated {new Date(media.createdAt).toLocaleString()} ·{' '}
               {media.origin === 'tutor' ? 'requested by Yoyo' : 'requested by you'}
-              {media.lessonStep ? ` · glucose lesson step ${media.lessonStep}` : ''}
               {media.source
                 ? ` · ${data.documents.find((d) => d.id === media.source!.documentId)?.originalName ?? 'lecture'} p. ${media.source.page}`
                 : ''}

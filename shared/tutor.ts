@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { LessonKey, LessonStep } from './lessons';
 import { MediaKind, Subject, type Generation } from './media';
-import { QuestionId } from './practice';
 import {
   ConnectionSchema,
   DiagramSchema,
@@ -134,9 +132,6 @@ export type StudySession = z.infer<typeof StudySessionSchema>;
 export type TutorMessage = z.infer<typeof MessageSchema>;
 export type Explanation = z.infer<typeof ExplanationSchema>;
 export type TutorRuntime = {
-  activeLessonId: string | null;
-  /** Outside lectures, Yoyo teaches on the user's screen rather than in the app window. */
-  lessonSurface: 'screen' | 'app';
   drawing: ScreenDrawing | null;
   sessionId: string | null;
   chatId: string | null;
@@ -161,7 +156,6 @@ export type TutorRuntime = {
   generation: Generation | null;
   /** A short, transient message shown beside Yoyo. */
   notice: string | null;
-  practice: { questionId: QuestionId; checking: boolean } | null;
   config: {
     voice: boolean;
     vision: boolean;
@@ -171,12 +165,6 @@ export type TutorRuntime = {
 };
 export type WindowSource = { id: string; name: string };
 export const ToolSchema = z.discriminatedUnion('name', [
-  z.object({
-    name: z.literal('open_visual_lesson'),
-    lesson: LessonKey,
-    step: LessonStep.default(1),
-  }),
-  z.object({ name: z.literal('navigate_visual_lesson'), step: LessonStep }),
   z.object({
     name: z.literal('generate_illustration'),
     subject: Subject,
@@ -195,12 +183,6 @@ export const ToolSchema = z.discriminatedUnion('name', [
     reason: z.string().trim().max(120).optional(),
   }),
   SketchSchema.extend({ name: z.literal('sketch_on_screen'), near: Uuid.optional() }),
-  z.object({ name: z.literal('ask_practice_question'), question: QuestionId.optional() }),
-  z.object({
-    name: z.literal('record_practice_attempt'),
-    question: QuestionId,
-    answer: z.string().trim().min(1).max(2000),
-  }),
   z.object({
     name: z.literal('analyze_current_screen'),
     question: z.string().trim().min(1).max(2000),
@@ -216,17 +198,6 @@ export const ToolSchema = z.discriminatedUnion('name', [
 ]);
 export type TutorTool = z.infer<typeof ToolSchema>;
 export const IntentSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('lesson-open'),
-    lesson: LessonKey,
-    savedId: Uuid.optional(),
-    surface: z.enum(['screen', 'app']).optional(),
-  }),
-  z.object({ type: z.literal('lesson-step'), id: Uuid, step: LessonStep }),
-  z.object({ type: z.literal('lesson-close') }),
-  z.object({ type: z.literal('lesson-narrate') }),
-  z.object({ type: z.literal('practice-open'), question: QuestionId.optional() }),
-  z.object({ type: z.literal('practice-close') }),
   z.object({ type: z.literal('screen-clear') }),
   z.object({ type: z.literal('nudge') }),
   z.object({ type: z.literal('inform'), text: z.string().min(1).max(6000) }),

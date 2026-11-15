@@ -191,24 +191,7 @@ export function installTutor(
   function intent(input: unknown) {
     const action = IntentSchema.parse(input);
     if (action.type === 'open') open();
-    if (action.type === 'lesson-open') {
-      const surface = action.surface ?? 'app';
-      service.openLesson(action.savedId, surface);
-      if (surface === 'app') open();
-    }
     if (action.type === 'screen-clear') service.clearDrawing();
-    if (action.type === 'lesson-step') service.stepLesson(action.id, action.step);
-    if (action.type === 'practice-open')
-      service.openPractice(
-        action.question,
-        service.state.activeLessonId ? service.state.lessonSurface : 'app',
-      );
-    if (action.type === 'practice-close') service.closePractice();
-    if (action.type === 'lesson-close') {
-      if (service.state.practice) service.closePractice();
-      service.state.activeLessonId = null;
-      service.emit();
-    }
     if (action.type === 'hold-start') {
       stuck.reset();
       if (holdActive || service.state.input === 'sending') return;
@@ -216,11 +199,9 @@ export function installTutor(
       captureDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       // Capture and read the screen the instant the key goes down, before the voice
       // connection is even ready; the session picks it up when it asks.
-      earlyCapture =
-        service.state.lecture ||
-        (service.state.activeLessonId && service.state.lessonSurface === 'app')
-          ? null
-          : { display: captureDisplay, result: runCapture(captureDisplay) };
+      earlyCapture = service.state.lecture
+        ? null
+        : { display: captureDisplay, result: runCapture(captureDisplay) };
       earlyCapture?.result.catch(() => {});
       service.state.input = 'arming';
       service.state.error = '';
@@ -292,11 +273,7 @@ export function installTutor(
         !['arming', 'listening', 'sending'].includes(service.state.input)
       )
         throw new Error('Hold the talk key or Yoyo to capture your screen.');
-      if (
-        service.state.lecture ||
-        (service.state.activeLessonId && service.state.lessonSurface === 'app')
-      )
-        return;
+      if (service.state.lecture) return;
       const id = service.state.sessionId,
         display = captureDisplay ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       service.stopSharing();
@@ -491,31 +468,6 @@ export function installTutor(
     },
     true,
   );
-  handle(
-    'media:generate',
-    (input) => {
-      const job = service.generate(input, 'student');
-      void job.settled;
-      return { id: job.id };
-    },
-    true,
-  );
-  handle(
-    'practice:answer',
-    (input) => {
-      const p = z.object({ questionId: z.string(), answer: z.unknown() }).parse(input);
-      return service.answerPractice(p.questionId, p.answer as any, 'student');
-    },
-    true,
-  );
-  handle(
-    'practice:remove',
-    (input) => {
-      store.deleteAttempt(Id.parse(input));
-      emit();
-    },
-    true,
-  );
   handle('media:cancel', () => service.cancelGeneration(), true);
   handle('media:dismiss', () => service.dismissGeneration(), true);
   handle('media:read', (input) => store.readMedia(Id.parse(input)), true);
@@ -533,26 +485,48 @@ export function installTutor(
   const tickMs = Number(process.env.YOTEACH_STUCK_TICK_MS) || 30_000,
     fixedAfter = Number(process.env.YOTEACH_STUCK_AFTER_MS) || 0,
     ignoreIdle = process.env.YOTEACH_STUCK_IGNORE_IDLE === '1';
+  // With any test hook set, each check says what it decided (main-process output only).
+  const debug = !!(process.env.YOTEACH_STUCK_TICK_MS || process.env.YOTEACH_STUCK_AFTER_MS)
+    ? (why: string) => console.log(`[stuck] ${new Date().toLocaleTimeString()} ${why}`)
+    : () => {};
   const stuck = new StuckWatch(fixedAfter ? () => fixedAfter : undefined);
   const watch = setInterval(async () => {
     try {
       const s = store.snapshot().settings,
         r = service.state;
-      const busy =
-        holdActive ||
-        r.lecture ||
-        r.input !== 'idle' ||
-        ['listening', 'thinking', 'speaking', 'pointing'].includes(r.activity) ||
-        main()?.isFocused();
-      if (!s.proactiveHelp || !s.mascotVisible || busy) return stuck.reset();
+      // Pointing is only a moment after drawing, so it never counts as busy.
+      const busy = holdActive
+        ? 'holding the talk key'
+        : r.lecture
+          ? 'in a lecture'
+          : r.input !== 'idle'
+            ? `input ${r.input}`
+            : ['listening', 'thinking', 'speaking'].includes(r.activity)
+              ? `Yoyo is ${r.activity}`
+              : main()?.isFocused()
+                ? 'the Yoteach window is in front'
+                : '';
+      if (!s.proactiveHelp || !s.mascotVisible || busy) {
+        debug(
+          `skipped: ${!s.proactiveHelp ? 'turned off in Settings' : !s.mascotVisible ? 'Yoyo is hidden' : busy}`,
+        );
+        return stuck.reset();
+      }
       // Staring at a hard slide without touching anything is exactly being stuck, so idle time
       // only counts as "away" after five minutes; and nobody is nudged after three idle minutes.
       const idle = ignoreIdle ? 0 : powerMonitor.getSystemIdleTime();
-      if (idle > 300) return stuck.reset();
+      if (idle > 300) {
+        debug(`skipped: away (${Math.round(idle)} s without input)`);
+        return stuck.reset();
+      }
       const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       const image = await runCapture(display);
       const words: string[] = (image.words ?? []).map((w: { text: string }) => w.text);
-      if (!stuck.observe(words, Date.now(), idle <= 180)) return;
+      const offer = stuck.observe(words, Date.now(), idle <= 180);
+      debug(
+        `${words.length} words · ${stuck.describe(Date.now())}${offer ? ' · OFFERING HELP' : ''}`,
+      );
+      if (!offer) return;
       const key = {
         control: 'Control',
         'right-control': 'Right Control',
@@ -571,8 +545,9 @@ export function installTutor(
       // With a conversation already open, Yoyo offers help out loud too (no screen data sent).
       if (service.state.sessionId && service.state.status === 'connected')
         main()?.webContents.send('tutor:intent', { type: 'nudge' });
-    } catch {
+    } catch (e) {
       /* No Screen Recording permission or capture failed: stay quiet. */
+      debug(`capture failed: ${e instanceof Error ? e.message.slice(0, 200) : e}`);
     }
   }, tickMs);
   watch.unref?.();

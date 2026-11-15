@@ -137,7 +137,7 @@ test('lecture walkthroughs get their own chat with slide numbers and logged draw
   }
 });
 
-test('v6 data migrates to v7: one chat per earlier session, titled, with an exact backup', () => {
+test('v6 data migrates to the current version: one chat per earlier session, titled, with an exact backup', () => {
   const f = setup();
   try {
     const now = new Date().toISOString();
@@ -187,7 +187,7 @@ test('v6 data migrates to v7: one chat per earlier session, titled, with an exac
     const bytes = JSON.stringify(legacy);
     writeFileSync(f.store.file, bytes);
     const data = new Store(f.dir).snapshot();
-    assert.equal(data.version, 7);
+    assert.equal(data.version, 8);
     assert.deepEqual(data.chats.map((c) => [c.kind, c.title]).sort(), [
       ['chat', 'What is a vector, really'],
       ['lecture', 'Metabolism.pdf'],

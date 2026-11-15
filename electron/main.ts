@@ -201,15 +201,13 @@ function updateTray() {
     ]),
   );
 }
-// The on-screen layer may read state, change the lesson/practice it shows, and toggle clicks.
+// The on-screen layer may read state, show generated media, and toggle clicks.
 const overlayChannels = new Set([
   'workspace:get',
   'tutor:get',
   'tutor:intent',
   'overlay:interactive',
   'overlay:focus',
-  'practice:answer',
-  'media:generate',
   'media:cancel',
   'media:dismiss',
   'media:read',

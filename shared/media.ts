@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { LessonStep } from './lessons';
 
-// Generated media is illustrative. Precise science stays in authored lesson scenes.
+// Generated media is illustrative, never a precise diagram.
 export const MediaKind = z.enum(['image', 'video']);
 export type MediaKind = z.infer<typeof MediaKind>;
 export const FalModelId = z
@@ -39,8 +38,6 @@ export const GeneratedMediaSchema = z.object({
   requestId: z.string().min(1).max(120),
   origin: z.enum(['student', 'tutor']),
   sessionId: z.uuid().nullable(),
-  lessonId: z.uuid().nullable(),
-  lessonStep: LessonStep.nullable(),
   source: z.object({ documentId: z.uuid(), page: z.number().int().positive() }).nullable(),
   createdAt: z.string().datetime(),
 });
@@ -56,8 +53,6 @@ export type Generation = {
   kind: MediaKind;
   subject: string;
   origin: 'student' | 'tutor';
-  lessonId: string | null;
-  lessonStep: number | null;
   phase: GenerationPhase;
   queuePosition: number | null;
   startedAt: string;

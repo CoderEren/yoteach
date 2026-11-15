@@ -50,15 +50,10 @@ const api: DesktopApi = {
     onNavigate: (fn) => listen('tutor:navigate', fn),
   },
   media: {
-    generate: (request) => ipcRenderer.invoke('media:generate', request),
     cancel: () => ipcRenderer.invoke('media:cancel'),
     dismiss: () => ipcRenderer.invoke('media:dismiss'),
     read: (id) => ipcRenderer.invoke('media:read', id),
     remove: (id) => ipcRenderer.invoke('media:remove', id),
-  },
-  practice: {
-    answer: (questionId, answer) => ipcRenderer.invoke('practice:answer', { questionId, answer }),
-    remove: (id) => ipcRenderer.invoke('practice:remove', id),
   },
   getState: () => ipcRenderer.invoke('workspace:get'),
   command: (command) => ipcRenderer.invoke('workspace:command', command),

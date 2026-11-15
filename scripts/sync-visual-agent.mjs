@@ -23,17 +23,23 @@ const stamp = Date.now(),
   directory = `work/agent-visual-${stamp}`;
 mkdirSync(directory, { recursive: true, mode: 0o700 });
 writeFileSync(directory + '/before.json', JSON.stringify(before, null, 2), { mode: 0o600 });
-const ids = [...before.conversation_config.agent.prompt.tool_ids];
+let ids = [...before.conversation_config.agent.prompt.tool_ids];
 const attached = await Promise.all(
   ids.map((toolId) => request('/tools/' + encodeURIComponent(toolId))),
 );
 writeFileSync(directory + '/tools-before.json', JSON.stringify(attached, null, 2), { mode: 0o600 });
-for (const name of [
+// The built-in glucose lesson and its practice were removed from the app: detach their tools
+// (the tool definitions themselves stay in the account and in the backup above).
+const retired = [
   'open_visual_lesson',
   'navigate_visual_lesson',
-  'generate_illustration',
   'ask_practice_question',
   'record_practice_attempt',
+];
+const retiredIds = attached.filter((t) => retired.includes(t.tool_config.name)).map((t) => t.id);
+ids = ids.filter((toolId) => !retiredIds.includes(toolId));
+for (const name of [
+  'generate_illustration',
   'draw_on_screen',
   'sketch_diagram',
   'clear_screen',
@@ -67,8 +73,11 @@ const verified = {
     before.conversation_config.agent.prompt.llm === after.conversation_config.agent.prompt.llm,
   authUnchanged: same(before.platform_settings.auth, after.platform_settings.auth),
   overridesUnchanged: same(before.platform_settings.overrides, after.platform_settings.overrides),
-  originalToolsPreserved: before.conversation_config.agent.prompt.tool_ids.every((toolId) =>
-    ids.includes(toolId),
+  originalToolsPreserved: before.conversation_config.agent.prompt.tool_ids
+    .filter((toolId) => !retiredIds.includes(toolId))
+    .every((toolId) => ids.includes(toolId)),
+  retiredDetached: retiredIds.every(
+    (toolId) => !after.conversation_config.agent.prompt.tool_ids.includes(toolId),
   ),
 };
 writeFileSync(directory + '/verification.json', JSON.stringify(verified, null, 2));

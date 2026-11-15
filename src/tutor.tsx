@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { Conversation as ElevenConversation } from '@elevenlabs/client';
 import type { SharedSnapshot, TutorIntent, TutorRuntime, TutorTool } from '../shared/tutor';
 import { api, unwrap } from './api';
-import { lessonContext } from '../shared/lessons';
 import { HoldAudio } from './audio/hold-audio';
 import { hasSpeech } from '../shared/hold-audio';
 import { guessSlideKind, slideInstruction } from '../shared/slides';
@@ -230,42 +229,6 @@ export function TutorProvider({ children }: { children: ReactNode }) {
       voice.current.sendUserMessage(note);
       return;
     }
-    if (
-      action.type === 'lesson-open' ||
-      action.type === 'lesson-step' ||
-      action.type === 'lesson-narrate'
-    ) {
-      const current = await unwrap(api.tutor.get());
-      const saved = (await unwrap(api.getState())).lessons.find(
-        (l) => l.id === current.activeLessonId,
-      );
-      if (!saved) return;
-      if (action.type === 'lesson-narrate') {
-        if (live.current?.mode === 'text' && sessionId.current) await disconnect();
-        if (!sessionId.current) await handle({ type: 'start', topicId: null, mode: 'voice' });
-        if (!voice.current || !sessionId.current) return;
-        // The user may close or change the lesson while authentication is pending.
-        const latest = await unwrap(api.tutor.get());
-        const latestSaved = (await unwrap(api.getState())).lessons.find((l) => l.id === saved.id);
-        if (latest.activeLessonId !== saved.id || latestSaved?.step !== saved.step) return;
-      }
-      voice.current?.sendContextualUpdate(
-        'Current authored visual lesson (study data; replaces previous screen grounding): ' +
-          JSON.stringify(lessonContext(saved)),
-      );
-      if (action.type === 'lesson-narrate')
-        voice.current?.sendUserMessage(
-          'Explain the current visual lesson step concisely using the supplied authored content. Do not advance yet; invite a question.',
-        );
-      return;
-    }
-    if (action.type === 'lesson-close') {
-      voice.current?.sendContextualUpdate(
-        'The visual lesson has closed. Discard its visible-state context.',
-      );
-      if (sessionId.current && live.current?.lecture) await teachSlide(sessionId.current, false);
-      return;
-    }
     if (action.type === 'hold-cancel') {
       cancelHold();
       if (sessionId.current)
@@ -306,35 +269,13 @@ export function TutorProvider({ children }: { children: ReactNode }) {
         });
         // Stream the rest of the question live while the key stays down.
         if (turn.held) heldAudio.current.streamLive(() => !turn.cancelled && hold.current === turn);
-        if (live.current?.activeLessonId && live.current.lessonSurface === 'app') {
-          const saved = (await unwrap(api.getState())).lessons.find(
-            (l) => l.id === live.current?.activeLessonId,
-          );
-          if (saved && !turn.cancelled)
-            voice.current?.sendContextualUpdate(
-              'The student is asking about this authored visual lesson: ' +
-                JSON.stringify(lessonContext(saved)),
-            );
-        } else if (!live.current?.lecture) {
+        if (!live.current?.lecture) {
           try {
             await unwrap(api.tutor.captureScreen());
             if (turn.cancelled) return;
             voice.current?.sendContextualUpdate(
               'A fresh still of the screen was captured for this held question; a map of it follows with the question. Discard earlier screen regions.',
             );
-            const onScreen = live.current?.activeLessonId
-              ? (await unwrap(api.getState())).lessons.find(
-                  (l) => l.id === live.current?.activeLessonId,
-                )
-              : undefined;
-            if (onScreen && !turn.cancelled)
-              voice.current?.sendContextualUpdate(
-                'The authored lesson card is also open on the screen: ' +
-                  JSON.stringify(lessonContext(onScreen)) +
-                  (live.current?.practice
-                    ? ` A practice question is showing: ${live.current.practice.questionId}. If this is the student's answer, record it with record_practice_attempt.`
-                    : ''),
-              );
           } catch {
             if (turn.cancelled) return;
             voice.current?.sendContextualUpdate(
@@ -473,16 +414,12 @@ export function TutorProvider({ children }: { children: ReactNode }) {
         const clientTools = Object.fromEntries(
           (
             [
-              'open_visual_lesson',
-              'navigate_visual_lesson',
               'draw_on_screen',
               'sketch_diagram',
               'clear_screen',
               'sketch_on_screen',
               'celebrate',
               'generate_illustration',
-              'ask_practice_question',
-              'record_practice_attempt',
               'analyze_current_screen',
               'highlight_screen_region',
               'draw_annotation',

@@ -19,8 +19,6 @@ import {
   type TutorMessage,
   type Explanation,
 } from '../shared/tutor';
-import { LessonKey, LessonStep, type SavedLesson } from '../shared/lessons';
-import { AttemptSchema, type PracticeAttempt } from '../shared/practice';
 import {
   GeneratedMediaSchema,
   MediaFilename,
@@ -56,14 +54,13 @@ export class Store {
     if (existsSync(this.file)) {
       try {
         const raw = JSON.parse(readFileSync(this.file, 'utf8'));
+        const original = raw.version;
         if ([1, 2, 3, 4, 5, 6].includes(raw.version)) {
           // Keep an exact pre-migration snapshot, including legacy notes and associations.
           const backup = this.file + `.v${raw.version}.backup`;
           if (!existsSync(backup)) writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
           raw.version = 7;
-          raw.lessons ??= [];
           raw.media ??= [];
-          raw.attempts ??= [];
           raw.slideDrawings ??= [];
           raw.sessions ??= [];
           raw.messages ??= [];
@@ -91,6 +88,19 @@ export class Store {
             for (const m of messages) m.chatId = id;
           }
         }
+        if (raw.version === 7) {
+          // v8 drops the authored glucose lesson and its practice answers; generated media stay.
+          const backup = this.file + '.v7.backup';
+          if (original === 7 && !existsSync(backup))
+            writeFileSync(backup, readFileSync(this.file), { mode: 0o600 });
+          raw.version = 8;
+          delete raw.lessons;
+          delete raw.attempts;
+          for (const m of raw.media ?? []) {
+            delete m.lessonId;
+            delete m.lessonStep;
+          }
+        }
         this.state = StateSchema.parse(raw);
         // A prior process cannot own a live session after relaunch.
         this.state.sessions.forEach((s) => {
@@ -108,43 +118,6 @@ export class Store {
     }
     this.cleanupOrphans();
   }
-  openLesson(key: SavedLesson['key'], sessionId: string | null, savedId?: string) {
-    LessonKey.parse(key);
-    const n = this.snapshot();
-    if (savedId) {
-      const saved = n.lessons.find((l) => l.id === savedId);
-      if (!saved) throw new Error('This saved lesson is unavailable.');
-      return saved;
-    }
-    const session = sessionId ? n.sessions.find((s) => s.id === sessionId && !s.endedAt) : null;
-    if (sessionId && !session) throw new Error('This study session has ended.');
-    const existing = n.lessons.find((l) => l.key === key && l.sessionId === sessionId);
-    if (existing) return existing;
-    const now = new Date().toISOString();
-    const lesson: SavedLesson = {
-      id: randomUUID(),
-      key,
-      revision: 1,
-      step: 1,
-      sessionId,
-      source: session?.documentId ? { documentId: session.documentId, page: session.page } : null,
-      createdAt: now,
-      updatedAt: now,
-    };
-    n.lessons.push(lesson);
-    this.save(n);
-    return lesson;
-  }
-  setLessonStep(id: string, step: number) {
-    LessonStep.parse(step);
-    const n = this.snapshot(),
-      lesson = n.lessons.find((l) => l.id === id);
-    if (!lesson) throw new Error('This saved lesson is unavailable.');
-    lesson.step = step;
-    lesson.updatedAt = new Date().toISOString();
-    this.save(n);
-    return lesson;
-  }
   /** Write the file first, then reference it; a failed save removes the unreferenced file. */
   addMedia(
     meta: Omit<GeneratedMedia, 'id' | 'filename' | 'bytes' | 'createdAt' | 'source'>,
@@ -155,11 +128,9 @@ export class Store {
       filename = `${id}.${mediaExtension[meta.contentType]}`,
       path = join(this.mediaDir, filename);
     const session = meta.sessionId ? n.sessions.find((s) => s.id === meta.sessionId) : null;
-    const lesson = meta.lessonId ? n.lessons.find((l) => l.id === meta.lessonId) : null;
-    if (meta.lessonId && !lesson) throw new Error('This saved lesson is unavailable.');
     const source = session?.documentId
       ? { documentId: session.documentId, page: session.page }
-      : (lesson?.source ?? null);
+      : null;
     const media = GeneratedMediaSchema.parse({
       ...meta,
       id,
@@ -191,29 +162,6 @@ export class Store {
       throw error;
     }
     return media;
-  }
-  addAttempt(input: Omit<PracticeAttempt, 'id' | 'createdAt' | 'source'>) {
-    const n = this.snapshot();
-    const session = input.sessionId ? n.sessions.find((s) => s.id === input.sessionId) : null;
-    const lesson = input.lessonId ? n.lessons.find((l) => l.id === input.lessonId) : null;
-    if (input.lessonId && !lesson) throw new Error('This saved lesson is unavailable.');
-    const attempt = AttemptSchema.parse({
-      ...input,
-      id: randomUUID(),
-      sessionId: session ? session.id : null,
-      source: session?.documentId
-        ? { documentId: session.documentId, page: session.page }
-        : (lesson?.source ?? null),
-      createdAt: new Date().toISOString(),
-    });
-    n.attempts.push(attempt);
-    this.save(n);
-    return attempt;
-  }
-  deleteAttempt(id: string) {
-    const n = this.snapshot();
-    n.attempts = n.attempts.filter((a) => a.id !== id);
-    this.save(n);
   }
   readMedia(id: string): { bytes: Uint8Array; contentType: MediaType } {
     const media = this.state.media.find((m) => m.id === id);
@@ -395,7 +343,7 @@ export class Store {
     n.explanations.forEach((e) => {
       if (e.source && !n.documents.some((d) => d.id === e.source!.documentId)) e.source = null;
     });
-    for (const m of [...n.media, ...n.attempts]) {
+    for (const m of n.media) {
       if (m.source && !n.documents.some((d) => d.id === m.source!.documentId)) m.source = null;
       if (m.sessionId && !n.sessions.some((s) => s.id === m.sessionId)) m.sessionId = null;
     }
@@ -616,7 +564,6 @@ export class Store {
     n.messages = n.messages.filter((m) => m.sessionId !== id);
     n.explanations = n.explanations.filter((e) => e.sessionId !== id);
     n.media = n.media.filter((m) => m.sessionId !== id);
-    n.attempts = n.attempts.filter((a) => a.sessionId !== id);
     n.chats = n.chats.filter((c) => n.messages.some((m) => m.chatId === c.id));
     n.slideDrawings = n.slideDrawings.filter((d) => n.chats.some((c) => c.id === d.chatId));
     this.save(n);

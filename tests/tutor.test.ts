@@ -97,7 +97,7 @@ test('Stage 1 migration preserves notes and persists the current version safely'
     delete (old as any).explanations;
     writeFileSync(f.store.file, JSON.stringify(old));
     const next = new Store(f.dir).snapshot();
-    assert.equal(next.version, 7);
+    assert.equal(next.version, 8);
     assert.equal(next.documents[0].id, f.doc.id);
     assert.deepEqual(next.sessions, []);
   } finally {
@@ -371,59 +371,48 @@ test('version 2 migration preserves every legacy record and backs up exact origi
   }
 });
 
-test('visual lessons preserve source links and steps, validate navigation and survive v3 migration', async () => {
+test('v7 data drops the old built-in lesson and practice answers, keeps media, with an exact backup', () => {
   const f = setup();
   try {
-    const legacy: any = { ...f.store.snapshot(), version: 3 };
-    delete legacy.lessons;
+    const now = new Date().toISOString();
+    const legacy: any = { ...f.store.snapshot(), version: 7 };
+    legacy.lessons = [
+      {
+        id: randomUUID(),
+        key: 'glucose-phosphorylation',
+        step: 4,
+        sessionId: null,
+        source: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    legacy.attempts = [{ id: randomUUID(), questionId: 'energy-source' }];
+    legacy.media = [];
     const bytes = JSON.stringify(legacy);
     writeFileSync(f.store.file, bytes);
-    const migrated = new Store(f.dir);
-    assert.equal(readFileSync(f.store.file + '.v3.backup', 'utf8'), bytes);
-    assert.deepEqual(migrated.snapshot().lessons, []);
-    assert.deepEqual(migrated.snapshot().documents, legacy.documents);
-    const session = migrated.startSession(null, 'text', f.doc.id, 1);
-    const saved = migrated.openLesson('glucose-phosphorylation', session.id);
-    assert.deepEqual(saved.source, { documentId: f.doc.id, page: 1 });
-    assert.equal(migrated.openLesson(saved.key, session.id).id, saved.id);
-    migrated.setLessonStep(saved.id, 4);
-    const before = migrated.snapshot();
-    assert.throws(() => migrated.setLessonStep(saved.id, 7));
-    assert.throws(() => migrated.setLessonStep(randomUUID(), 1));
-    assert.deepEqual(migrated.snapshot(), before);
-    const reopened = new Store(f.dir);
-    assert.equal(reopened.openLesson(saved.key, null, saved.id).step, 4);
-    assert.equal(reopened.snapshot().lessons[0].sessionId, session.id);
+    const migrated = new Store(f.dir).snapshot() as any;
+    assert.equal(migrated.version, 8);
+    assert.equal(migrated.lessons, undefined);
+    assert.equal(migrated.attempts, undefined);
+    assert.deepEqual(migrated.documents, legacy.documents);
+    assert.equal(readFileSync(f.store.file + '.v7.backup', 'utf8'), bytes);
+    // Older data still migrates all the way.
+    const older: any = { ...f.store.snapshot(), version: 3 };
+    delete older.chats;
+    writeFileSync(f.store.file, JSON.stringify(older));
+    assert.equal(new Store(f.dir).snapshot().version, 8);
   } finally {
     f.cleanup();
   }
 });
 
-test('visual tools reject stale sessions, open the workspace and return authored step grounding', async () => {
+test('tools reject sessions that have ended', async () => {
   const f = setup();
   try {
-    const session = await f.service.start(null, 'text', f.doc.id, 1);
-    const opened: any = await f.service.tool(session.id, {
-      name: 'open_visual_lesson',
-      lesson: 'glucose-phosphorylation',
-      step: 3,
-    });
-    assert.equal(opened.scene, 'transfer');
-    assert.equal(f.navigated(), 'workspace');
-    assert.equal(f.service.state.snapshot, null);
-    const moved: any = await f.service.tool(session.id, {
-      name: 'navigate_visual_lesson',
-      step: 6,
-    });
-    assert.equal(moved.scene, 'balance');
-    assert.match(moved.takeaway, /2 ATP net/);
-    assert.throws(() => f.service.stepLesson(randomUUID(), 1));
+    const session = await f.service.start(null, 'text');
     f.service.end();
-    await assert.rejects(
-      f.service.tool(session.id, { name: 'navigate_visual_lesson', step: 1 }),
-      /ended/,
-    );
-    assert.equal(f.store.snapshot().lessons[0].step, 6);
+    await assert.rejects(f.service.tool(session.id, { name: 'clear_screen' }), /ended/);
   } finally {
     f.cleanup();
   }

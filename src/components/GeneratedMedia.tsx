@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Clapperboard, ImagePlus, RotateCcw, Trash2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { GeneratedMedia } from '../../shared/media';
 import { api, unwrap } from '../api';
 import { useTutor } from '../tutor';
@@ -57,48 +57,16 @@ const phaseText = {
   running: 'Generating',
   saving: 'Saving on this Mac',
 } as const;
-/**
- * Status and result for fal generation. With a subject, offers student-initiated generation;
- * otherwise shows only what the tutor started.
- */
-export function GenerationPanel({
-  media,
-  subject,
-  lessonId,
-  lessonStep,
-}: {
-  media: GeneratedMedia[];
-  subject?: string;
-  lessonId?: string;
-  lessonStep?: number;
-}) {
+/** Status and result of the image or clip Yoyo is generating with fal. */
+export function GenerationPanel({ media }: { media: GeneratedMedia[] }) {
   const { runtime: r } = useTutor();
-  const [error, setError] = useState('');
   const g = r?.generation ?? null,
     busy = !!g && (g.phase === 'queued' || g.phase === 'running' || g.phase === 'saving');
-  const here = (m: GeneratedMedia) =>
-    lessonId ? m.lessonId === lessonId && m.lessonStep === lessonStep : false;
-  const fromJob = g?.mediaId ? media.find((m) => m.id === g.mediaId) : undefined;
-  const shown =
-    fromJob && (!lessonId || here(fromJob))
-      ? fromJob
-      : lessonId
-        ? media.filter(here).at(-1)
-        : undefined;
-  const relevant = !!g && (!lessonId || (g.lessonId === lessonId && g.lessonStep === lessonStep));
-  if (!subject && !relevant) return null;
-  async function run(kind: 'image' | 'video') {
-    setError('');
-    try {
-      await unwrap(api.media.generate({ kind, subject: subject! }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }
-  const config = r?.config.media;
+  const shown = g?.mediaId ? media.find((m) => m.id === g.mediaId) : undefined;
+  if (!g) return null;
   return (
     <section className="generation-panel" aria-label="Generated image or clip">
-      {relevant && busy && (
+      {busy && (
         <div className="generation-status" role="status">
           <span className="generation-pulse" aria-hidden="true" />
           <span>
@@ -111,64 +79,19 @@ export function GenerationPanel({
           </button>
         </div>
       )}
-      {relevant && (g.phase === 'failed' || g.phase === 'cancelled') && (
+      {(g.phase === 'failed' || g.phase === 'cancelled') && (
         <div className="banner error" role="alert">
           {g.error}
-          {subject && g.phase === 'failed' && (
-            <button className="text-button" onClick={() => void run(g.kind)}>
-              <RotateCcw size={14} /> Retry
-            </button>
-          )}
           <button className="text-button" onClick={() => void api.media.dismiss()}>
             Dismiss
           </button>
         </div>
       )}
-      {error && (
-        <div className="banner error" role="alert">
-          {error}
-          <button className="text-button" onClick={() => setError('')}>
-            Dismiss
-          </button>
-        </div>
-      )}
       {shown && <MediaView media={shown} />}
-      {!subject && relevant && g.phase === 'done' && (
+      {g.phase === 'done' && (
         <button className="text-button" onClick={() => void api.media.dismiss()}>
-          <X size={14} /> Close illustration
+          <X size={14} /> Close
         </button>
-      )}
-      {subject && (
-        <div className="generation-actions">
-          <button
-            className="button small"
-            disabled={busy || !config?.image}
-            onClick={() => void run('image')}
-          >
-            <ImagePlus size={16} />
-            {shown ? 'New visual analogy' : 'Generate visual analogy'}
-          </button>
-          {config?.video && (
-            <button className="button small" disabled={busy} onClick={() => void run('video')}>
-              <Clapperboard size={16} />
-              Short clip
-            </button>
-          )}
-          {shown && (
-            <button
-              className="icon-button"
-              aria-label="Delete this generated media"
-              onClick={() =>
-                void unwrap(api.media.remove(shown.id)).catch((e) => setError(String(e)))
-              }
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-          {!config?.image && (
-            <small>Add FAL_KEY to .env and restart to generate illustrations.</small>
-          )}
-        </div>
       )}
     </section>
   );

@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { SavedLessonSchema } from './lessons';
-import { GeneratedMediaSchema, type GenerateRequest, type MediaType } from './media';
-import { AttemptSchema, type Answer, type PracticeAttempt, type QuestionId } from './practice';
+import { GeneratedMediaSchema, type MediaType } from './media';
 import {
   StudySessionSchema,
   MessageSchema,
@@ -70,12 +68,10 @@ export const ActivitySchema = z.object({
   createdAt: Stamp,
 });
 export const StateSchema = z.object({
-  version: z.literal(7),
+  version: z.literal(8),
   chats: z.array(ChatSchema),
   slideDrawings: z.array(SlideDrawingSchema),
-  lessons: z.array(SavedLessonSchema),
   media: z.array(GeneratedMediaSchema),
-  attempts: z.array(AttemptSchema),
   sessions: z.array(StudySessionSchema),
   messages: z.array(MessageSchema),
   explanations: z.array(ExplanationSchema),
@@ -133,14 +129,9 @@ export type ImportPayload = z.infer<typeof ImportSchema>;
 export type PendingImport = { token: string; name: string; bytes: Uint8Array };
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export interface MediaApi {
-  generate(request: GenerateRequest): Promise<Result<{ id: string }>>;
   cancel(): Promise<Result<void>>;
   dismiss(): Promise<Result<void>>;
   read(id: string): Promise<Result<{ bytes: Uint8Array; contentType: MediaType }>>;
-  remove(id: string): Promise<Result<void>>;
-}
-export interface PracticeApi {
-  answer(questionId: QuestionId, answer: Answer): Promise<Result<PracticeAttempt>>;
   remove(id: string): Promise<Result<void>>;
 }
 export interface DesktopApi {
@@ -161,7 +152,6 @@ export interface DesktopApi {
   };
   tutor: TutorApi;
   media: MediaApi;
-  practice: PracticeApi;
   getState(): Promise<Result<AppState>>;
   command(command: Command): Promise<Result<AppState>>;
   pickPdf(courseId: string | null, sample?: boolean): Promise<Result<PendingImport | null>>;
@@ -175,12 +165,10 @@ export interface DesktopApi {
   onState(callback: (state: AppState) => void): () => void;
 }
 export const freshState = (): AppState => ({
-  version: 7,
+  version: 8,
   chats: [],
   slideDrawings: [],
-  lessons: [],
   media: [],
-  attempts: [],
   sessions: [],
   messages: [],
   explanations: [],
