@@ -198,6 +198,7 @@ export const ToolSchema = z.discriminatedUnion('name', [
 ]);
 export type TutorTool = z.infer<typeof ToolSchema>;
 export const IntentSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('dismiss-error') }),
   z.object({ type: z.literal('screen-clear') }),
   z.object({ type: z.literal('nudge') }),
   z.object({ type: z.literal('inform'), text: z.string().min(1).max(6000) }),

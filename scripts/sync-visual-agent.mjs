@@ -1,6 +1,7 @@
 // Explicit maintenance action: update the existing configured agent, never create another agent.
 // Run only when the user has authorized hosted agent configuration changes.
 import { config } from 'dotenv';
+import { visualToolNames } from './agent-tool-config.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 config({ quiet: true });
 const id = process.env.ELEVENLABS_AGENT_ID;
@@ -38,14 +39,7 @@ const retired = [
 ];
 const retiredIds = attached.filter((t) => retired.includes(t.tool_config.name)).map((t) => t.id);
 ids = ids.filter((toolId) => !retiredIds.includes(toolId));
-for (const name of [
-  'generate_illustration',
-  'draw_on_screen',
-  'sketch_diagram',
-  'clear_screen',
-  'sketch_on_screen',
-  'celebrate',
-]) {
+for (const name of visualToolNames) {
   const tool_config = JSON.parse(readFileSync(`docs/agent-tools/${name}.json`, 'utf8'));
   const existing = attached.find((tool) => tool.tool_config.name === name);
   if (existing) await request('/tools/' + existing.id, 'PATCH', { tool_config });
@@ -64,7 +58,22 @@ await request('/agents/' + encodeURIComponent(id), 'PATCH', {
 });
 const after = await request('/agents/' + encodeURIComponent(id));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const synced = await Promise.all(
+  ids.map((toolId) => request('/tools/' + encodeURIComponent(toolId))),
+);
+// API defaults may be added, but every configured value must round-trip unchanged.
+function includesConfig(actual, expected) {
+  if (expected && typeof expected === 'object')
+    return Object.entries(expected).every(([k, v]) => includesConfig(actual?.[k], v));
+  return actual === expected;
+}
 const verified = {
+  visualToolsMatch: visualToolNames.every((name) =>
+    includesConfig(
+      synced.find((t) => t.tool_config.name === name)?.tool_config,
+      JSON.parse(readFileSync(`docs/agent-tools/${name}.json`, 'utf8')),
+    ),
+  ),
   promptMatches: after.conversation_config.agent.prompt.prompt === prompt,
   temperatureSet: after.conversation_config.agent.prompt.temperature === temperature,
   toolsMatch: same(after.conversation_config.agent.prompt.tool_ids, ids),

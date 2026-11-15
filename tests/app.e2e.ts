@@ -37,6 +37,14 @@ test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion
     }, resolve('public/sample-lecture.pdf'));
     await page.getByRole('button', { name: /Upload a lecture PDF/ }).click();
     await expect(page.locator('.lecture-upload')).toContainText('sample-lecture.pdf');
+    await page.screenshot({
+      path: `docs/overnight/cycle-3/${process.env.YOTEACH_EVIDENCE_PHASE ?? 'after'}.png`,
+    });
+    await expect(page.getByRole('status')).toContainText('not set up');
+    await expect(page.getByRole('button', { name: 'Run me through the lecture' })).toHaveAttribute(
+      'aria-describedby',
+      'lecture-setup',
+    );
     await expect(page.locator('.lecture-new button')).toHaveCount(2);
     await expect(page.getByRole('checkbox')).toHaveCount(0);
     await expect(page.getByLabel('Ask Yoyo')).toHaveCount(0);

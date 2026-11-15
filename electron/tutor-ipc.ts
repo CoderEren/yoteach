@@ -190,6 +190,11 @@ export function installTutor(
   handle('tutor:get', () => service.get());
   function intent(input: unknown) {
     const action = IntentSchema.parse(input);
+    if (action.type === 'dismiss-error') {
+      service.state.error = '';
+      service.emit();
+      return;
+    }
     if (action.type === 'open') open();
     if (action.type === 'screen-clear') service.clearDrawing();
     if (action.type === 'hold-start') {
