@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "draw_on_screen",
-  "description": "Draw on the student's screen (or lecture slide) over regionIds from the screen map or analyze_current_screen: circle, underline, box, arrow, highlight or point, with few-word labels and labelled arrows between regions. Animated like handwriting; Yoyo flies to each mark. Call it repeatedly with clear:false to build an explanation as you speak. Never invent regionIds.",
+  "description": "Draw directly on the student's screen or lecture slide, on what is already there: circle a term, underline a phrase, highlight a definition, box a structure, arrow to a step, and connect parts with labelled arrows. Target each mark by quoting the exact visible words (quote), or by a regionId from the screen map. Animated like handwriting; Yoyo flies to the first mark. Build an explanation with several calls (clear:false) as you speak. If the content is on screen, annotate it here instead of redrawing it in a sketch.",
   "expects_response": true,
   "response_timeout_secs": 10,
   "parameters": {
@@ -13,9 +13,13 @@
         "items": {
           "type": "object",
           "properties": {
+            "quote": {
+              "type": "string",
+              "description": "Exact visible words to mark (two to eight words, copied as written on screen or slide). Preferred."
+            },
             "regionId": {
               "type": "string",
-              "description": "A regionId returned by the latest analyze_current_screen."
+              "description": "Alternatively, a regionId from the screen map."
             },
             "shape": {
               "type": "string",
@@ -35,7 +39,6 @@
             }
           },
           "required": [
-            "regionId",
             "shape"
           ]
         }
@@ -48,11 +51,11 @@
           "properties": {
             "from": {
               "type": "string",
-              "description": "A regionId returned by the latest analyze_current_screen."
+              "description": "Start: an exact visible quote or a regionId."
             },
             "to": {
               "type": "string",
-              "description": "A regionId returned by the latest analyze_current_screen."
+              "description": "End: an exact visible quote or a regionId."
             },
             "label": {
               "type": "string",

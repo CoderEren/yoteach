@@ -62,3 +62,28 @@ test('labels and panels avoid text; voice tags never reach the reader', () => {
   assert.equal(cleanSpeech('Use [1, 2] as indices.'), 'Use [1, 2] as indices.');
   assert.equal(cleanSpeech('the drug [/slow] by opening its ring'), 'the drug by opening its ring');
 });
+
+test('quotes resolve on PDF slides from text runs alone', async () => {
+  const { wordsOf } = await import('../shared/grounding');
+  const slide = {
+    textBoxes: [
+      {
+        text: 'Beta-lactams bind penicillin-binding proteins',
+        box: { x: 0.1, y: 0.3, width: 0.6, height: 0.05 },
+      },
+      {
+        text: 'Blocking cross-linking weakens the cell wall',
+        box: { x: 0.1, y: 0.4, width: 0.55, height: 0.05 },
+      },
+    ],
+  };
+  const words = wordsOf(slide);
+  assert.equal(words.length, 10);
+  const hit = anchor('weakens the cell wall', null, words, slide.textBoxes)!;
+  assert.equal(hit.how, 'words');
+  assert.ok(
+    hit.box.x > 0.3 && hit.box.x + hit.box.width <= 0.651,
+    'only the quoted part of the line',
+  );
+  assert.ok(Math.abs(hit.box.y - 0.4) < 1e-9);
+});

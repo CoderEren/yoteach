@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
 import type { Store } from './store';
 import type { TutorRuntime, TutorIntent } from '../shared/tutor';
-import { fitImage, pointBeside } from '../shared/desktop-geometry';
+import { PET, fitImage, pointBeside } from '../shared/desktop-geometry';
 
 export function installDesktop(options: {
   store: Store;
@@ -112,8 +112,8 @@ export function installDesktop(options: {
     if (!dragging && pointed && home) {
       const area = screen.getDisplayNearestPoint(home).workArea;
       animate(
-        Math.max(area.x, Math.min(home.x, area.x + area.width - 200)),
-        Math.max(area.y, Math.min(home.y, area.y + area.height - 220)),
+        Math.max(area.x, Math.min(home.x, area.x + area.width - PET.width)),
+        Math.max(area.y, Math.min(home.y, area.y + area.height - PET.height)),
       );
     }
     pointed = false;
@@ -260,8 +260,8 @@ export function installDesktop(options: {
       y = origin.y + action.y - pointer.y;
     const area = screen.getDisplayNearestPoint({ x: action.x, y: action.y }).workArea;
     win.setPosition(
-      Math.round(Math.max(area.x, Math.min(x, area.x + area.width - 200))),
-      Math.round(Math.max(area.y, Math.min(y, area.y + area.height - 220))),
+      Math.round(Math.max(area.x, Math.min(x, area.x + area.width - PET.width))),
+      Math.round(Math.max(area.y, Math.min(y, area.y + area.height - PET.height))),
     );
     if (action.phase === 'end') {
       dragging = false;

@@ -51,13 +51,16 @@ for (const name of [
   }
 }
 const prompt = readFileSync('docs/YOYO-AGENT-PROMPT.md', 'utf8').split('\n---\n')[1].trim();
+// Temperature 0 made every explanation open the same way; a moderate value keeps it natural.
+const temperature = 0.7;
 await request('/agents/' + encodeURIComponent(id), 'PATCH', {
-  conversation_config: { agent: { prompt: { prompt, tool_ids: ids } } },
+  conversation_config: { agent: { prompt: { prompt, tool_ids: ids, temperature } } },
 });
 const after = await request('/agents/' + encodeURIComponent(id));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const verified = {
   promptMatches: after.conversation_config.agent.prompt.prompt === prompt,
+  temperatureSet: after.conversation_config.agent.prompt.temperature === temperature,
   toolsMatch: same(after.conversation_config.agent.prompt.tool_ids, ids),
   voiceUnchanged: same(before.conversation_config.tts, after.conversation_config.tts),
   modelUnchanged:

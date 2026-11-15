@@ -114,6 +114,15 @@ From the user's 15 Nov report: questions (matrix in a coordinate system, cholest
 - iCloud Desktop sync created conflict copies in `dist/` ("index 2.html") during rapid rebuilds, which broke test launches. `rm -rf dist` before building resolves it; consider moving the repo out of the iCloud-synced Desktop.
 - Agent synced (backup `work/agent-visual-1794700815830`). Tests: 49 unit tests (new `tests/slides.test.ts`) and 8 Electron journeys.
 
+## Chunk 9 — clean screens, quote marks, natural speech, proactive help, smaller Yoyo
+
+- **Clearing.** A slide change clears all drawings. A new question clears the previous drawing unless the topic check reports `buildsOnLast` (a follow-up on the last answer or drawing); small talk and new questions clear it. A drawing made for the new question is never cleared.
+- **Promised drawings.** Live tool logs showed "I'll highlight…" followed by a diagram box, because slide regions weren't ready on the first slide. `draw_on_screen` marks and connections now accept `quote` (exact visible words), resolved on the spot against recognised words or PDF text runs (`wordsOf`). Unresolved targets are reported, not fatal. Live: quote marks landed from slide 1 (5 marks), then 6 on slide 2.
+- **Natural speech.** The hosted agent ran Claude Sonnet 4.6 at temperature 0, which gave identical openings. The sync script now sets temperature 0.7 (`temperatureSet` verified). The prompt and the per-question note ban template openers and announcements, and prefer in-place annotation over pop-up boxes. Openings now vary, but Yoyo still sometimes announces a drawing ("I will draw…") and once promised highlights without drawing. A newer agent model (e.g. Claude Sonnet 5.5) may follow these rules better; that is the user's call.
+- **Proactive help.** `shared/stuck.ts` `StuckWatch`: every 30 s, when the student is active (system idle under 45 s), not in a lecture or conversation turn and not in Yoteach, the screen under the pointer is captured and read on-device (nothing sent). If it stays the same longer than `stuckAfterMs` (45 s + 0.4 s per word, between 75 and 360 s), Yoyo shows "Stuck on this one? Hold <key> and ask me." once per screen. If a conversation is open, the agent also offers help in one sentence (`nudge`; no screen data sent). Settings has a switch; the default is on.
+- **Smaller Yoyo:** 150×165 (was 200×220), one constant (`PET`).
+- Tests: 52 unit tests and 8 Electron journeys. Live runs launch visible app copies (each with a Yoyo), so keep them short or seed test data with `mascotVisible: false`.
+
 ## Remaining
 
 - Live spoken practice through the hosted agent (the tools are synced; not exercised with a microphone).

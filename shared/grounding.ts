@@ -178,3 +178,30 @@ export function labelSpot(
   }
   return best;
 }
+
+/**
+ * Word boxes for a snapshot: recognised words for screens; for PDF slides, words spread across
+ * each text run in proportion to their characters (runs are single lines of PDF text).
+ */
+export function wordsOf(snapshot: { words?: Word[]; textBoxes: Line[] }): Word[] {
+  if (snapshot.words?.length) return snapshot.words;
+  const out: Word[] = [];
+  snapshot.textBoxes.forEach((run, line) => {
+    const text = run.text;
+    const total = text.length || 1;
+    for (const m of text.matchAll(/\S+/g)) {
+      const start = m.index ?? 0;
+      out.push({
+        text: m[0],
+        line,
+        box: {
+          x: run.box.x + (run.box.width * start) / total,
+          y: run.box.y,
+          width: (run.box.width * m[0].length) / total,
+          height: run.box.height,
+        },
+      });
+    }
+  });
+  return out;
+}

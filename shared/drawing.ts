@@ -3,17 +3,31 @@ import { z } from 'zod';
 // On-screen drawing. Marks attach only to grounded regions; diagrams are laid out by the
 // app. The tutor never supplies raw coordinates.
 const RegionId = z.uuid();
-const Label = z.string().trim().min(1).max(60);
 export const MarkShape = z.enum(['highlight', 'circle', 'underline', 'box', 'arrow', 'point']);
-export const MarkSchema = z.object({
-  regionId: RegionId,
-  shape: MarkShape,
-  label: Label.optional(),
-});
+/** A mark targets a region from the screen map, or simply quotes the words to mark. */
+export const MarkSchema = z
+  .object({
+    regionId: RegionId.optional(),
+    quote: z.string().trim().min(1).max(120).optional(),
+    shape: MarkShape.catch('circle'),
+    label: z
+      .string()
+      .trim()
+      .min(1)
+      .transform((t) => t.slice(0, 60))
+      .optional(),
+  })
+  .refine((m) => m.regionId || m.quote, 'Give a regionId or a quote of the words to mark.');
+/** Connections join two regions or two quoted phrases (either form, per end). */
 export const ConnectionSchema = z.object({
-  from: RegionId,
-  to: RegionId,
-  label: z.string().trim().min(1).max(40).optional(),
+  from: z.string().trim().min(1).max(120),
+  to: z.string().trim().min(1).max(120),
+  label: z
+    .string()
+    .trim()
+    .min(1)
+    .transform((t) => t.slice(0, 40))
+    .optional(),
 });
 const NodeId = z
   .string()

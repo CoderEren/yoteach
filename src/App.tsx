@@ -257,6 +257,30 @@ export default function App() {
               )}
             </section>
             <section className="settings-group">
+              <h3>Help when I’m stuck</h3>
+              <div className="settings-row">
+                <div>
+                  <label htmlFor="proactive-help">Offer help</label>
+                  <p>
+                    If you stay on the same screen longer than it should take, Yoyo offers to help.
+                    This check reads the screen on your Mac only; nothing is sent.
+                  </p>
+                </div>
+                <input
+                  id="proactive-help"
+                  type="checkbox"
+                  role="switch"
+                  className="switch"
+                  checked={data.settings.proactiveHelp}
+                  onChange={(e) =>
+                    void unwrap(
+                      api.command({ type: 'settings.update', proactiveHelp: e.target.checked }),
+                    ).then(setData)
+                  }
+                />
+              </div>
+            </section>
+            <section className="settings-group">
               <h3>Appearance</h3>
               <div className="settings-row">
                 <div>

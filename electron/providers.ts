@@ -244,7 +244,7 @@ export class Providers {
     current: { title: string; named: boolean; recent: string[] } | null,
     question: string,
     signal: AbortSignal,
-  ): Promise<{ sameTopic: boolean; title: string }> {
+  ): Promise<{ sameTopic: boolean; title: string; buildsOnLast: boolean }> {
     if (!this.config.visionKey) throw new Error('No topic model is configured.');
     const response = await this.request('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -264,13 +264,17 @@ export class Providers {
             schema: {
               type: 'object',
               additionalProperties: false,
-              required: ['sameTopic', 'title'],
-              properties: { sameTopic: { type: 'boolean' }, title: { type: 'string' } },
+              required: ['sameTopic', 'title', 'buildsOnLast'],
+              properties: {
+                sameTopic: { type: 'boolean' },
+                title: { type: 'string' },
+                buildsOnLast: { type: 'boolean' },
+              },
             },
           },
         },
         system:
-          'You file a student\'s question into study chats. sameTopic: true if the new question continues the current chat\'s subject (follow-ups, clarifications, related sub-points and small talk count as the same); false only for a clearly different subject (e.g. glycolysis then the TCA cycle, or biology then vector addition). title: a 1–4 word subject name in Title Case for the chat this question belongs to (no quotes, no "Chat about"). If sameTopic is true and the current title is already a good subject name, return it unchanged.',
+          'You file a student\'s question into study chats. sameTopic: true if the new question continues the current chat\'s subject (follow-ups, clarifications, related sub-points and small talk count as the same); false only for a clearly different subject (e.g. glycolysis then the TCA cycle, or biology then vector addition). title: a 1–4 word subject name in Title Case for the chat this question belongs to (no quotes, no "Chat about"). If sameTopic is true and the current title is already a good subject name, return it unchanged. buildsOnLast: true only if the new question refers to or extends the tutor\'s last answer or drawing (e.g. "why that step?", "what about the second arrow?", "show it again"); false for a new question, small talk such as "can you hear me?", thanks, or a change of subject.',
         messages: [
           {
             role: 'user',
@@ -282,7 +286,11 @@ export class Providers {
     if (!response.ok) throw new Error(`Topic check failed (${response.status}).`);
     const payload = (await response.json()) as { content?: { type: string; text?: string }[] };
     const parsed = z
-      .object({ sameTopic: z.boolean(), title: z.string().trim().min(1).max(80) })
+      .object({
+        sameTopic: z.boolean(),
+        title: z.string().trim().min(1).max(80),
+        buildsOnLast: z.boolean().catch(true),
+      })
       .parse(
         JSON.parse(
           payload.content
@@ -291,7 +299,11 @@ export class Providers {
             .join('') ?? '',
         ),
       );
-    return { sameTopic: parsed.sameTopic, title: parsed.title.replace(/^["']|["']$/g, '') };
+    return {
+      sameTopic: parsed.sameTopic,
+      buildsOnLast: parsed.buildsOnLast,
+      title: parsed.title.replace(/^["']|["']$/g, ''),
+    };
   }
   /**
    * Read one lecture slide ahead of time (fast model): how much teaching it deserves, what it

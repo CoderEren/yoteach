@@ -383,6 +383,7 @@ export class Store {
       case 'settings.update':
         if (cmd.theme) n.settings.theme = cmd.theme;
         if (cmd.talkKey) n.settings.talkKey = cmd.talkKey;
+        if (cmd.proactiveHelp !== undefined) n.settings.proactiveHelp = cmd.proactiveHelp;
         break;
     }
     if (!n.topics.some((t) => t.id === n.settings.lastTopicId)) n.settings.lastTopicId = null;

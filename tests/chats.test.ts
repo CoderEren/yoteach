@@ -35,9 +35,10 @@ function setup() {
         const input = JSON.parse(body.messages[0].content);
         topicCalls.push({ model: body.model, input });
         const tca = /TCA/i.test(input.newQuestion);
+        const buildsOnLast = /that step|the arrow|again/i.test(input.newQuestion);
         const reply = input.currentChat
-          ? { sameTopic: !tca, title: tca ? 'TCA Cycle' : 'Glycolysis' }
-          : { sameTopic: true, title: tca ? 'TCA Cycle' : 'Glycolysis' };
+          ? { sameTopic: !tca, title: tca ? 'TCA Cycle' : 'Glycolysis', buildsOnLast }
+          : { sameTopic: true, title: tca ? 'TCA Cycle' : 'Glycolysis', buildsOnLast };
         return new Response(
           JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reply) }] }),
         );
@@ -193,6 +194,29 @@ test('v6 data migrates to v7: one chat per earlier session, titled, with an exac
     ]);
     assert.ok(data.messages.every((m) => data.chats.some((c) => c.id === m.chatId)));
     assert.equal(readFileSync(f.store.file + '.v6.backup', 'utf8'), bytes);
+  } finally {
+    f.cleanup();
+  }
+});
+
+test('a new question clears the last drawing unless it builds on it', async () => {
+  const f = setup();
+  try {
+    const s = await f.service.start(null, 'voice');
+    const sketch = {
+      name: 'sketch_on_screen' as const,
+      title: 'Investment',
+      elements: [{ type: 'arrow', from: [10, 10], to: [50, 10] }],
+    };
+    f.service.transcript(s.id, 'user', 'Why does glycolysis invest ATP?', 'u1');
+    await f.service.filed();
+    await f.service.tool(s.id, sketch as never);
+    f.service.transcript(s.id, 'user', 'Why is that step needed?', 'u2');
+    await f.service.filed();
+    assert.ok(f.service.state.drawing?.sketch, 'a follow-up on the drawing keeps it');
+    f.service.transcript(s.id, 'user', 'Can you hear me?', 'u3');
+    await f.service.filed();
+    assert.equal(f.service.state.drawing, null, 'small talk clears it');
   } finally {
     f.cleanup();
   }

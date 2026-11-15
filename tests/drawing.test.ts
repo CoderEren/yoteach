@@ -176,7 +176,7 @@ test('drawing attaches only to grounded regions and follows the screen it was ca
         connections: [],
         clear: true,
       }),
-      /Never invent regions/,
+      /Could not find .* on screen/,
     );
     const drawn = (await f.service.tool(
       s.id,

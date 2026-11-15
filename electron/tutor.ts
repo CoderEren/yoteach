@@ -15,7 +15,7 @@ import { Providers, type SlidePrep, type VisionAnswer } from './providers';
 import { FalClient } from './fal';
 import { GenerateRequestSchema, type GenerateRequest } from '../shared/media';
 import type { ScreenDrawing } from '../shared/drawing';
-import { anchor } from '../shared/grounding';
+import { anchor, wordsOf } from '../shared/grounding';
 import {
   AnswerSchema,
   QuestionId,
@@ -587,6 +587,8 @@ export class TutorService {
       chat = data.chats.find((c) => c.id === chatId);
     if (!chat || chat.kind !== 'chat') return;
     const earlier = data.messages.filter((m) => m.chatId === chat.id && m.id !== messageId);
+    // The drawing on screen when the question arrived; a newer one is the answer's, keep it.
+    const shownRevision = this.state.drawing?.revision ?? null;
     try {
       const verdict = await this.providers.topic(
         earlier.length
@@ -600,10 +602,22 @@ export class TutorService {
         AbortSignal.timeout(15000),
       );
       if (this.state.sessionId !== sessionId) return;
+      // A new question clears the last explanation's drawings unless it builds on them.
+      if (
+        !verdict.buildsOnLast &&
+        this.state.drawing &&
+        this.state.drawing.revision === shownRevision
+      ) {
+        this.state.drawing = null;
+        this.state.focusRegion = null;
+      }
       if (!earlier.length || verdict.sameTopic) {
         if (!chat.named || chat.title !== verdict.title)
           this.store.renameChat(chat.id, verdict.title);
       } else {
+        // A new subject: clear the previous explanation's drawings off the screen.
+        this.state.drawing = null;
+        this.state.focusRegion = null;
         const next = this.store.createChat('chat', verdict.title, sessionId);
         this.store.renameChat(next.id, verdict.title);
         const after = this.store
@@ -791,39 +805,63 @@ export class TutorService {
           );
         if (!tool.marks.length && !tool.connections.length)
           throw new Error('Give at least one mark or connection.');
-        const region = (id: string) => {
-          const found = this.state.annotations.find((a) => a.id === id);
-          if (!found)
-            throw new Error(
-              'Use regionIds returned by the latest analyze_current_screen. Never invent regions.',
-            );
-          return found;
+        // Each target is a regionId or a quote of the words; quotes are found on this screen or
+        // slide. Unresolvable targets are reported back instead of failing the whole drawing.
+        const missed: string[] = [];
+        const resolve = (ref: string) => {
+          const known = this.state.annotations.find((a) => a.id === ref);
+          if (known) return known;
+          const found = anchor(ref, null, wordsOf(snapshot), snapshot.textBoxes);
+          if (!found) {
+            missed.push(ref);
+            return null;
+          }
+          const made: Annotation = {
+            id: randomUUID(),
+            snapshotId: snapshot.id,
+            shape: 'highlight',
+            box: found.box,
+            label: ref.slice(0, 100),
+            evidence: ref.slice(0, 500),
+            precision: snapshot.source.kind === 'pdf' ? 'pdf-text' : 'screen-text',
+            ...(found.parts.length > 1 ? { parts: found.parts.slice(0, 4) } : {}),
+          };
+          this.state.annotations = [...this.state.annotations, made].slice(-60);
+          return made;
         };
+        const marks = tool.marks.flatMap((m) => {
+          const r = resolve(m.regionId ?? m.quote!);
+          return r
+            ? [
+                {
+                  id: randomUUID(),
+                  regionId: r.id,
+                  shape: m.shape,
+                  label: m.label ?? null,
+                  box: r.box,
+                  parts: r.parts,
+                },
+              ]
+            : [];
+        });
+        const connections = tool.connections.flatMap((c) => {
+          const a = resolve(c.from),
+            b = resolve(c.to);
+          return a && b
+            ? [{ id: randomUUID(), from: a.box, to: b.box, label: c.label ?? null }]
+            : [];
+        });
+        if (!marks.length && !connections.length)
+          throw new Error(
+            `Could not find ${missed.map((m) => `"${m}"`).join(', ')} on screen. Quote a few exact words that are visible, or sketch it instead, and keep talking.`,
+          );
         const previous =
           !tool.clear && this.state.drawing?.snapshotId === snapshot.id ? this.state.drawing : null;
         const drawing: ScreenDrawing = {
           id: randomUUID(),
           snapshotId: snapshot.id,
-          marks: [
-            ...(previous?.marks ?? []),
-            ...tool.marks.map((m) => ({
-              id: randomUUID(),
-              regionId: m.regionId,
-              shape: m.shape,
-              label: m.label ?? null,
-              box: region(m.regionId).box,
-              parts: region(m.regionId).parts,
-            })),
-          ],
-          connections: [
-            ...(previous?.connections ?? []),
-            ...tool.connections.map((c) => ({
-              id: randomUUID(),
-              from: region(c.from).box,
-              to: region(c.to).box,
-              label: c.label ?? null,
-            })),
-          ],
+          marks: [...(previous?.marks ?? []), ...marks],
+          connections: [...(previous?.connections ?? []), ...connections],
           diagram: this.state.drawing?.diagram ?? null,
           sketch: this.state.drawing?.sketch ?? null,
           revision: (this.state.drawing?.revision ?? 0) + 1,
@@ -835,8 +873,7 @@ export class TutorService {
             snapshot.source.page,
             drawing.marks.map((m) => ({ shape: m.shape, label: m.label, box: m.box })),
           );
-        const first = tool.marks[0]?.regionId ?? tool.connections[0]?.to;
-        this.state.focusRegion = first;
+        this.state.focusRegion = marks[0]?.regionId ?? null;
         this.state.focusRevision++;
         this.state.activity = 'pointing';
         this.emit();
@@ -844,7 +881,9 @@ export class TutorService {
           drawn: drawing.marks.length + drawing.connections.length,
           where:
             snapshot.source.kind === 'pdf' ? 'on the lecture slide' : 'on the student’s screen',
-          note: 'Drawn with a short animation. Refer to it naturally while you explain.',
+          note: missed.length
+            ? `Drawn, except ${missed.map((m) => `"${m}"`).join(', ')} which is not visible as written.`
+            : 'Drawn with a short animation. Refer to it naturally while you explain.',
         };
       }
       case 'sketch_diagram': {
@@ -990,6 +1029,9 @@ export class TutorService {
           throw new Error('The current slide is still being prepared.');
         this.store.setSlide(sessionId, tool.page);
         this.stopSharing(false);
+        // A new slide starts with a clean screen: last slide's marks and sketches go.
+        this.state.drawing = null;
+        this.state.focusRegion = null;
         lecture.page = tool.page;
         this.state.lecturePreparing = true;
         this.emit();

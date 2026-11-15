@@ -59,6 +59,8 @@ export const SettingsSchema = z.object({
   mascotPosition: z.object({ x: z.number().int(), y: z.number().int() }).nullable(),
   lastTopicId: Id.nullable(),
   talkKey: z.enum(['control', 'fn', 'right-control', 'right-option', 'f8']).default('control'),
+  /** Offer help when the student seems stuck on one screen (checked on-device only). */
+  proactiveHelp: z.boolean().default(true),
 });
 export const ActivitySchema = z.object({
   id: Id,
@@ -116,6 +118,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     type: z.literal('settings.update'),
     theme: SettingsSchema.shape.theme.optional(),
     talkKey: SettingsSchema.shape.talkKey.optional(),
+    proactiveHelp: z.boolean().optional(),
   }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
@@ -182,5 +185,6 @@ export const freshState = (): AppState => ({
     mascotPosition: null,
     lastTopicId: null,
     talkKey: 'control',
+    proactiveHelp: true,
   },
 });

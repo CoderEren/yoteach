@@ -89,7 +89,7 @@ test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion
         .find((w) => w.webContents.getURL().includes('/companion'))!
         .getBounds(),
     );
-    expect([bounds.width, bounds.height]).toEqual([200, 220]);
+    expect([bounds.width, bounds.height]).toEqual([150, 165]); // the smaller Yoyo
     await expect(pet.getByRole('button')).toHaveCount(1);
     await expect(pet.locator('.drag-grip, .yoyo-caption, .companion-panel')).toHaveCount(0);
     await pet.evaluate(async () => {

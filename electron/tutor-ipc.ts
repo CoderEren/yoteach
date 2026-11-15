@@ -20,6 +20,7 @@ import { FalClient } from './fal';
 import { TutorService } from './tutor';
 import type { Store } from './store';
 import { macStudyWindows } from './window-sources';
+import { StuckWatch } from '../shared/stuck';
 type Handle = (name: string, fn: (input: any) => unknown, workspaceOnly?: boolean) => void;
 export function installTutor(
   store: Store,
@@ -181,6 +182,7 @@ export function installTutor(
       service.emit();
     }
     if (action.type === 'hold-start') {
+      stuck.reset();
       if (holdActive || service.state.input === 'sending') return;
       holdActive = true;
       captureDisplay = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -497,6 +499,50 @@ export function installTutor(
     },
     true,
   );
+  // Proactive help: notice a long stay on one screen. Runs only on-device text recognition on
+  // the display under the pointer; the image and text never leave this Mac.
+  const stuck = new StuckWatch();
+  const watch = setInterval(async () => {
+    try {
+      const s = store.snapshot().settings,
+        r = service.state;
+      const busy =
+        holdActive ||
+        r.lecture ||
+        r.input !== 'idle' ||
+        ['listening', 'thinking', 'speaking', 'pointing'].includes(r.activity) ||
+        main()?.isFocused();
+      if (!s.proactiveHelp || !s.mascotVisible || busy) return stuck.reset();
+      // Away from the keyboard is not stuck.
+      if (powerMonitor.getSystemIdleTime() > 45) return stuck.reset();
+      const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+      const image = await runCapture(display);
+      const words: string[] = (image.words ?? []).map((w: { text: string }) => w.text);
+      if (!stuck.observe(words, Date.now())) return;
+      const key = {
+        control: 'Control',
+        'right-control': 'Right Control',
+        fn: 'Fn',
+        'right-option': 'Right Option',
+        f8: 'F8',
+      }[s.talkKey];
+      service.state.notice = `Stuck on this one? Hold ${key} and ask me.`;
+      service.emit();
+      setTimeout(() => {
+        if (service.state.notice?.startsWith('Stuck')) {
+          service.state.notice = null;
+          service.emit();
+        }
+      }, 9000);
+      // With a conversation already open, Yoyo offers help out loud too (no screen data sent).
+      if (service.state.sessionId && service.state.status === 'connected')
+        main()?.webContents.send('tutor:intent', { type: 'nudge' });
+    } catch {
+      /* No Screen Recording permission or capture failed: stay quiet. */
+    }
+  }, 30_000);
+  watch.unref?.();
+  app.on('before-quit', () => clearInterval(watch));
   powerMonitor.on('lock-screen', stopSession);
   powerMonitor.on('suspend', stopSession);
   return { service, stopSession, stopSharing, intent };

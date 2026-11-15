@@ -228,6 +228,7 @@ export const IntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('practice-open'), question: QuestionId.optional() }),
   z.object({ type: z.literal('practice-close') }),
   z.object({ type: z.literal('screen-clear') }),
+  z.object({ type: z.literal('nudge') }),
   z.object({ type: z.literal('inform'), text: z.string().min(1).max(6000) }),
   z.object({ type: z.literal('hold-start') }),
   z.object({ type: z.literal('hold-end') }),

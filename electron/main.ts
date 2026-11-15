@@ -21,6 +21,7 @@ import { Id, ImportSchema } from '../shared/model';
 import { Store } from './store';
 import { installTutor } from './tutor-ipc';
 import { installDesktop } from './desktop';
+import { PET } from '../shared/desktop-geometry';
 let desktop: ReturnType<typeof installDesktop> | undefined;
 let overlay: BrowserWindow | null = null;
 let tutoring: ReturnType<typeof installTutor> | undefined;
@@ -118,8 +119,7 @@ function showCompanion(show: boolean) {
     if (process.platform === 'darwin' && companion.isSimpleFullScreen())
       companion.setSimpleFullScreen(false);
     if (companion.isMaximized()) companion.unmaximize();
-    const width = 200,
-      height = 220;
+    const { width, height } = PET;
     const current = companion.getBounds();
     const saved = store.snapshot().settings.mascotPosition;
     const x = current.width === width ? current.x : (saved?.x ?? current.x) + 200 - width;
@@ -135,15 +135,15 @@ function createCompanion() {
   const area = screen.getPrimaryDisplay().workArea;
   const saved = store.snapshot().settings.mascotPosition;
   const position = clampPosition(
-    saved?.x ?? area.x + area.width - 240,
-    saved?.y ?? area.y + area.height - 260,
-    200,
-    220,
+    saved?.x ?? area.x + area.width - PET.width - 40,
+    saved?.y ?? area.y + area.height - PET.height - 40,
+    PET.width,
+    PET.height,
   );
   companion = new BrowserWindow({
     ...position,
-    width: 200,
-    height: 220,
+    width: PET.width,
+    height: PET.height,
     frame: false,
     type: 'panel',
     focusable: false,

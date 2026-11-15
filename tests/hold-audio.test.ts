@@ -48,3 +48,26 @@ test('silent or noise-only holds are not speech; a spoken burst is', () => {
   assert.equal(hasSpeech([], rate), false);
   assert.equal(hasSpeech([tone(1.5, 0.5)], rate), true, 'speaking from the first moment');
 });
+import { StuckWatch, sameScreen, stuckAfterMs } from '../shared/stuck';
+test('stuck detection: a short screen held too long earns one offer; changes and long texts do not', () => {
+  const short = 'Find the derivative of x squared plus three x'.split(' ');
+  const w = new StuckWatch();
+  assert.equal(w.observe(short, 0), false);
+  assert.equal(w.observe(short, 60_000), false);
+  assert.equal(
+    w.observe([...short, '12:01'], stuckAfterMs(short.length) + 1),
+    true,
+    'clock change is still the same screen',
+  );
+  assert.equal(
+    w.observe(short, stuckAfterMs(short.length) + 60_000),
+    false,
+    'only once per screen',
+  );
+  assert.equal(w.observe('A completely different page about vectors'.split(' '), 400_000), false);
+  assert.ok(stuckAfterMs(600) > stuckAfterMs(10), 'longer reading allows longer dwell');
+  assert.ok(
+    sameScreen(['a', 'b', 'c', 'd', 'e', 'f', 'g'], ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']),
+  );
+  assert.ok(!sameScreen(['a', 'b'], ['c', 'd']));
+});
