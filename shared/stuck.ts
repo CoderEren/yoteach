@@ -14,22 +14,30 @@ export function sameScreen(a: string[], b: string[]) {
   return both / Math.max(A.size, B.size, 1) >= 0.85;
 }
 /** Tracks dwell on one screen and says when to offer help, once per screen. */
+/** Below this many recognised words (a full-screen video or photo) there is nothing to be stuck on. */
+export const MIN_WORDS = 5;
 export class StuckWatch {
+  constructor(private after: (wordCount: number) => number = stuckAfterMs) {}
   private words: string[] = [];
   private since: number | null = null;
   private offered = false;
-  observe(words: string[], now: number): boolean {
+  /** `canOffer: false` keeps tracking the screen without using up the one offer. */
+  observe(words: string[], now: number, canOffer = true): boolean {
     const normal = words
       .map((w) => w.toLowerCase())
       .filter((w) => /\p{L}/u.test(w))
       .slice(0, 600);
+    if (normal.length < MIN_WORDS) {
+      this.reset();
+      return false;
+    }
     if (this.since === null || !sameScreen(this.words, normal)) {
       this.words = normal;
       this.since = now;
       this.offered = false;
       return false;
     }
-    if (this.offered || now - this.since < stuckAfterMs(normal.length)) return false;
+    if (!canOffer || this.offered || now - this.since < this.after(normal.length)) return false;
     this.offered = true;
     return true;
   }

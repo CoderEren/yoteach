@@ -152,6 +152,22 @@ From the user's 15 Nov report: questions (matrix in a coordinate system, cholest
 - Fixes: Yoyo clipped on the right (container 150×165); a sketch title replaced mid-animation
   froze half-faded (`fromTo` with explicit end values); ink beading.
 
+## Chunk 11 — circling pictures, drawing in every subject, proactive help fixes
+
+- Circling or pointing now works on pictures and figures, not only words: the circled spot is
+  cropped (`nativeImage`, 1.6× padding) and the quick model says what it shows
+  (`Providers.describeSpot`, ~2.5 s). The trail streams to the service every ~400 ms during the
+  hold, so this usually finishes before release; the screen map's `pointer.seen` carries it.
+  Loop detection is more forgiving (≥1.3π turn, closes within half its size).
+- Drawing guidance is subject-neutral (history maps, economics curves, networks, physics, maths,
+  geography, language…); fal images for any subject. Checked headlessly: supply and demand,
+  Hastings battlefield, how a webpage loads, circled receptors.
+- Proactive help: idle time only counts as away after 5 minutes (staring at a hard slide is being
+  stuck; no offer while idle over 3 minutes, without using it up); screens with fewer than 5
+  recognised words (full-screen video, photos) never trigger. Test hooks
+  `YOTEACH_STUCK_TICK_MS`, `YOTEACH_STUCK_AFTER_MS`, `YOTEACH_STUCK_IGNORE_IDLE`; new e2e proves
+  the offer appears and no network request is made.
+
 ## Remaining
 
 - Live spoken practice through the hosted agent (the tools are synced; not exercised with a microphone).

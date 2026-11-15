@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   desktopCapturer,
+  nativeImage,
   powerMonitor,
   session,
   systemPreferences,
@@ -53,6 +54,33 @@ export function installTutor(
     videoModel: process.env.FAL_VIDEO_MODEL ?? '',
   });
   const service = new TutorService(store, providers, emit, open, fal);
+  // A zoomed crop around what the student circled, with some surroundings for context.
+  service.cropImage = (dataUrl, box) => {
+    const img = nativeImage.createFromDataURL(dataUrl);
+    const { width, height } = img.getSize();
+    if (!width || !height) return null;
+    const w = Math.min(1, Math.max(box.width * 1.6, 0.14)),
+      h = Math.min(1, Math.max(box.height * 1.6, 0.14));
+    const x = Math.min(1 - w, Math.max(0, box.x + box.width / 2 - w / 2)),
+      y = Math.min(1 - h, Math.max(0, box.y + box.height / 2 - h / 2));
+    const rect = {
+      x: Math.round(x * width),
+      y: Math.round(y * height),
+      width: Math.max(1, Math.round(w * width)),
+      height: Math.max(1, Math.round(h * height)),
+    };
+    let crop = img.crop(rect);
+    if (rect.width > 1000) crop = crop.resize({ width: 1000, quality: 'good' });
+    return {
+      image: 'data:image/jpeg;base64,' + crop.toJPEG(85).toString('base64'),
+      spot: {
+        x: (box.x - x) / w,
+        y: (box.y - y) / h,
+        width: box.width / w,
+        height: box.height / h,
+      },
+    };
+  };
   let selected: { id: string; epoch: number } | null = null;
   let displayGrant = false;
   let holdActive = false;
@@ -501,7 +529,11 @@ export function installTutor(
   );
   // Proactive help: notice a long stay on one screen. Runs only on-device text recognition on
   // the display under the pointer; the image and text never leave this Mac.
-  const stuck = new StuckWatch();
+  // Test hooks (never set in normal use): shorter tick and threshold, and ignoring idle time.
+  const tickMs = Number(process.env.YOTEACH_STUCK_TICK_MS) || 30_000,
+    fixedAfter = Number(process.env.YOTEACH_STUCK_AFTER_MS) || 0,
+    ignoreIdle = process.env.YOTEACH_STUCK_IGNORE_IDLE === '1';
+  const stuck = new StuckWatch(fixedAfter ? () => fixedAfter : undefined);
   const watch = setInterval(async () => {
     try {
       const s = store.snapshot().settings,
@@ -513,12 +545,14 @@ export function installTutor(
         ['listening', 'thinking', 'speaking', 'pointing'].includes(r.activity) ||
         main()?.isFocused();
       if (!s.proactiveHelp || !s.mascotVisible || busy) return stuck.reset();
-      // Away from the keyboard is not stuck.
-      if (powerMonitor.getSystemIdleTime() > 45) return stuck.reset();
+      // Staring at a hard slide without touching anything is exactly being stuck, so idle time
+      // only counts as "away" after five minutes; and nobody is nudged after three idle minutes.
+      const idle = ignoreIdle ? 0 : powerMonitor.getSystemIdleTime();
+      if (idle > 300) return stuck.reset();
       const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
       const image = await runCapture(display);
       const words: string[] = (image.words ?? []).map((w: { text: string }) => w.text);
-      if (!stuck.observe(words, Date.now())) return;
+      if (!stuck.observe(words, Date.now(), idle <= 180)) return;
       const key = {
         control: 'Control',
         'right-control': 'Right Control',
@@ -540,7 +574,7 @@ export function installTutor(
     } catch {
       /* No Screen Recording permission or capture failed: stay quiet. */
     }
-  }, 30_000);
+  }, tickMs);
   watch.unref?.();
   app.on('before-quit', () => clearInterval(watch));
   powerMonitor.on('lock-screen', stopSession);

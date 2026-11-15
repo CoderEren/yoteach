@@ -41,7 +41,7 @@ function quoteOf(words: Word[]) {
 }
 
 /**
- * The loop with the most travel that turns at least ~1.6π and closes back on itself. Lets the
+ * The loop with the most travel that turns at least ~1.3π and (nearly) closes back on itself. Lets the
  * student wander to the spot first and wander off after; only the loop counts.
  */
 function findLoop(p: TrailPoint[], aspect: number) {
@@ -74,8 +74,9 @@ function findLoop(p: TrailPoint[], aspect: number) {
         h = y1 - y0;
       const size = Math.max(w, h);
       if (Math.min(w, h) < 0.012) continue; // a line, not a loop
-      const closes = dist(p[i], p[j], aspect) <= Math.max(0.02, size * 0.35);
-      if (closes && Math.abs(turn) >= 1.6 * Math.PI && (!best || travel > best.travel))
+      // Hand-drawn loops rarely close exactly or turn a full circle.
+      const closes = dist(p[i], p[j], aspect) <= Math.max(0.03, size * 0.5);
+      if (closes && Math.abs(turn) >= 1.3 * Math.PI && (!best || travel > best.travel))
         best = { i, j, travel };
     }
   }

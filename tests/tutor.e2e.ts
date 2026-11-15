@@ -9,9 +9,10 @@ import {
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-async function launch(dir: string) {
+async function launch(dir: string, extra: Record<string, string> = {}) {
   const env = {
     ...process.env,
+    ...extra,
     YOTEACH_DATA_DIR: dir,
     ELEVENLABS_API_KEY: 'test-only-key',
     ELEVENLABS_AGENT_ID: 'test-only-agent',
@@ -79,6 +80,11 @@ async function fixtures(app: ElectronApplication, page: Page) {
             image: 'data:image/jpeg;base64,/9j/',
             width: 1200,
             height: 800,
+            words: ((globalThis as any).__captureWords ?? []).map((text: string, i: number) => ({
+              text,
+              line: 0,
+              box: { x: 0.05 + i * 0.06, y: 0.3, width: 0.05, height: 0.03 },
+            })),
           }),
           stderr: '',
         };
@@ -406,6 +412,55 @@ test('held microphone streams only while held, captures screen, cancels drag and
       await Promise.all((window as any).__testContexts.map((c: AudioContext) => c.close()));
     });
     expect(errors).toEqual([]);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('proactive help: a screen held too long gets one on-device "Stuck?" offer', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-stuck-'));
+  let app: ElectronApplication | undefined;
+  try {
+    // Shortened timings; the real ones are a 30 s check and 75 s or more on one screen.
+    const boot = await launch(dir, {
+      YOTEACH_STUCK_TICK_MS: '300',
+      YOTEACH_STUCK_AFTER_MS: '1500',
+      YOTEACH_STUCK_IGNORE_IDLE: '1',
+    });
+    app = boot.app;
+    await fixtures(app, boot.page);
+    await app.evaluate(({ BrowserWindow }) => {
+      (globalThis as any).__requests = [];
+      const original = globalThis.fetch;
+      globalThis.fetch = async (...args) => {
+        (globalThis as any).__requests.push(String(args[0]));
+        return original(...args);
+      };
+      // Yoteach itself in front means the student is using the app, not stuck on something.
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().endsWith('#/'))!
+        .hide();
+    });
+    const pet = app.windows().find((w) => w.url().includes('/companion'))!;
+    // A full-screen video (no text) is never "stuck".
+    await pet.waitForTimeout(2500);
+    await expect(pet.locator('.companion-notice')).toHaveCount(0);
+    // A short problem that stays put earns the offer.
+    await app.evaluate(() => {
+      (globalThis as any).__captureWords = 'Find the derivative of x squared plus three x'.split(
+        ' ',
+      );
+    });
+    await expect(pet.locator('.companion-notice')).toHaveText(
+      /Stuck on this one\? Hold .+ and ask me\./,
+      {
+        timeout: 6000,
+      },
+    );
+    // Only screenshots and on-device text recognition ran: nothing went over the network.
+    expect(await app.evaluate(() => (globalThis as any).__requests)).toEqual([]);
+    expect(await app.evaluate(() => (globalThis as any).__captures)).toBeGreaterThan(5);
   } finally {
     await app?.close();
     rmSync(dir, { recursive: true, force: true });

@@ -48,7 +48,7 @@ test('silent or noise-only holds are not speech; a spoken burst is', () => {
   assert.equal(hasSpeech([], rate), false);
   assert.equal(hasSpeech([tone(1.5, 0.5)], rate), true, 'speaking from the first moment');
 });
-import { StuckWatch, sameScreen, stuckAfterMs } from '../shared/stuck';
+import { StuckWatch, sameScreen, stuckAfterMs, MIN_WORDS } from '../shared/stuck';
 test('stuck detection: a short screen held too long earns one offer; changes and long texts do not', () => {
   const short = 'Find the derivative of x squared plus three x'.split(' ');
   const w = new StuckWatch();
@@ -70,4 +70,18 @@ test('stuck detection: a short screen held too long earns one offer; changes and
     sameScreen(['a', 'b', 'c', 'd', 'e', 'f', 'g'], ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']),
   );
   assert.ok(!sameScreen(['a', 'b'], ['c', 'd']));
+});
+
+test('stuck detection ignores wordless screens and waits while the student is idle', () => {
+  const w = new StuckWatch();
+  // A video or photo: nothing to read, nothing to be stuck on.
+  assert.equal(w.observe([], 0), false);
+  assert.equal(w.observe(['play'], 10 * 60_000), false);
+  const page = Array.from({ length: MIN_WORDS + 20 }, (_, i) => `word${i}`);
+  const due = stuckAfterMs(page.length);
+  assert.equal(w.observe(page, 0), false);
+  // Idle at the moment it becomes due: no offer, and the offer is not used up.
+  assert.equal(w.observe(page, due + 1, false), false);
+  assert.equal(w.observe(page, due + 30_000), true);
+  assert.equal(w.observe(page, due + 60_000), false, 'offered once per screen');
 });

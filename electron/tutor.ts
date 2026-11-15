@@ -146,8 +146,24 @@ export class TutorService {
     startedAt: number;
     points: TrailPoint[];
     aspect: number;
-    read: { snapshotId: string; kind: 'circle' | 'point'; quote: string; regionId: string } | null;
+    read: {
+      snapshotId: string;
+      kind: 'circle' | 'point';
+      quote: string;
+      regionId: string;
+      /** What the spot shows, from a quick look at a crop of it (pictures included). */
+      seen: Promise<string>;
+      box: { x: number; y: number; width: number; height: number };
+      /** Trail length when last read, so unchanged trails are not re-read. */
+      length: number;
+      ctl: AbortController;
+    } | null;
   } | null = null;
+  /** Zoomed JPEG crop of a screenshot around a box (set by the Electron side). */
+  cropImage?: (
+    image: string,
+    box: { x: number; y: number; width: number; height: number },
+  ) => { image: string; spot: { x: number; y: number; width: number; height: number } } | null;
   private inventory?: {
     snapshotId: string;
     done: Promise<void>;
@@ -465,35 +481,80 @@ export class TutorService {
     })();
     this.inventory = entry;
   }
-  /** The cursor path of a held question (display-normalised), read once its screen is in. */
+  /**
+   * The cursor path of a held question (display-normalised). Arrives in pieces while the key is
+   * held, so what was circled is usually understood before the student lets go.
+   */
   setTrail(trail: { startedAt: number; points: TrailPoint[]; aspect: number } | null) {
-    this.trail = trail && { ...trail, read: null };
+    if (trail && this.trail?.startedAt === trail.startedAt) {
+      this.trail.points = trail.points;
+    } else {
+      this.trail?.read?.ctl.abort();
+      this.trail = trail && { ...trail, read: null };
+    }
     this.readTrail();
   }
   /** A circle or point on the captured screen becomes a region the tutor can draw on. */
   private readTrail() {
     const trail = this.trail,
       snapshot = this.state.snapshot;
-    if (!trail || trail.read || !snapshot || snapshot.source.kind !== 'screen') return;
+    if (!trail || !snapshot || snapshot.source.kind !== 'screen') return;
     // Only the screen captured for this hold, never an older one.
     if (Date.parse(snapshot.capturedAt) < trail.startedAt) return;
+    const prev = trail.read?.snapshotId === snapshot.id ? trail.read : null;
+    if (prev && prev.length === trail.points.length) return;
     const gesture = readGesture(trail.points, wordsOf(snapshot), trail.aspect);
-    if (!gesture) return;
+    if (!gesture) return; // keep what was already understood
+    const close = (a: number, b: number) => Math.abs(a - b) < 0.015;
+    if (
+      prev &&
+      prev.kind === gesture.kind &&
+      close(prev.box.x, gesture.box.x) &&
+      close(prev.box.y, gesture.box.y) &&
+      close(prev.box.width, gesture.box.width) &&
+      close(prev.box.height, gesture.box.height)
+    ) {
+      prev.length = trail.points.length;
+      return;
+    }
+    if (prev) {
+      prev.ctl.abort();
+      this.state.annotations = this.state.annotations.filter((a) => a.id !== prev.regionId);
+    }
     const region = {
       id: randomUUID(),
       snapshotId: snapshot.id,
       shape: gesture.kind === 'circle' ? ('circle' as const) : ('point' as const),
       box: gesture.box,
       label: gesture.kind === 'circle' ? 'circled by the student' : 'pointed at by the student',
-      evidence: gesture.quote.slice(0, 500),
+      evidence: (gesture.quote || 'the spot the student marked').slice(0, 500),
       precision: 'screen-text' as const,
     };
     this.state.annotations = [...this.state.annotations, region].slice(-40);
+    // Look at the spot itself, so pictures and figures count, not only words.
+    const ctl = new AbortController();
+    const look = (async () => {
+      if (!this.providers.config.visionKey) return '';
+      const zoom = this.cropImage?.(snapshot.image, gesture.box) ?? {
+        image: snapshot.image,
+        spot: gesture.box,
+      };
+      return this.providers
+        .describeSpot(
+          { ...zoom, kind: gesture.kind, text: gesture.quote },
+          AbortSignal.any([ctl.signal, AbortSignal.timeout(8000)]),
+        )
+        .catch(() => '');
+    })();
     trail.read = {
       snapshotId: snapshot.id,
       kind: gesture.kind,
       quote: gesture.quote,
       regionId: region.id,
+      box: gesture.box,
+      length: trail.points.length,
+      ctl,
+      seen: look,
     };
   }
   /** What the tutor needs to answer and draw at once: summary plus grounded region IDs. */
@@ -502,16 +563,15 @@ export class TutorService {
       snapshot = this.state.snapshot;
     if (!snapshot) return null;
     this.readTrail();
-    const pointer =
-      this.trail?.read && this.trail.read.snapshotId === snapshot.id
-        ? {
-            kind: this.trail.read.kind,
-            quote: this.trail.read.quote,
-            regionId: this.trail.read.regionId,
-          }
-        : null;
-    if (entry && entry.snapshotId === snapshot.id)
-      await Promise.race([entry.done, new Promise((r) => setTimeout(r, timeoutMs))]);
+    const read = this.trail?.read?.snapshotId === snapshot.id ? this.trail.read : null;
+    const deadline = new Promise<void>((r) => setTimeout(r, timeoutMs));
+    const [, seen] = await Promise.all([
+      entry && entry.snapshotId === snapshot.id ? Promise.race([entry.done, deadline]) : null,
+      read ? Promise.race([read.seen, deadline.then(() => '')]) : '',
+    ]);
+    const pointer = read
+      ? { kind: read.kind, quote: read.quote, regionId: read.regionId, seen: seen ?? '' }
+      : null;
     if (this.state.snapshot?.id !== snapshot.id) return null;
     const summary = entry?.snapshotId === snapshot.id ? entry.summary : null;
     if (!summary && !pointer) return null;
