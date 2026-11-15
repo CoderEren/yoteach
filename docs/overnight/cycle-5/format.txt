@@ -1,0 +1,6 @@
+
+> yoteach@0.1.0 format:check
+> prettier --check src electron shared scripts tests *.ts
+
+Checking formatting...
+All matched files use Prettier code style!

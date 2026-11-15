@@ -186,6 +186,86 @@ test('Chats and Lectures, minimal lecture setup, saved PDFs, draggable companion
   }
 });
 
+test('Yoyo visibility is keyboard-operable in Settings and persists both ways', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'yoteach-visibility-'));
+  let app: ElectronApplication | undefined;
+  try {
+    let boot = await launch(dir);
+    app = boot.app;
+    let page = boot.page;
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    const visible = page.getByRole('switch', { name: 'Show Yoyo', exact: true });
+    await expect(visible).toBeChecked();
+    const selector =
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]';
+    const count = await dialog.locator(selector).count();
+    const visited = new Set<number>();
+    for (let i = 0; i < count; i++) {
+      await page.keyboard.press('Tab');
+      visited.add(
+        await dialog.evaluate(
+          (el, selector) =>
+            Array.from(el.querySelectorAll(selector)).indexOf(document.activeElement!),
+          selector,
+        ),
+      );
+    }
+    expect([...visited].sort((a, b) => a - b)).toEqual(Array.from({ length: count }, (_, i) => i));
+    await expect(page.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.locator(selector).last()).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Close dialog' })).toBeFocused();
+    await visible.focus();
+    await page.keyboard.press('Space');
+    await expect(visible).not.toBeChecked();
+    await expect
+      .poll(() =>
+        app!.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('/companion'))!
+            .isVisible(),
+        ),
+      )
+      .toBe(false);
+    await page.screenshot({ path: 'docs/overnight/cycle-5/after.png', animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(page.locator('.sidebar-companion')).toContainText('Yoyo is hidden.');
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeFocused();
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    page = boot.page;
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const restored = page.getByRole('switch', { name: 'Show Yoyo', exact: true });
+    await expect(restored).not.toBeChecked();
+    await restored.focus();
+    await page.keyboard.press('Space');
+    await expect(restored).toBeChecked();
+    await expect
+      .poll(() =>
+        app!.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().includes('/companion'))!
+            .isVisible(),
+        ),
+      )
+      .toBe(true);
+    await app.close();
+    app = undefined;
+    boot = await launch(dir);
+    app = boot.app;
+    const state = await boot.page.evaluate(() => window.yoteach.getState());
+    expect(state.ok && state.value.settings.mascotVisible).toBe(true);
+  } finally {
+    await app?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('packaged Yoteach starts with its own identity and isolated data', async () => {
   test.skip(
     !existsSync('release/Yoteach.app/Contents/MacOS/Yoteach'),

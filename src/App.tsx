@@ -157,7 +157,7 @@ export default function App() {
             <div className="mini-yoyo">
               <Yoyo />
             </div>
-            <strong>Yoyo is here.</strong>
+            <strong>{data.settings.mascotVisible ? 'Yoyo is here.' : 'Yoyo is hidden.'}</strong>
             <button
               className="icon-button"
               aria-label="Show Yoyo"
@@ -273,6 +273,27 @@ export default function App() {
             </section>
             <section className="settings-group">
               <h3>Appearance</h3>
+              <div className="settings-row">
+                <div>
+                  <label htmlFor="show-yoyo">Show Yoyo</label>
+                  <p>
+                    Keep Yoyo visible on your desktop. Chats and Lectures stay available when
+                    hidden.
+                  </p>
+                </div>
+                <input
+                  id="show-yoyo"
+                  type="checkbox"
+                  role="switch"
+                  className="switch"
+                  checked={data.settings.mascotVisible}
+                  onChange={(e) =>
+                    void unwrap(api.companion(e.target.checked ? 'show' : 'hide')).catch((e) =>
+                      setError(e.message),
+                    )
+                  }
+                />
+              </div>
               <div className="settings-row">
                 <div>
                   <span className="settings-label">Theme</span>
